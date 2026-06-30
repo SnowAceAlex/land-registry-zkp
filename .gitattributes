@@ -1,0 +1,11 @@
+# Normalize line endings
+* text=auto eol=lf
+
+# Binary files
+*.ico binary
+*.png binary
+*.jpg binary
+*.svg text eol=lf
+*.wasm binary
+*.ptau binary
+*.zkey binary

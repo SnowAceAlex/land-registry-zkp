@@ -1,0 +1,17 @@
+{
+  "name": "land-registry-zkp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Monorepo: Blockchain-based Land Use Rights management with Merkle tree + ZKP (Groth16)",
+  "scripts": {
+    "dev:backend": "pnpm --filter backend run start:dev",
+    "dev:frontend": "pnpm --filter frontend run dev",
+    "compile": "pnpm --filter blockchain run hardhat compile",
+    "test:blockchain": "pnpm --filter blockchain run test",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

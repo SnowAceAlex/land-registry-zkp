@@ -1,0 +1,8 @@
+# Test files go here.
+# Use Hardhat's built-in test runner (Mocha + Chai):
+#   pnpm --filter blockchain hardhat test
+#
+# Suggested test files to create:
+#   test/RootRegistry.test.ts  — unit tests for publishRoot, verifyProof, AccessControl
+#   test/merkleTree.test.ts    — unit tests for shared/merkleTree.ts (buildTree, generateProof, etc.)
+#   test/zkpHelper.test.ts     — integration tests: generate proof → verify off-chain → verify on-chain

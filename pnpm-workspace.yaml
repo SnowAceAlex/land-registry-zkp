@@ -1,0 +1,16 @@
+packages:
+  - 'blockchain'
+  - 'web-app/frontend'
+  - 'web-app/backend'
+allowBuilds:
+  '@nestjs/core': true
+  '@prisma/client': true
+  '@prisma/engines': true
+  blake-hash: true
+  bufferutil: true
+  keccak: true
+  prisma: true
+  secp256k1: true
+  sharp: true
+  unrs-resolver: true
+  utf-8-validate: true

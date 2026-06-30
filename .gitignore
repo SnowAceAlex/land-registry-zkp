@@ -1,0 +1,70 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Hardhat / Blockchain
+artifacts/
+cache/
+typechain-types/
+blockchain/circuits/build/
+blockchain/ptau/*.ptau
+coverage/
+coverage.json
+
+# Next.js
+.next/
+out/
+
+# NestJS / Build output
+dist/
+build/
+
+# Prisma
+# (keep schema.prisma, but ignore generated client if desired)
+# web-app/backend/node_modules/.prisma/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
+
+# snarkjs build outputs (circuits)
+*.zkey
+*.wtns
+*.r1cs
+*.sym
+verification_key.json
+proof.json
+public.json
+
+# npm lock file (project uses pnpm)
+package-lock.json
+
+# AI tool generated files
+AGENTS.md
+CLAUDE.md

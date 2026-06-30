@@ -1,0 +1,14 @@
+# This directory stores Powers-of-Tau (.ptau) files for the trusted setup.
+# These files are large and should NOT be committed to git (already in .gitignore).
+#
+# To download a suitable .ptau file:
+#   - For circuits with up to 2^20 constraints (~1M):
+#     wget https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_20.ptau
+#
+#   - For development/testing (smaller, faster):
+#     wget https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau
+#
+# After downloading, run the trusted setup:
+#   snarkjs groth16 setup circuits/build/ownership/ownership.r1cs ptau/powersOfTau28_hez_final_16.ptau circuits/build/ownership/ownership_0000.zkey
+#   snarkjs zkey contribute circuits/build/ownership/ownership_0000.zkey circuits/build/ownership/ownership.zkey --name="thesis contribution" -e="random entropy"
+#   snarkjs zkey export verificationkey circuits/build/ownership/ownership.zkey circuits/build/ownership/verification_key.json

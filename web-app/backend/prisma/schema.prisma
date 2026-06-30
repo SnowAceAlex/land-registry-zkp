@@ -1,0 +1,74 @@
+// This is your Prisma schema file.
+// Learn more about it at: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Uses DATABASE_URL from .env (root of monorepo or backend/)
+  // Default: postgresql://postgres:postgres@localhost:5433/land_registry?schema=public
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Property Model — Land Use Rights (LUR) Record
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Property {
+  /// Internal auto-increment primary key
+  id                Int      @id @default(autoincrement())
+
+  /// Public unique property identifier (cadastral code or numeric ID)
+  /// Stored as String to handle large numbers; convert to BigInt for circuit inputs
+  propertyId        String   @unique
+
+  /// Poseidon commitment to the owner's identity: Poseidon([ownerSecret])
+  /// Stored as String (hex) — the owner's actual identity is NEVER stored
+  ownerCommitment   String
+
+  /// Land use type: RESIDENTIAL | AGRICULTURAL | COMMERCIAL | INDUSTRIAL | FORESTRY
+  useType           String
+
+  /// LUR validity period — stored as Unix timestamp string (end date of the LUR)
+  validityPeriod    String
+
+  /// Encumbrance status: FREE | MORTGAGED | LITIGATED | RESTRICTED
+  encumbranceStatus String
+
+  /// Assessed value in VND — stored as String to preserve precision of large integers
+  assessedValue     String
+
+  // TODO: Add additional fields as needed:
+  //   - location: String?         (geographic coordinates or address)
+  //   - area: String?             (land area in m²)
+  //   - leafHash: String?         (cache the Poseidon leaf hash after tree build)
+  //   - merkleIndex: Int?         (position in the Merkle tree)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("properties")
+}
+
+// TODO: Add more models as needed:
+//
+// model MerkleRoot {
+//   id          Int      @id @default(autoincrement())
+//   root        String   @unique           // hex string of the Merkle root
+//   version     Int                        // monotonically increasing version number
+//   txHash      String?                   // on-chain transaction hash of publishRoot()
+//   publishedAt DateTime @default(now())
+//   @@map("merkle_roots")
+// }
+//
+// model ProofRequest {
+//   id              Int      @id @default(autoincrement())
+//   propertyId      String
+//   requestedBy     String                 // wallet address of the verifier
+//   circuitType     String                 // 'ownership' | 'mortgage' | 'transfer'
+//   status          String   @default("PENDING")
+//   createdAt       DateTime @default(now())
+//   @@map("proof_requests")
+// }
