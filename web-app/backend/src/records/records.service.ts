@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * RecordsService
@@ -6,33 +7,19 @@ import { Injectable } from '@nestjs/common';
  * Business logic for Land Use Rights (LUR) records management.
  * Talks to the PostgreSQL database via Prisma ORM.
  *
- * TODO:
- *  1. Inject PrismaService (create src/prisma/prisma.service.ts first)
- *     constructor(private readonly prisma: PrismaService) {}
+ * PrismaService is injected via NestJS DI — it is provided globally by
+ * PrismaModule which is imported in AppModule.
  *
- *  2. Implement findAll() — paginated list of all Property records
- *     return this.prisma.property.findMany({ skip, take, orderBy: { createdAt: 'desc' } });
- *
- *  3. Implement findById(propertyId: string) — get a single Property by propertyId
- *     return this.prisma.property.findUnique({ where: { propertyId } });
- *
- *  4. Implement create(dto: CreatePropertyDto) — create a new Property
- *     Validate that propertyId is unique before inserting.
- *     After creating, trigger ChainService to rebuild the Merkle tree and publish new root.
- *
- *  5. Implement update(propertyId: string, dto: UpdatePropertyDto) — update a record
- *     After updating, trigger Merkle tree rebuild + publishRoot on-chain.
- *
- *  6. Implement delete(propertyId: string) — soft-delete or hard-delete
- *     After deleting, rebuild and publish new Merkle root.
- *
- * NOTE: ownerCommitment is stored as a hex string.
- *       Convert to BigInt when passing to @land-registry/blockchain merkleTree functions.
+ * Method stubs are ready to implement:
+ *  - findAll()  — paginated list of all Property records
+ *  - findById() — single Property by propertyId
+ *  - create()   — create a new Property; then trigger Merkle tree rebuild
+ *  - update()   — update a record; then trigger Merkle tree rebuild
+ *  - remove()   — delete a record; then rebuild and publish Merkle root
  */
 @Injectable()
 export class RecordsService {
-  // TODO: inject PrismaService
-  // constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll() {
     // TODO: implement

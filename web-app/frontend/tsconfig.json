@@ -19,7 +19,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@land-registry/blockchain/shared": ["../../blockchain/shared/index.ts"],
+      "@land-registry/blockchain": ["../../blockchain/shared/index.ts"]
     }
   },
   "include": [

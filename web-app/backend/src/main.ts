@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
@@ -17,7 +18,8 @@ async function bootstrap() {
   const port = process.env.PORT ?? 3001;
   await app.listen(port);
 
-  console.log(`🚀 Backend running at: http://localhost:${port}/api`);
+  console.log(`[Bootstrap] Backend running at: http://localhost:${port}/api`);
 }
 
 bootstrap();
+

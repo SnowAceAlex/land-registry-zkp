@@ -1,0 +1,14 @@
+// Root tsconfig — for editor (VS Code TypeScript language server) only.
+// Tells the TS server to look in sub-project directories for source files.
+// Sub-projects each have their own tsconfig.json with real compiler settings.
+{
+  "compilerOptions": {
+    "skipLibCheck": true
+  },
+  "exclude": [
+    "node_modules",
+    "blockchain/node_modules",
+    "web-app/backend/node_modules",
+    "web-app/frontend/node_modules"
+  ]
+}

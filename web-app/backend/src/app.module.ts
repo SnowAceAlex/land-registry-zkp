@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PrismaModule } from './prisma/prisma.module';
 import { RecordsModule } from './records/records.module';
 import { ProofModule } from './proof/proof.module';
 import { ChainModule } from './chain/chain.module';
@@ -7,12 +8,12 @@ import { ChainModule } from './chain/chain.module';
  * Root application module.
  * Imports all feature modules.
  *
- * TODO: Add PrismaModule (a global module wrapping PrismaClient) so all
- *       services can inject PrismaService without re-importing PrismaModule.
- *       Example: create src/prisma/prisma.module.ts + prisma.service.ts
+ * PrismaModule is @Global(), so PrismaService is available everywhere
+ * without re-importing PrismaModule in each feature module.
  */
 @Module({
   imports: [
+    PrismaModule,
     RecordsModule,
     ProofModule,
     ChainModule,

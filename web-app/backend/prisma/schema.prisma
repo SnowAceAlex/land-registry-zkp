@@ -7,9 +7,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // Uses DATABASE_URL from .env (root of monorepo or backend/)
+  // Connection URL is now configured in prisma/prisma.config.ts (Prisma 7+)
   // Default: postgresql://postgres:postgres@localhost:5433/land_registry?schema=public
-  url      = env("DATABASE_URL")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

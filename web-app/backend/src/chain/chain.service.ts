@@ -48,7 +48,7 @@ export class ChainService implements OnModuleInit {
   async onModuleInit() {
     // TODO: initialize provider, signer, contract connection here
     // This runs once when the NestJS module loads.
-    console.log('ChainService initialized — TODO: connect to RootRegistry contract');
+    console.log('[ChainService] Initialized — TODO: connect to RootRegistry contract');
   }
 
   async publishRoot(_records: unknown[]): Promise<string> {
