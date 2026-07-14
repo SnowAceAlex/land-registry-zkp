@@ -19,6 +19,10 @@ blockchain/ptau/*.ptau
 coverage/
 coverage.json
 
+# Mock data fixtures (Phase 0) — regenerated via `pnpm --filter blockchain run mock:generate`;
+# mockSecrets.json holds ownerSecret private key material, never commit it.
+blockchain/fixtures/
+
 # Next.js
 .next/
 out/
