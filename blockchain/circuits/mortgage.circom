@@ -19,7 +19,7 @@ pragma circom 2.0.0;
  *   - encumbranceStatus: the claimed encumbrance value to verify (0 = free, 1 = mortgaged, ...)
  *
  * Private inputs (witness):
- *   - ownerCommitment, useType, validityPeriod, assessedValue (hidden record fields)
+ *   - ownerCommitment, useType, validityPeriod, tenureType (hidden record fields)
  *   - merkleProof: siblings + path indices
  *
  * TODO:

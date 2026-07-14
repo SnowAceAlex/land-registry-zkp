@@ -12,8 +12,12 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "types": ["node", "mocha"]
   },
   "include": ["./hardhat.config.ts", "./scripts/**/*", "./test/**/*", "./shared/**/*"],
-  "exclude": ["node_modules", "dist", "artifacts", "cache"]
+  "exclude": ["node_modules", "dist", "artifacts", "cache"],
+  "ts-node": {
+    "files": true
+  }
 }

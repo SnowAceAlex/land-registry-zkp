@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install*)",
+      "Bash(pnpm run *)",
+      "Bash(pnpm --filter backend *)",
+      "Bash(pnpm --filter blockchain *)",
+      "Bash(pnpm --filter frontend *)",
+      "Bash(pnpm dev:*)",
+      "Bash(pnpm compile*)",
+      "Bash(pnpm db:up*)",
+      "Bash(pnpm test:*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch)",
+      "Bash(git branch -a)",
+      "Bash(git branch -v)",
+      "Bash(git branch --show-current)",
+      "Bash(docker compose ps*)",
+      "Bash(docker compose up -d)",
+      "Bash(docker compose down)",
+      "Bash(circom --version)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git branch -d*)",
+      "Bash(git branch -D*)",
+      "Bash(rm -rf*)",
+      "Bash(docker compose down -v*)",
+      "Bash(docker compose down --volumes*)",
+      "Bash(pnpm --filter backend prisma migrate reset*)",
+      "Bash(pnpm run prisma migrate reset*)"
+    ]
+  }
+}

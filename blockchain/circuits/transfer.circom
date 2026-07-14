@@ -22,7 +22,7 @@ pragma circom 2.0.0;
  *   - newOwnerCommitment: Poseidon(newOwnerSecret)
  *
  * Private inputs (witness):
- *   - record fields (useType, validityPeriod, encumbranceStatus, assessedValue)
+ *   - record fields (useType, validityPeriod, encumbranceStatus, tenureType)
  *   - oldOwnerSecret: proves old owner authorized the transfer
  *   - newOwnerSecret: proves new owner accepted
  *   - oldMerkleProof: inclusion proof in the old root
