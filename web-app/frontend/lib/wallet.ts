@@ -27,22 +27,21 @@
  *   RainbowKit docs:    https://www.rainbowkit.com/docs/installation
  */
 
-// TODO: uncomment after installing wagmi, viem, @rainbow-me/rainbowkit, @tanstack/react-query
-//
-// import { getDefaultConfig } from '@rainbow-me/rainbowkit';
-// import { hardhat, sepolia } from 'wagmi/chains';
-//
-// const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? '';
-//
-// if (!projectId) {
-//   console.warn('[wallet.ts] NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is not set');
-// }
-//
-// export const wagmiConfig = getDefaultConfig({
-//   appName: 'Land Registry ZKP',
-//   projectId,
-//   chains: [sepolia, hardhat],
-//   ssr: true, // Required for Next.js App Router
-// });
+// uncomment after installing wagmi, viem, @rainbow-me/rainbowkit, @tanstack/react-query
 
-export {};
+import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { hardhat, sepolia } from 'wagmi/chains';
+
+const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? '';
+
+if (!projectId) {
+  console.warn('[wallet.ts] NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is not set');
+}
+
+export const wagmiConfig = getDefaultConfig({
+  appName: 'Land Registry ZKP',
+  projectId,
+  chains: [sepolia, hardhat],
+  ssr: true, // Required for Next.js App Router
+});
+

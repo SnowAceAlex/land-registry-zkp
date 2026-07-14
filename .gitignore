@@ -68,3 +68,12 @@ package-lock.json
 # AI tool generated files
 AGENTS.md
 CLAUDE.md
+
+#Agent Skills
+.agents/
+skills-lock.json
+
+#Documentation
+CODING_ROADMAP.md
+THESIS_IMPLEMENTATION_GUIDE.md
+Pre_Thesis_Final_Report_BuiCongVinh_ITCSIU22165.md

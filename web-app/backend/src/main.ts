@@ -1,4 +1,11 @@
 import 'reflect-metadata';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load env variables from root or backend package root
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), 'web-app/backend/.env') });
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 

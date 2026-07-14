@@ -18,6 +18,7 @@
         "name": "next"
       }
     ],
+    "types": ["node"],
     "paths": {
       "@/*": ["./*"],
       "@land-registry/blockchain/shared": ["../../blockchain/shared/index.ts"],
