@@ -16,7 +16,7 @@ pragma circom 2.0.0;
  *   - ownerCommitment: Poseidon(ownerSecret) — the owner's identity commitment
  *
  * Private inputs (witness — never revealed):
- *   - record fields: propertyId, useType, validityPeriod, encumbranceStatus, assessedValue
+ *   - record fields: propertyId, useType, validityPeriod, encumbranceStatus, tenureType
  *   - ownerSecret: the owner's private key / secret scalar
  *   - merkleProof: sibling hashes + path indices for the Merkle inclusion proof
  *

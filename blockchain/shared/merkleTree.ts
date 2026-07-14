@@ -118,7 +118,13 @@ export async function buildTree(records: LURRecord[]): Promise<LURMerkleTree> {
 
   const indexByPropertyId = new Map<string, number>();
   records.forEach((record, i) => {
-    indexByPropertyId.set(record.propertyId.toString(), i);
+    const key = record.propertyId.toString();
+    // propertyId is documented as unique — fail fast instead of silently
+    // overwriting the index (which would yield a proof for the wrong leaf).
+    if (indexByPropertyId.has(key)) {
+      throw new Error(`buildTree: duplicate propertyId ${record.propertyId}`);
+    }
+    indexByPropertyId.set(key, i);
   });
 
   const layers: bigint[][] = [leaves];
@@ -176,7 +182,16 @@ export async function generateMerkleProof(
     throw new Error(`generateMerkleProof: propertyId ${record.propertyId} not found in tree`);
   }
 
-  const leaf = tree.leaves[index];
+  // Recompute the leaf from the provided record and ensure it matches the tree.
+  // Guards against a caller passing a record whose fields drifted from what the
+  // tree was built with — otherwise they'd get a proof for a stale leaf that
+  // silently fails to match the circuit-computed leaf downstream.
+  const leaf = await hashRecord(record);
+  if (leaf !== tree.leaves[index]) {
+    throw new Error(
+      `generateMerkleProof: record hash does not match tree leaf for propertyId ${record.propertyId}`,
+    );
+  }
   const siblings: bigint[] = [];
   const pathIndices: number[] = [];
 
@@ -218,7 +233,12 @@ export async function verifyMerkleProof(proof: MerkleProofData, root: bigint): P
   let current = proof.leaf;
   for (let level = 0; level < TREE_DEPTH; level++) {
     const sibling = proof.siblings[level];
-    const isRightChild = proof.pathIndices[level] === 1;
+    const pathIndex = proof.pathIndices[level];
+    // Reject malformed proofs: pathIndices must be exactly 0 (left) or 1 (right).
+    if (pathIndex !== 0 && pathIndex !== 1) {
+      return false;
+    }
+    const isRightChild = pathIndex === 1;
     const [left, right] = isRightChild ? [sibling, current] : [current, sibling];
     current = await poseidonHash([left, right]);
   }

@@ -67,4 +67,45 @@ describe('merkleTree (Phase 1)', () => {
     expect(proof.siblings).to.have.lengthOf(TREE_DEPTH);
     expect(await verifyMerkleProof(proof, tree.root)).to.equal(true);
   });
+
+  it('fails fast when records contain a duplicate propertyId', async () => {
+    const { records } = await generateMockRecords(3);
+    records[2] = { ...records[2], propertyId: records[0].propertyId };
+
+    let threw = false;
+    try {
+      await buildTree(records);
+    } catch (e) {
+      threw = true;
+      expect((e as Error).message).to.match(/duplicate propertyId/);
+    }
+    expect(threw).to.equal(true);
+  });
+
+  it('rejects a record whose fields drifted from the tree leaf', async () => {
+    const { records } = await generateMockRecords(5);
+    const tree = await buildTree(records);
+    // Same propertyId (so lookup succeeds) but a mutated field -> different leaf.
+    const drifted = { ...records[1], validityPeriod: records[1].validityPeriod + 1n };
+
+    let threw = false;
+    try {
+      await generateMerkleProof(tree, drifted);
+    } catch (e) {
+      threw = true;
+      expect((e as Error).message).to.match(/does not match tree leaf/);
+    }
+    expect(threw).to.equal(true);
+  });
+
+  it('rejects a proof with a malformed pathIndices entry', async () => {
+    const { records } = await generateMockRecords(4);
+    const tree = await buildTree(records);
+    const proof = await generateMerkleProof(tree, records[0]);
+
+    const malformed = { ...proof, pathIndices: [...proof.pathIndices] };
+    malformed.pathIndices[0] = 2; // not 0 or 1
+
+    expect(await verifyMerkleProof(malformed, tree.root)).to.equal(false);
+  });
 });

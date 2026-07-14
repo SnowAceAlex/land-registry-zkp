@@ -13,7 +13,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "types": ["node"]
+    "types": ["node", "mocha"]
   },
   "include": ["./hardhat.config.ts", "./scripts/**/*", "./test/**/*", "./shared/**/*"],
   "exclude": ["node_modules", "dist", "artifacts", "cache"],
