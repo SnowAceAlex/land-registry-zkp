@@ -204,6 +204,29 @@ describe('circuits/transfer.circom (Phase 2)', () => {
     await expectRejected(inputFor(fx, 0n), 'expired land must not change hands');
   });
 
+  // Boundary semantics of the zero threshold, pinned deliberately (D27).
+  //
+  // `RemainingTermCheck` is a threshold primitive — "at least N seconds remain" —
+  // so N = 0 means `validityPeriod >= currentTimestamp` and a title expiring at
+  // exactly this instant still transfers. That is NOT an oversight, and it is not
+  // in tension with ownership.circom, which asks for strictness by passing N = 1
+  // at its own call site (see ownership.test.ts, same boundary, opposite verdict).
+  //
+  // Tightening N = 0 into `> currentTimestamp` would buy nothing: currentTimestamp
+  // is prover-chosen and only checked to within PROOF_TIMESTAMP_TOLERANCE_SECONDS
+  // (±600s), so the 1-second boundary sits inside a 600-second window anyway. It
+  // would also make the public signal lie — a bank reading minRequiredRemainingTerm
+  // would find 0 and 1 meaning the same thing.
+  it('accepts a title expiring exactly now at a zero threshold (D27 boundary)', async () => {
+    const fx = await makeTransferFixture(now, {
+      tenureType: TenureType.FIXED_TERM,
+      validityPeriod: now, // expires this very second
+    });
+
+    const witness = await circuit.calculateWitness(inputFor(fx, 0n));
+    await circuit.checkConstraints(witness);
+  });
+
   it('rejects a transfer claiming more remaining term than the title has', async () => {
     const fx = await makeTransferFixture(now, {
       tenureType: TenureType.FIXED_TERM,
