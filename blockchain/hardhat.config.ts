@@ -40,6 +40,12 @@ const config: HardhatUserConfig = {
     outDir: 'typechain-types',
     target: 'ethers-v6',
   },
+  mocha: {
+    // Circuit tests compile their .circom file via circom_tester before running,
+    // which blows past mocha's 20s default. Poseidon-heavy circuits (transfer
+    // builds two 20-level Merkle paths) are the slow ones.
+    timeout: 300_000,
+  },
 };
 
 export default config;

@@ -12,7 +12,9 @@
     "test": "hardhat test",
     "deploy:local": "hardhat run scripts/deploy.ts --network hardhat",
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
-    "mock:generate": "ts-node scripts/generateMockData.ts"
+    "mock:generate": "ts-node scripts/generateMockData.ts",
+    "circuits:compile": "ts-node scripts/compileCircuits.ts",
+    "circuits:smoke": "ts-node scripts/setup/smokeOwnership.ts"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.2",
@@ -26,6 +28,7 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@types/node": "^20.12.12",
+    "circom_tester": "^0.0.24",
     "hardhat": "^2.22.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5"

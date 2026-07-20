@@ -15,7 +15,13 @@
     "resolveJsonModule": true,
     "types": ["node", "mocha"]
   },
-  "include": ["./hardhat.config.ts", "./scripts/**/*", "./test/**/*", "./shared/**/*"],
+  "include": [
+    "./hardhat.config.ts",
+    "./scripts/**/*",
+    "./test/**/*",
+    "./shared/**/*",
+    "./types/**/*"
+  ],
   "exclude": ["node_modules", "dist", "artifacts", "cache"],
   "ts-node": {
     "files": true
