@@ -3,33 +3,79 @@ pragma circom 2.0.0;
 /*
  * ownership.circom
  * ─────────────────────────────────────────────────────────────────────────────
- * Purpose: Zero-Knowledge Proof circuit for OWNERSHIP verification.
+ * Use case: a landholder proves to a buyer/notary that they control a specific
+ * property and that the title has not expired — without revealing the land use
+ * type, the expiry date, the encumbrance status, or their secret.
  *
- * This circuit proves that:
- *   - The prover knows a Land Use Right (LUR) record that belongs to them
- *     (i.e., their identity commitment matches ownerCommitment in the record)
- *   - The record is a valid leaf in the current published Merkle root
- *   - Without revealing the full record contents (privacy-preserving)
+ * Public signals (order is load-bearing — D21, indexed by LandRegistryVerifier):
+ *   [0] merkleRoot         must equal the root published in RootRegistry
+ *   [1] propertyId         which property is being claimed
+ *   [2] ownerCommitment    pseudonymous owner handle (D8), not a real identity
+ *   [3] currentTimestamp   checked on-chain against block.timestamp ±tolerance (D9)
  *
- * Public inputs:
- *   - merkleRoot: the Merkle root currently stored in RootRegistry.sol
- *   - ownerCommitment: Poseidon(ownerSecret) — the owner's identity commitment
+ * Private: useType, validityPeriod, encumbranceStatus, tenureType, ownerSecret,
+ *          siblings[20], pathIndices[20]
  *
- * Private inputs (witness — never revealed):
- *   - record fields: propertyId, useType, validityPeriod, encumbranceStatus, tenureType
- *   - ownerSecret: the owner's private key / secret scalar
- *   - merkleProof: sibling hashes + path indices for the Merkle inclusion proof
- *
- * TODO:
- *  1. Include merkleProof.circom template from ./common/merkleProof.circom
- *  2. Include Poseidon hasher from circomlib (npm: circomlib)
- *  3. Hash the record fields into a leaf: leaf = Poseidon([propertyId, ownerCommitment, ...])
- *  4. Verify ownerCommitment == Poseidon([ownerSecret])
- *  5. Verify Merkle inclusion: MerkleProof(leaf, siblings, indices) == merkleRoot
- *  6. Add range checks or other constraints as needed for the thesis
- *
- * Reference: https://docs.circom.io/
- * circomlib templates: https://github.com/iden3/circomlib
+ * Constraints (CODING_ROADMAP §2.2):
+ *   1. ownerCommitment == Poseidon([ownerSecret])          — owner binding
+ *   2. leaf == Poseidon([...6 fields...])                  — D4 order
+ *   3. MerkleProof(leaf, path).root == merkleRoot          — inclusion
+ *   4. tenureType == PERPETUAL OR validityPeriod > now     — not expired
  */
 
-// TODO: implement circuit body
+include "circomlib/circuits/poseidon.circom";
+include "common/merkleProof.circom";
+include "common/leafHasher.circom";
+include "common/termCheck.circom";
+
+template Ownership(levels) {
+    // ── Public inputs ────────────────────────────────────────────────────────
+    signal input merkleRoot;
+    signal input propertyId;
+    signal input ownerCommitment;
+    signal input currentTimestamp;
+
+    // ── Private inputs ───────────────────────────────────────────────────────
+    signal input useType;
+    signal input validityPeriod;
+    signal input encumbranceStatus;
+    signal input tenureType;
+    signal input ownerSecret;
+    signal input siblings[levels];
+    signal input pathIndices[levels];
+
+    // 1. Owner binding: only someone who knows the preimage of the public
+    //    ownerCommitment can produce this witness.
+    component commitmentHasher = Poseidon(1);
+    commitmentHasher.inputs[0] <== ownerSecret;
+    commitmentHasher.out === ownerCommitment;
+
+    // 2. Reconstruct the leaf from the record fields (D4 order lives in LeafHasher).
+    component leafHasher = LeafHasher();
+    leafHasher.propertyId <== propertyId;
+    leafHasher.ownerCommitment <== ownerCommitment;
+    leafHasher.useType <== useType;
+    leafHasher.validityPeriod <== validityPeriod;
+    leafHasher.encumbranceStatus <== encumbranceStatus;
+    leafHasher.tenureType <== tenureType;
+
+    // 3. That leaf must sit in the tree whose root the state authority published.
+    component merkle = MerkleProof(levels);
+    merkle.leaf <== leafHasher.leaf;
+    for (var i = 0; i < levels; i++) {
+        merkle.siblings[i] <== siblings[i];
+        merkle.pathIndices[i] <== pathIndices[i];
+    }
+    merkle.root === merkleRoot;
+
+    // 4. Not expired. minRequiredRemainingTerm = 1 makes the shared threshold
+    //    check mean `validityPeriod >= currentTimestamp + 1`, i.e. strictly
+    //    greater than now — the §2.2 semantics. PERPETUAL titles bypass it.
+    component term = RemainingTermCheck(64);
+    term.tenureType <== tenureType;
+    term.validityPeriod <== validityPeriod;
+    term.currentTimestamp <== currentTimestamp;
+    term.minRequiredRemainingTerm <== 1;
+}
+
+component main {public [merkleRoot, propertyId, ownerCommitment, currentTimestamp]} = Ownership(20);

@@ -13,5 +13,11 @@ export * from './types';
 // Merkle Tree utilities (Poseidon-based)
 export * from './merkleTree';
 
+// Circuit witness input builders (single source of circuit signal names — D25)
+export * from './circuitInputs';
+
+// Date/timezone helpers (UTC+7 at the edges, Unix epoch in-circuit — D10)
+export * from './datetime';
+
 // ZKP / snarkjs Groth16 wrapper
 export * from './zkpHelper';
