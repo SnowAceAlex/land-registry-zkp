@@ -2,11 +2,9 @@
 
 Hướng dẫn deploy bộ contract on-chain theo đúng 3 giai đoạn: **local → Sepolia thử → Sepolia chính thức**.
 
-Mọi lệnh chạy từ **thư mục gốc repo** trừ khi ghi rõ khác. Shell mặc định là PowerShell.
+Mọi lệnh chạy từ **thư mục gốc repo** trừ khi ghi rõ khác. Ví dụ:
 
-```bash
-cd D:\thesis\land-registry-zkp
-```
+    cd <path-to>/land-registry-zkp
 
 ⚠️ Chạy `pnpm --filter blockchain ...` từ ngoài repo (ví dụ terminal vừa mở, đang ở `C:\Users\<bạn>`) sẽ báo **`No projects matched the filters`** — pnpm đi ngược lên tìm workspace và vớ phải workspace khác trên máy. Không phải lỗi cấu hình, chỉ là đứng sai chỗ.
 
