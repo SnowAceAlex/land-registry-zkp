@@ -14,6 +14,7 @@
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
     "mock:generate": "ts-node scripts/generateMockData.ts",
     "circuits:compile": "ts-node scripts/compileCircuits.ts",
+    "circuits:setup": "ts-node scripts/setup/setupAll.ts",
     "circuits:smoke": "ts-node scripts/setup/smokeOwnership.ts"
   },
   "dependencies": {
