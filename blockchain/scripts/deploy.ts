@@ -1,49 +1,141 @@
 /**
  * scripts/deploy.ts
  * ─────────────────────────────────────────────────────────────────────────────
- * Hardhat deploy script for RootRegistry contract.
+ * Phase 4 — deploy the full on-chain stack (D12):
+ *   RootRegistry
+ *   Groth16Verifier{Ownership,Mortgage,Transfer}   (generated — needs
+ *     `pnpm --filter blockchain run circuits:setup` to have been run)
+ *   LandRegistryVerifier                            (dispatcher)
+ * then register the state authority: STATE_AUTHORITY_ROLE grant + the D30
+ * identity anchor (keccak256 of the X.509 Subject "O" organization name) in one
+ * registerAuthority() call.
  *
  * Usage:
- *   pnpm --filter blockchain hardhat run scripts/deploy.ts --network hardhat
- *   pnpm --filter blockchain hardhat run scripts/deploy.ts --network sepolia
+ *   pnpm --filter blockchain run deploy:local     (--network hardhat)
+ *   pnpm --filter blockchain run deploy:sepolia   (--network sepolia)
  *
- * TODO:
- *  1. Deploy RootRegistry with the deployer wallet as the initial admin
- *  2. Grant STATE_AUTHORITY_ROLE to one or more authority accounts
- *  3. Log the deployed contract address (save to .env or a deployments/ file)
- *  4. Optionally verify on Etherscan: npx hardhat verify --network sepolia <address> <args>
+ * Env (see .env.example): PRIVATE_KEY / SEPOLIA_RPC_URL for sepolia, plus
+ *   AUTHORITY_ADDRESS   authority account (default: deployer — fine for PoC)
+ *   AUTHORITY_ORG_NAME  X.509 Subject "O" to anchor (default below; must match
+ *                       the self-signed certificate used by Phase 9)
+ *
+ * Addresses are written to deployments/<network>.json (committed — it is the
+ * record of where the thesis contracts live, esp. on Sepolia).
  */
 
-import { ethers } from 'hardhat';
+import * as fs from 'fs';
+import * as path from 'path';
+import { ethers, network } from 'hardhat';
+
+/** Default mock organization for the PoC — X.509 Subject "O" (D30). */
+const DEFAULT_ORG_NAME = 'So Tai nguyen va Moi truong TP.HCM';
+
+const VERIFIER_CONTRACTS = [
+  'Groth16VerifierOwnership',
+  'Groth16VerifierMortgage',
+  'Groth16VerifierTransfer',
+] as const;
 
 async function main() {
   const [deployer] = await ethers.getSigners();
+  // `||` not `??`: an unset var in .env arrives as an empty string, which `??`
+  // would happily pass through as the authority address.
+  const authorityAddress = process.env.AUTHORITY_ADDRESS?.trim() || deployer.address;
+  const orgName = process.env.AUTHORITY_ORG_NAME?.trim() || DEFAULT_ORG_NAME;
+  const instituteHash = ethers.keccak256(ethers.toUtf8Bytes(orgName));
 
-  console.log('Deploying RootRegistry with account:', deployer.address);
-  console.log('Account balance:', (await deployer.provider.getBalance(deployer.address)).toString());
+  // Validate BEFORE deploying anything — a bad address should not surface as an
+  // opaque ENS-resolution failure after five contracts have already cost gas.
+  if (!ethers.isAddress(authorityAddress)) {
+    throw new Error(
+      `AUTHORITY_ADDRESS is not a valid address: "${authorityAddress}". ` +
+        `Leave it empty in .env to use the deployer account.`,
+    );
+  }
 
-  // TODO: Deploy RootRegistry
-  // const RootRegistry = await ethers.getContractFactory('RootRegistry');
-  // const rootRegistry = await RootRegistry.deploy(deployer.address);
-  // await rootRegistry.waitForDeployment();
-  //
-  // const address = await rootRegistry.getAddress();
-  // console.log('RootRegistry deployed to:', address);
-  //
-  // TODO: Grant STATE_AUTHORITY_ROLE to authority accounts
-  // const STATE_AUTHORITY_ROLE = await rootRegistry.STATE_AUTHORITY_ROLE();
-  // await rootRegistry.grantRole(STATE_AUTHORITY_ROLE, authorityAddress);
-  // console.log('STATE_AUTHORITY_ROLE granted to:', authorityAddress);
-  //
-  // TODO (D30, Phase 4): when granting STATE_AUTHORITY_ROLE, ALSO set the
-  //   authority's on-chain identity anchor, e.g.:
-  //     const institute = ethers.keccak256(ethers.toUtf8Bytes(orgName)); // X.509 Subject "O"
-  //     await rootRegistry.setAuthorityInstitute(authorityAddress, institute);
-  //   (or fold grant + anchor into one function). The constructor stays
-  //   deploy(admin) — the institute is per-authority (mapping), not a single
-  //   immutable. See CODING_ROADMAP.md §0 (D30).
+  console.log(`network:   ${network.name}`);
+  console.log(`deployer:  ${deployer.address}`);
+  console.log(`balance:   ${ethers.formatEther(await deployer.provider.getBalance(deployer.address))} ETH`);
+  console.log(`authority: ${authorityAddress}`);
+  console.log(`org name:  "${orgName}"\n           → ${instituteHash}\n`);
 
-  console.log('TODO: implement deploy logic');
+  // The generated verifiers only exist after trusted setup + sync + compile.
+  for (const name of VERIFIER_CONTRACTS) {
+    const solPath = path.join(__dirname, '..', 'contracts', 'verifiers', `${name}.sol`);
+    if (!fs.existsSync(solPath)) {
+      throw new Error(
+        `Missing contracts/verifiers/${name}.sol — run ` +
+          `"pnpm --filter blockchain run circuits:setup" (then compile) before deploying.`,
+      );
+    }
+  }
+
+  const registry = await ethers.deployContract('RootRegistry', [deployer.address]);
+  await registry.waitForDeployment();
+  console.log(`RootRegistry             ${await registry.getAddress()}`);
+
+  const verifierAddresses: string[] = [];
+  for (const name of VERIFIER_CONTRACTS) {
+    const verifier = await ethers.deployContract(name);
+    await verifier.waitForDeployment();
+    verifierAddresses.push(await verifier.getAddress());
+    console.log(`${name.padEnd(24)} ${await verifier.getAddress()}`);
+  }
+
+  const landRegistryVerifier = await ethers.deployContract('LandRegistryVerifier', [
+    await registry.getAddress(),
+    ...verifierAddresses,
+  ]);
+  await landRegistryVerifier.waitForDeployment();
+  console.log(`LandRegistryVerifier     ${await landRegistryVerifier.getAddress()}`);
+
+  const deployment = {
+    network: network.name,
+    chainId: Number((await deployer.provider.getNetwork()).chainId),
+    deployedAt: new Date().toISOString(),
+    deployer: deployer.address,
+    authority: { address: authorityAddress, orgName, instituteHash },
+    contracts: {
+      RootRegistry: await registry.getAddress(),
+      Groth16VerifierOwnership: verifierAddresses[0],
+      Groth16VerifierMortgage: verifierAddresses[1],
+      Groth16VerifierTransfer: verifierAddresses[2],
+      LandRegistryVerifier: await landRegistryVerifier.getAddress(),
+    },
+  };
+
+  // Write the record BEFORE the last transaction: on a live network the
+  // contracts above already cost gas, and losing their addresses to a failure
+  // in the step below would strand them. smoke:<network> reports an
+  // unregistered authority clearly, so a half-finished record is recoverable.
+  const deploymentsDir = path.join(__dirname, '..', 'deployments');
+  fs.mkdirSync(deploymentsDir, { recursive: true });
+  const outPath = path.join(deploymentsDir, `${network.name}.json`);
+  fs.writeFileSync(outPath, JSON.stringify(deployment, null, 2));
+
+  // D30: role grant + institute anchor, atomically.
+  const tx = await registry.registerAuthority(authorityAddress, instituteHash);
+  await tx.wait();
+  console.log(`\nSTATE_AUTHORITY_ROLE + authorityInstitute anchored for ${authorityAddress}`);
+
+  console.log(`\ndeployment record → ${path.relative(process.cwd(), outPath)}`);
+  console.log(
+    `set NEXT_PUBLIC_CONTRACT_ADDRESS=${deployment.contracts.RootRegistry} (RootRegistry) in .env for the frontend`,
+  );
+
+  if (network.name === 'sepolia') {
+    console.log('\nOptional Etherscan verification:');
+    console.log(
+      `  npx hardhat verify --network sepolia ${deployment.contracts.RootRegistry} ${deployer.address}`,
+    );
+    for (const [i, name] of VERIFIER_CONTRACTS.entries()) {
+      console.log(`  npx hardhat verify --network sepolia ${verifierAddresses[i]}  # ${name}`);
+    }
+    console.log(
+      `  npx hardhat verify --network sepolia ${deployment.contracts.LandRegistryVerifier} ` +
+        `${deployment.contracts.RootRegistry} ${verifierAddresses.join(' ')}`,
+    );
+  }
 }
 
 main()

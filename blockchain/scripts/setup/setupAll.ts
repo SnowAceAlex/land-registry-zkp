@@ -28,6 +28,7 @@ import {
 } from '../../shared/zkpHelper';
 import { BLOCKCHAIN_DIR, setupCircuit } from './trustedSetup';
 import { buildSampleInput } from './sampleWitness';
+import { syncVerifier } from './syncVerifiers';
 
 type CircuitType = ProofPackage['circuitType'];
 const CIRCUITS: CircuitType[] = ['ownership', 'mortgage', 'transfer'];
@@ -45,6 +46,10 @@ interface Metric {
 async function runCircuit(circuit: CircuitType): Promise<Metric> {
   console.log(`\n▶ ${circuit}`);
   const { info, power } = await setupCircuit(circuit);
+  // Phase 4: mirror the fresh verifier into contracts/verifiers/ (renamed,
+  // gitignored) so the on-chain contracts can never drift from this zkey.
+  const syncedPath = path.relative(BLOCKCHAIN_DIR, syncVerifier(circuit));
+  console.log(`  verifier → ${syncedPath}`);
   const { wasmPath, zkeyPath, vkeyPath } = getCircuitPaths(circuit, BLOCKCHAIN_DIR);
 
   const { input, expectedPublicSignals } = await buildSampleInput(circuit);

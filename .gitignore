@@ -15,6 +15,13 @@ artifacts/
 cache/
 typechain-types/
 blockchain/circuits/build/
+# Auto-synced from circuits/build/ by verifiers:sync — must match the gitignored
+# .zkey, so never committed; regenerate via circuits:setup
+blockchain/contracts/verifiers/*.sol
+# Throwaway local deployments (chain resets, addresses are deterministic).
+# deployments/sepolia.json IS committed — it is the record of the live demo.
+blockchain/deployments/hardhat.json
+blockchain/deployments/localhost.json
 blockchain/ptau/*.ptau
 coverage/
 coverage.json

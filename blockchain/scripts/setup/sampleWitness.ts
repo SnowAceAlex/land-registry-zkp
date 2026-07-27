@@ -71,9 +71,20 @@ async function placeInTree(
   return { tree, allRecords };
 }
 
-/** Build a valid witness + expected public signals for one circuit. */
-export async function buildSampleInput(circuit: CircuitType): Promise<SampleInput> {
-  const now = nowUnixTimestamp();
+/**
+ * Build a valid witness + expected public signals for one circuit.
+ *
+ * @param opts.now `currentTimestamp` to bake into the witness (Unix seconds).
+ *                 Defaults to wall-clock time; the Hardhat integration tests
+ *                 pass the chain's block timestamp instead, since the on-chain
+ *                 freshness check (D9/D26) compares against block.timestamp and
+ *                 the two clocks diverge once tests manipulate chain time.
+ */
+export async function buildSampleInput(
+  circuit: CircuitType,
+  opts: { now?: bigint } = {},
+): Promise<SampleInput> {
+  const now = opts.now ?? nowUnixTimestamp();
   const record = await makeSubjectRecord(now);
   const { tree, allRecords } = await placeInTree(record);
   const proof = await generateMerkleProof(tree, record);
