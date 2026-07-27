@@ -72,6 +72,8 @@ contract LandRegistryVerifier {
     error RootMismatch(bytes32 expected, bytes32 actual);
     /// @notice The proof's currentTimestamp is outside the tolerance window (replay guard).
     error StaleTimestamp(uint256 claimed, uint256 blockTime);
+    /// @notice A constructor dependency was the zero address.
+    error ZeroAddressDependency();
 
     // -------------------------------------------------------------------------
     // Constructor
@@ -83,6 +85,19 @@ contract LandRegistryVerifier {
         IMortgageVerifier _mortgageVerifier,
         ITransferVerifier _transferVerifier
     ) {
+        // These four are immutable: a zero address here cannot be corrected
+        // afterwards, only redeployed around. Every verify* call would revert on
+        // the call to a non-contract, with no hint as to which dependency was
+        // wrong. Cheap one-time check for an otherwise unfixable deployment.
+        if (
+            address(_registry) == address(0) ||
+            address(_ownershipVerifier) == address(0) ||
+            address(_mortgageVerifier) == address(0) ||
+            address(_transferVerifier) == address(0)
+        ) {
+            revert ZeroAddressDependency();
+        }
+
         registry = _registry;
         ownershipVerifier = _ownershipVerifier;
         mortgageVerifier = _mortgageVerifier;

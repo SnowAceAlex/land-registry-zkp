@@ -82,6 +82,25 @@ describe('contracts/LandRegistryVerifier — mock verifiers (Phase 4)', () => {
     return { registry, verifier, mock, authority };
   }
 
+  it('rejects a zero address for any constructor dependency', async () => {
+    const { registry, mock } = await loadFixture(deployFixture);
+    const registryAddress = await registry.getAddress();
+    const mockAddress = await mock.getAddress();
+    const factory = await ethers.getContractFactory('LandRegistryVerifier');
+
+    // All four are immutable — a zero address here can never be corrected, only
+    // redeployed around, so each slot is checked independently.
+    const good = [registryAddress, mockAddress, mockAddress, mockAddress];
+    for (let slot = 0; slot < good.length; slot++) {
+      const args = [...good];
+      args[slot] = ethers.ZeroAddress;
+      await expect(factory.deploy(...args)).to.be.revertedWithCustomError(
+        factory,
+        'ZeroAddressDependency',
+      );
+    }
+  });
+
   it('mirrors PROOF_TIMESTAMP_TOLERANCE_SECONDS from shared/datetime.ts (D26)', async () => {
     const { verifier } = await loadFixture(deployFixture);
     expect(await verifier.TIMESTAMP_TOLERANCE_SECONDS()).to.equal(

@@ -46,9 +46,9 @@ async function main() {
 
   // Validate BEFORE deploying anything — a bad address should not surface as an
   // opaque ENS-resolution failure after five contracts have already cost gas.
-  if (!ethers.isAddress(authorityAddress)) {
+  if (!ethers.isAddress(authorityAddress) || authorityAddress === ethers.ZeroAddress) {
     throw new Error(
-      `AUTHORITY_ADDRESS is not a valid address: "${authorityAddress}". ` +
+      `AUTHORITY_ADDRESS must be a valid non-zero address: "${authorityAddress}". ` +
         `Leave it empty in .env to use the deployer account.`,
     );
   }

@@ -79,6 +79,8 @@ contract RootRegistry is AccessControl {
     error DuplicateRoot(bytes32 root);
     /// @notice registerAuthority() with an empty institute hash.
     error ZeroInstituteHash();
+    /// @notice registerAuthority() for the zero address — nobody can ever sign as it.
+    error ZeroAuthorityAccount();
 
     // -------------------------------------------------------------------------
     // Constructor
@@ -127,6 +129,10 @@ contract RootRegistry is AccessControl {
         address account,
         bytes32 instituteHash
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        // Recoverable (the admin can simply call again with the right account),
+        // but a role granted to address(0) is inert and silently leaves the
+        // registry with nobody able to publish — fail loudly instead.
+        if (account == address(0)) revert ZeroAuthorityAccount();
         if (instituteHash == bytes32(0)) revert ZeroInstituteHash();
 
         _grantRole(STATE_AUTHORITY_ROLE, account);

@@ -108,6 +108,15 @@ describe('contracts/RootRegistry (Phase 4)', () => {
         .withArgs(outsider.address, ORG_HASH);
     });
 
+    it('rejects the zero address as authority', async () => {
+      const { registry, admin } = await loadFixture(deployFixture);
+      // Recoverable, but a role granted to address(0) is inert: nobody can sign
+      // as it, so the registry would look configured while having no publisher.
+      await expect(
+        registry.connect(admin).registerAuthority(ethers.ZeroAddress, ORG_HASH),
+      ).to.be.revertedWithCustomError(registry, 'ZeroAuthorityAccount');
+    });
+
     it('rejects a zero institute hash', async () => {
       const { registry, admin, outsider } = await loadFixture(deployFixture);
       await expect(
