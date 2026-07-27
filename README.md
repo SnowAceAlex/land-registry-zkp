@@ -44,7 +44,7 @@ Phases 0–4 of the roadmap are implemented and tested. The cryptographic and on
 | 7–9 | Frontend — government / owner / verifier portals | ⬜ Not started |
 | 10–11 | E2E integration, evaluation metrics, thesis writing | ⬜ Not started |
 
-**Test suite**: 99 passing (`pnpm run test:blockchain`). On a checkout without trusted-setup artifacts the proof-dependent tests self-skip → 83 passing + 16 pending, never failing.
+**Test suite**: 101 passing (`pnpm run test:blockchain`). On a checkout without trusted-setup artifacts the proof-dependent tests self-skip → 85 passing + 16 pending, never failing.
 
 ---
 
@@ -111,7 +111,7 @@ Builds all Solidity sources and regenerates the TypeChain bindings.
 pnpm run test:blockchain
 ```
 
-Expect **99 passing** (~25s). If you see 83 passing + 16 pending, step 3 did not complete — the proof-dependent tests skipped themselves.
+Expect **101 passing** (~25s). If you see 85 passing + 16 pending, step 3 did not complete — the proof-dependent tests skipped themselves.
 
 ### 6. Deploy (optional)
 

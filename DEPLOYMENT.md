@@ -6,6 +6,8 @@ Mọi lệnh chạy từ **thư mục gốc repo** trừ khi ghi rõ khác. Ví 
 
     cd <path-to>/land-registry-zkp
 
+Shell mặc định trong tài liệu này là **PowerShell** — các lệnh đặt biến môi trường (`$env:...`) dùng cú pháp PowerShell; bản Git Bash tương đương được ghi kèm ở chỗ cần thiết.
+
 ⚠️ Chạy `pnpm --filter blockchain ...` từ ngoài repo (ví dụ terminal vừa mở, đang ở `C:\Users\<bạn>`) sẽ báo **`No projects matched the filters`** — pnpm đi ngược lên tìm workspace và vớ phải workspace khác trên máy. Không phải lỗi cấu hình, chỉ là đứng sai chỗ.
 
 | Giai đoạn | Mạng | Mục đích | Mất gì |
@@ -74,7 +76,7 @@ pnpm run compile
 pnpm run test:blockchain
 ```
 
-Kỳ vọng **99 passing**. Nếu ra 83 passing + 16 pending nghĩa là artifacts ở bước 0.2 chưa xong — quay lại làm.
+Kỳ vọng **101 passing**. Nếu ra 85 passing + 16 pending nghĩa là artifacts ở bước 0.2 chưa xong — quay lại làm.
 
 ---
 
@@ -95,7 +97,7 @@ Chạy trên mạng `hardhat` in-process — deploy xong là **contract biến m
 **Terminal 1** — mở node và để chạy:
 
 ```bash
-cd D:\thesis\land-registry-zkp; pnpm --filter blockchain run node
+cd <path-to>/land-registry-zkp; pnpm --filter blockchain run node
 ```
 
 Node lắng nghe ở `http://127.0.0.1:8545`, chainId **31337**, in ra 20 account test kèm private key (10000 ETH mỗi cái). Đừng đóng terminal này — đóng là contract mất sạch.
@@ -103,7 +105,7 @@ Node lắng nghe ở `http://127.0.0.1:8545`, chainId **31337**, in ra 20 accoun
 **Terminal 2** — deploy vào node đó:
 
 ```bash
-cd D:\thesis\land-registry-zkp; pnpm --filter blockchain run deploy:localhost
+cd <path-to>/land-registry-zkp; pnpm --filter blockchain run deploy:localhost
 ```
 
 Output mẫu (địa chỉ local là tất định, deploy lại luôn ra y hệt):
@@ -247,7 +249,7 @@ Nghĩa là: **bộ `blockchain/circuits/build/` trên máy bạn là thứ duy n
 
 ### 3.1 Checklist trước khi bấm deploy
 
-- [ ] `pnpm run test:blockchain` ra đủ **99 passing**
+- [ ] `pnpm run test:blockchain` ra đủ **101 passing**
 - [ ] Giai đoạn 2 đã chạy trơn, kể cả `SMOKE_PUBLISH=1` và verify Etherscan
 - [ ] `AUTHORITY_ORG_NAME` trong `.env` đã là tên cuối cùng (khớp X.509 sẽ dùng ở Phase 9)
 - [ ] Ví deployer còn ≥ 0.05 Sepolia ETH
@@ -308,8 +310,8 @@ Ba hàm `verify*` là `view` → gọi off-chain (qua RPC) **không tốn gas th
 
 | Lỗi | Nguyên nhân | Xử lý |
 |---|---|---|
-| `No projects matched the filters in "C:\Users\..."` | Đang đứng ngoài repo; pnpm tìm workspace khác trên máy | `cd D:\thesis\land-registry-zkp` rồi chạy lại |
-| `HH108: Cannot connect to the network localhost` | Chưa mở node ở terminal 1 | `cd D:\thesis\land-registry-zkp; pnpm --filter blockchain run node` |
+| `No projects matched the filters in "C:\Users\..."` | Đang đứng ngoài repo; pnpm tìm workspace khác trên máy | `cd <path-to>/land-registry-zkp` rồi chạy lại |
+| `HH108: Cannot connect to the network localhost` | Chưa mở node ở terminal 1 | `cd <path-to>/land-registry-zkp; pnpm --filter blockchain run node` |
 | `No contract code at 0x...` | Node local đã restart sau khi deploy | Deploy lại (bước 1.2) |
 | `Missing contracts/verifiers/Groth16Verifier*.sol` | Chưa chạy trusted setup | Bước 0.2 |
 | `HH12: artifact ... not found` | Đã sync verifier nhưng chưa compile | `pnpm run compile` |
@@ -328,7 +330,7 @@ Ba hàm `verify*` là `view` → gọi off-chain (qua RPC) **không tốn gas th
 
 ## 6. Bảng lệnh nhanh
 
-Mọi lệnh giả định đã `cd D:\thesis\land-registry-zkp`.
+Mọi lệnh giả định đã `cd <path-to>/land-registry-zkp`.
 
 ```bash
 # Chuẩn bị
@@ -336,15 +338,15 @@ pnpm install
 pnpm --filter blockchain run circuits:compile
 pnpm --filter blockchain run circuits:setup      # sinh zkey + sync verifier
 pnpm run compile
-pnpm run test:blockchain                          # 99 passing
+pnpm run test:blockchain                          # 101 passing
 
 # Local — terminal 1 (để nguyên, đừng đóng)
-cd D:\thesis\land-registry-zkp; pnpm --filter blockchain run node
+cd <path-to>/land-registry-zkp; pnpm --filter blockchain run node
 ```
 
 ```bash
 # Local — terminal 2
-cd D:\thesis\land-registry-zkp
+cd <path-to>/land-registry-zkp
 pnpm --filter blockchain run deploy:localhost
 pnpm --filter blockchain run smoke:localhost      # read-only
 $env:SMOKE_PUBLISH='1'; pnpm --filter blockchain run smoke:localhost   # vòng đầy đủ
