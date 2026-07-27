@@ -34,6 +34,17 @@ contract RootRegistry is AccessControl {
     /// @notice Sequential version counter incremented on each root publish.
     uint256 public rootVersion;
 
+    // TODO (D30, Phase 4): anchor issuer identity on-chain to close the
+    //   "is this address really the state authority?" gap. Add:
+    //     mapping(address => bytes32) public authorityInstitute;
+    //   Set authorityInstitute[account] = keccak256(bytes(orgName)) at the moment
+    //   STATE_AUTHORITY_ROLE is granted (orgName = X.509 Subject "O"). Keep it a
+    //   mapping, NOT a single immutable — the system anchors multiple authorities
+    //   (e.g. one Sở TN&MT per province). The contract only STORES this anchor;
+    //   X.509 chain + ethereumAccountSignature verification stays OFF-CHAIN in the
+    //   verifier portal (Phase 9) — RSA-2048 / ECDSA P-256 != secp256k1, so on-chain
+    //   verification is far too costly. See CODING_ROADMAP.md §0 (D30) + §3.
+
     // -------------------------------------------------------------------------
     // Events
     // -------------------------------------------------------------------------
@@ -82,6 +93,13 @@ contract RootRegistry is AccessControl {
 
     /**
      * @notice Verify that a given leaf is included in the latest published root.
+     *
+     * TODO (D11, Phase 4): DELETE this Merkle-path-only function (and this comment)
+     *      entirely. Merkle inclusion is already proven INSIDE the ZK circuits;
+     *      a separate on-chain path check is redundant and wastes gas. It survives
+     *      here only as a leftover stub — the description below predates D11 and is
+     *      no longer the intended design. See CODING_ROADMAP.md §0 (D11) + §3.
+     *
      * @dev This is an on-chain verification helper. The heavy ZKP verification
      *      (Groth16) will be done by a generated snarkjs Verifier contract placed
      *      in contracts/verifiers/. This function handles simple Merkle path checks.
