@@ -4,12 +4,18 @@
  * Wrapper around snarkjs for Groth16 proof generation and verification.
  *
  * ⚠️  IMPORTANT DESIGN RULE:
- *   This file is the single entry point for all snarkjs operations in the project.
- *   Backend (proof.service.ts) and the trusted-setup scripts import from here —
- *   never call snarkjs directly outside this file. The browser prover (frontend
- *   lib/zkp.ts) is the one documented exception: it calls snarkjs directly with
- *   fetched WASM/zkey URLs, and reuses only the browser-safe primitives
- *   (assertTimestampFresh + PUBLIC_SIGNAL_ORDER) — see the lazy `fs` note below.
+ *   This file is the single entry point for Groth16 proof GENERATION and
+ *   VERIFICATION (snarkjs.groth16.fullProve / groth16.verify). Backend
+ *   (proof.service.ts), the trusted-setup scripts, and tests prove/verify only
+ *   through here — never call groth16.fullProve/verify directly elsewhere. The
+ *   browser prover (frontend lib/zkp.ts) is the one documented exception: it
+ *   calls snarkjs directly with fetched WASM/zkey URLs, and reuses only the
+ *   browser-safe primitives (assertTimestampFresh + PUBLIC_SIGNAL_ORDER) — see
+ *   the lazy `fs` note below.
+ *
+ *   The one-time trusted-setup APIs (snarkjs.r1cs.* / snarkjs.zKey.*) are a
+ *   different concern — key generation, not proving — and are called directly
+ *   in scripts/setup/trustedSetup.ts; they are intentionally NOT routed here.
  *
  * Groth16 workflow:
  *   1. Compile circuit: circom ownership.circom --r1cs --wasm --sym
@@ -152,7 +158,7 @@ export function assertProofFresh(
  * @returns            { wasmPath, zkeyPath, vkeyPath }.
  */
 export function getCircuitPaths(
-  circuitName: string,
+  circuitName: CircuitType,
   baseDir: string,
 ): { wasmPath: string; zkeyPath: string; vkeyPath: string } {
   const buildDir = path.join(baseDir, 'circuits', 'build', circuitName);

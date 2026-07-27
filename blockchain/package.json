@@ -6,6 +6,9 @@
   "exports": {
     "./shared": "./shared/index.ts"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "hardhat": "hardhat",
     "compile": "hardhat compile",
