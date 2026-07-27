@@ -16,11 +16,12 @@ import * as path from 'path';
 
 import { PUBLIC_SIGNAL_ORDER } from '../shared/circuitInputs';
 import { nowUnixTimestamp } from '../shared/datetime';
-import { ProofPackage } from '../shared/types';
+import { Groth16Proof, ProofPackage } from '../shared/types';
 import {
   assertProofFresh,
   generateGroth16Proof,
   getCircuitPaths,
+  toSolidityCalldata,
   verifyGroth16Proof,
 } from '../shared/zkpHelper';
 import { buildSampleInput } from '../scripts/setup/sampleWitness';
@@ -67,6 +68,33 @@ describe('shared/zkpHelper (Phase 3)', () => {
         ).to.throw(/stale/);
       });
     }
+  });
+
+  describe('toSolidityCalldata (Phase 4)', () => {
+    it('drops the projective markers and swaps each pi_b coordinate pair', () => {
+      const proof: Groth16Proof = {
+        pi_a: ['1', '2', '1'],
+        pi_b: [
+          ['3', '4'],
+          ['5', '6'],
+          ['1', '0'],
+        ],
+        pi_c: ['7', '8', '1'],
+        protocol: 'groth16',
+        curve: 'bn128',
+      };
+
+      // snarkjs emits G2 coordinates as [x.a, x.b]; the EVM pairing precompile
+      // wants [x.b, x.a] — the swap here is what the on-chain verifiers expect.
+      expect(toSolidityCalldata(proof)).to.deep.equal({
+        a: ['1', '2'],
+        b: [
+          ['4', '3'],
+          ['6', '5'],
+        ],
+        c: ['7', '8'],
+      });
+    });
   });
 
   describe('generate + verify (integration — needs `circuits:setup` artifacts)', () => {

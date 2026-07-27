@@ -1,7 +1,9 @@
 # Land Registry ZKP
 
 > **Pre-thesis / Thesis**: Application of Blockchain in Real Estate Management  
-> Privacy-preserving Land Use Rights (LUR) registry using **Merkle tree + Zero-Knowledge Proofs (Groth16)** on Ethereum.
+> Privacy-preserving Land Use Rights (LUR) registry using **Merkle tree commitments + Zero-Knowledge Proofs (Groth16)** on Ethereum.
+
+Records live off-chain; only the Merkle root is published on-chain. Owners prove facts about their land — "I own this", "this title is unencumbered and has ≥ N years left", "ownership moved from A to B" — without revealing the record itself.
 
 ---
 
@@ -12,11 +14,37 @@ land-registry-zkp/
 ├── blockchain/          # Cryptographic layer: circom circuits, Hardhat contracts, shared ZKP logic
 ├── web-app/
 │   ├── backend/         # NestJS API: LUR record management, Merkle proof endpoints, chain interaction
-│   └── frontend/        # Next.js (App Router): owner dashboard, verifier interface
+│   └── frontend/        # Next.js (App Router): government / owner / verifier portals
 └── docker-compose.yml   # PostgreSQL 16 (host port 5433)
 ```
 
 **Design principle**: All Merkle tree / Poseidon hash logic lives exclusively in `blockchain/shared/`. Both `backend` and `frontend` import it from the `@land-registry/blockchain` workspace package — no logic duplication.
+
+**Companion docs**
+| Document | What it covers |
+|---|---|
+| [`DEPLOYMENT.md`](./DEPLOYMENT.md) | Deploy runbook: local node → Sepolia trial → Sepolia official, plus troubleshooting |
+| `CODING_ROADMAP.md` | Locked technical design: schema, circuit layout, contract architecture, and the binding Design Decisions Log (D1–D33) — *author's working copy, not committed* |
+| `THESIS_IMPLEMENTATION_GUIDE.md` | Academic framing, timeline, evaluation checklist — *author's working copy, not committed* |
+
+---
+
+## Current Status
+
+Phases 0–4 of the roadmap are implemented and tested. The cryptographic and on-chain layers are complete; the web application is scaffolded but its service bodies are not written yet.
+
+| Phase | Area | Status |
+|---|---|---|
+| 0 | Mock data generator, UTC+7 datetime utils | ✅ Done |
+| 1 | Merkle layer — Poseidon, fixed-depth-20 sparse tree | ✅ Done |
+| 2 | Circuits — `ownership`, `mortgage`, `transfer` (+3 shared templates) | ✅ Done |
+| 3 | Trusted setup — Groth16 zkey/vkey/verifier export, prove + verify E2E | ✅ Done |
+| 4 | Smart contracts — `RootRegistry`, `LandRegistryVerifier`, deploy scripts | ✅ Done |
+| 5–6 | Backend — government portal API, owner/proof API | ⬜ Not started |
+| 7–9 | Frontend — government / owner / verifier portals | ⬜ Not started |
+| 10–11 | E2E integration, evaluation metrics, thesis writing | ⬜ Not started |
+
+**Test suite**: 101 passing (`pnpm run test:blockchain`). On a checkout without trusted-setup artifacts the proof-dependent tests self-skip → 85 passing + 16 pending, never failing.
 
 ---
 
@@ -24,119 +52,133 @@ land-registry-zkp/
 
 | Tool | Version | Install |
 |------|---------|---------|
-| Node.js | ≥ 18 | https://nodejs.org |
+| Node.js | ≥ 20 | https://nodejs.org |
 | pnpm | ≥ 8 | `npm i -g pnpm` |
-| Docker Desktop | latest | https://www.docker.com/products/docker-desktop |
 | Rust + Cargo | stable | https://rustup.rs |
-| **circom compiler** | ≥ 2.x | `cargo install circom` *(see note below)* |
+| **circom compiler** | ≥ 2.x | `cargo install circom` *(see note)* |
+| Docker Desktop | latest | https://www.docker.com/products/docker-desktop — *only needed from Phase 5* |
 
 > ⚠️ **circom is a Rust binary, NOT an npm package.**  
-> Install it with: `cargo install circom`  
-> Verify: `circom --version`  
-> This is required before compiling any `.circom` circuit files (not needed for the initial setup skeleton).
+> Install with `cargo install circom`, verify with `circom --version`.  
+> Required to compile circuits and to run the circuit tests. Not needed for the rest of the stack.
 
 ---
 
 ## Quick Start
 
-### 1. Clone & Install Dependencies
+Everything below runs from the repo root.
+
+### 1. Clone & install
 
 ```bash
 git clone <repo-url>
 cd land-registry-zkp
-
-# Copy and fill environment variables
 cp .env.example .env
-
-# Install all workspace dependencies from root
 pnpm install
 ```
 
-### 2. Start PostgreSQL via Docker
+Nothing in `.env` is required for the local test suite — fill it in when you reach the deploy step.
+
+### 2. Compile the circuits
 
 ```bash
-# Starts postgres:16-alpine on host port 5433
-docker compose up -d
-
-# Verify it's running
-docker compose ps
+pnpm --filter blockchain run circuits:compile
 ```
 
-> Port **5433** is used (not 5432) to avoid conflicts with other local projects.
+Outputs `.r1cs` / `.wasm` / `.sym` into `blockchain/circuits/build/<name>/` and prints the constraint table.
 
-### 3. Run Prisma Migrations (first time)
+### 3. Run the trusted setup
 
 ```bash
-# From root — targets the backend package
-pnpm --filter backend prisma migrate dev --name init
+pnpm --filter blockchain run circuits:setup
 ```
 
-### 4. Run Each Package
+⚠️ **Do not skip this.** It produces the proving keys *and* the three generated `Groth16Verifier*.sol` contracts, all of which are gitignored — a fresh clone does not have them. The step downloads two public Powers-of-Tau files (~18 MB and ~36 MB, cached afterwards), runs the circuit-specific Phase-2 setup, then proves and verifies each circuit end to end.
+
+It also auto-syncs the generated verifiers into `blockchain/contracts/verifiers/` so Hardhat can compile them.
+
+### 4. Compile the contracts
 
 ```bash
-# Compile Solidity contracts (blockchain package)
-pnpm --filter blockchain hardhat compile
-
-# Start NestJS backend (port 3001)
-pnpm --filter backend run start:dev
-
-# Start Next.js frontend (port 3000)
-pnpm --filter frontend run dev
+pnpm run compile
 ```
 
-Or use root shortcuts:
+Builds all Solidity sources and regenerates the TypeChain bindings.
+
+### 5. Run the tests
+
 ```bash
-pnpm run db:up          # Start Docker Postgres
-pnpm run compile        # Compile contracts
-pnpm run dev:backend    # Start backend
-pnpm run dev:frontend   # Start frontend
+pnpm run test:blockchain
 ```
+
+Expect **101 passing** (~25s). If you see 85 passing + 16 pending, step 3 did not complete — the proof-dependent tests skipped themselves.
+
+### 6. Deploy (optional)
+
+```bash
+pnpm --filter blockchain run node          # terminal 1 — local chain, leave running
+```
+
+```bash
+pnpm --filter blockchain run deploy:localhost   # terminal 2
+pnpm --filter blockchain run smoke:localhost    # health check
+```
+
+See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the full runbook, including Sepolia and Etherscan verification.
+
+### 7. Database — needed from Phase 5 onward
+
+The backend service bodies are not implemented yet, so this is setup-ahead, not a requirement to run anything today.
+
+```bash
+pnpm run db:up                             # postgres:16-alpine on host port 5433
+pnpm --filter backend prisma migrate dev   # applies the existing migrations
+```
+
+> Port **5433** (not 5432) avoids conflicts with other local Postgres instances.
 
 ---
 
-## Recommended Development Order
+## Commands Reference
 
-Follow this sequence to avoid dependency blockers:
+```bash
+# Circuits & proving keys
+pnpm --filter blockchain run circuits:compile     # circom → build/ + constraint table
+pnpm --filter blockchain run circuits:setup       # trusted setup + verifier sync
+pnpm --filter blockchain run verifiers:sync       # re-sync verifiers only (no re-setup)
+pnpm --filter blockchain run mock:generate [N]    # regenerate fixtures (default 20 records)
 
-### Phase 1 — Blockchain Layer (`blockchain/`)
-1. Implement `shared/types.ts` — define `LURRecord`, `ProofInput`, `MerkleProofData`
-2. Implement `shared/merkleTree.ts` — Poseidon-based Merkle tree (circomlibjs + merkletreejs)
-3. Implement `shared/zkpHelper.ts` — snarkjs Groth16 wrapper
-4. Write and compile circom circuits: `circuits/common/merkleProof.circom` → `circuits/ownership.circom` etc.
-5. Run trusted setup: download powers-of-tau `.ptau` → `blockchain/ptau/`
-6. Implement and test `contracts/RootRegistry.sol` via Hardhat
+# Contracts
+pnpm run compile                                  # hardhat compile + typechain
+pnpm run test:blockchain                          # full test suite
+pnpm --filter blockchain run node                 # local chain on 127.0.0.1:8545
+pnpm --filter blockchain run deploy:localhost     # deploy to that chain
+pnpm --filter blockchain run deploy:sepolia       # deploy to Sepolia
+pnpm --filter blockchain run smoke:localhost      # verify a live deployment
+pnpm --filter blockchain run smoke:sepolia
 
-### Phase 2 — Backend (`web-app/backend/`)
-> Requires: Docker Postgres running, Phase 1 shared logic done
-
-1. Finalize Prisma schema, run `prisma migrate dev`
-2. Implement `records.service.ts` — CRUD for LUR records
-3. Implement `chain.service.ts` — connect ethers.js, call `RootRegistry`
-4. Implement `proof.service.ts` — generate Merkle proofs using `@land-registry/blockchain`
-
-### Phase 3 — Frontend (`web-app/frontend/`)
-> Requires: Backend running
-
-1. Configure wagmi + RainbowKit in `lib/wallet.ts`
-2. Implement `lib/api.ts` — calls to NestJS backend
-3. Implement `lib/zkp.ts` — client-side proof generation via snarkjs
-4. Build owner dashboard (`app/owner/page.tsx`)
-5. Build verifier interface (`app/verifier/page.tsx`)
+# Web app (scaffolded, service bodies pending)
+pnpm run db:up / db:down                          # docker compose
+pnpm run dev:backend                              # NestJS, port 3001
+pnpm run dev:frontend                             # Next.js, port 3000
+```
 
 ---
 
 ## Environment Variables
 
-See [`.env.example`](./.env.example) for all required variables.
+See [`.env.example`](./.env.example) for the full list.
 
-Key variables:
-| Variable | Description |
-|----------|-------------|
-| `SEPOLIA_RPC_URL` | Alchemy/Infura RPC for Sepolia testnet |
-| `PRIVATE_KEY` | Deployer wallet private key |
-| `DATABASE_URL` | PostgreSQL connection (default: port 5433 via Docker) |
-| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Deployed `RootRegistry` address |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | From cloud.walletconnect.com |
+| Variable | Description | Needed for |
+|----------|-------------|-----------|
+| `SEPOLIA_RPC_URL` | Alchemy/Infura RPC for Sepolia | Sepolia deploy |
+| `PRIVATE_KEY` | Deployer wallet private key | Sepolia deploy |
+| `ETHERSCAN_API_KEY` | Source verification via `hardhat verify` | Sepolia deploy |
+| `AUTHORITY_ADDRESS` | Account granted `STATE_AUTHORITY_ROLE` — blank = deployer | Any deploy |
+| `AUTHORITY_ORG_NAME` | X.509 Subject `O` anchored on-chain (D30) | Any deploy |
+| `DATABASE_URL` | PostgreSQL connection (port 5433 via Docker) | Phase 5+ |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Deployed `RootRegistry` address | Phase 7+ |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | From cloud.walletconnect.com | Phase 7+ |
 
 ---
 
@@ -144,12 +186,14 @@ Key variables:
 
 | Layer | Technology |
 |-------|-----------|
-| ZKP Circuits | circom 2.x |
-| Proof System | snarkjs (Groth16) |
-| Merkle Tree | merkletreejs + Poseidon (circomlibjs) |
-| Smart Contracts | Solidity 0.8.24 + OpenZeppelin |
-| Contract Dev | Hardhat (TypeScript) |
-| Backend | NestJS + Prisma + ethers.js |
+| ZKP Circuits | circom 2.2.3 |
+| Proof System | snarkjs (Groth16), Powers-of-Tau from the public Hermez/iden3 ceremony |
+| Merkle Tree | Hand-written fixed-depth-20 **sparse** tree + Poseidon via `circomlibjs` |
+| Smart Contracts | Solidity 0.8.36 + OpenZeppelin 5 |
+| Contract Dev | Hardhat 2 (TypeScript) + TypeChain |
+| Backend | NestJS 10 + Prisma 7 + ethers v6 |
 | Database | PostgreSQL 16 |
-| Frontend | Next.js 14 (App Router) + wagmi + RainbowKit |
+| Frontend | Next.js 16 (App Router) + React 19 + wagmi + RainbowKit |
 | Package Manager | pnpm workspaces |
+
+> The Merkle tree is deliberately **not** `merkletreejs`: that library pads to the next power of two, while the circuits need a fixed depth of 20 regardless of record count. The package is still listed as a dependency but is never imported.

@@ -13,11 +13,16 @@
     "hardhat": "hardhat",
     "compile": "hardhat compile",
     "test": "hardhat test",
+    "node": "hardhat node",
     "deploy:local": "hardhat run scripts/deploy.ts --network hardhat",
+    "deploy:localhost": "hardhat run scripts/deploy.ts --network localhost",
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
+    "smoke:localhost": "hardhat run scripts/smokeDeployment.ts --network localhost",
+    "smoke:sepolia": "hardhat run scripts/smokeDeployment.ts --network sepolia",
     "mock:generate": "ts-node scripts/generateMockData.ts",
     "circuits:compile": "ts-node scripts/compileCircuits.ts",
     "circuits:setup": "ts-node scripts/setup/setupAll.ts",
+    "verifiers:sync": "ts-node scripts/setup/syncVerifiers.ts",
     "circuits:smoke": "ts-node scripts/setup/smokeOwnership.ts"
   },
   "dependencies": {

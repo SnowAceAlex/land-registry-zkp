@@ -104,8 +104,8 @@ function verifierFileName(circuit: string): string {
  * `pnpm --filter blockchain run circuits:compile` first.
  *
  * The exported .sol keeps snarkjs's default `contract Groth16Verifier` name;
- * Phase 4 is what relocates/renames these into contracts/verifiers/ for the
- * on-chain dispatcher (they are not compiled by Hardhat from build/).
+ * syncVerifiers.ts relocates/renames it into contracts/verifiers/ for the
+ * on-chain dispatcher (the copy under build/ is not compiled by Hardhat).
  */
 export async function setupCircuit(circuit: string): Promise<CircuitSetupResult> {
   const buildDir = buildDirFor(circuit);
