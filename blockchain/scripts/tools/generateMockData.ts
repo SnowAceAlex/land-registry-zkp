@@ -1,5 +1,5 @@
 /**
- * scripts/generateMockData.ts
+ * scripts/tools/generateMockData.ts
  * ─────────────────────────────────────────────────────────────────────────────
  * Phase 0 — generates N mock LURRecord + matching ownerSecret pairs for use
  * across every later phase (Merkle tests, circuit witness tests, dev seeding).
@@ -16,10 +16,11 @@ import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { fromUnixTimestamp, nowUnixTimestamp } from '../shared/datetime';
-import { poseidonHash } from '../shared/merkleTree';
-import { hashOffchainMetadata } from '../shared/offchainMetadata';
-import { EncumbranceStatus, LURRecord, TenureType, UseType } from '../shared/types';
+import { fromUnixTimestamp, nowUnixTimestamp } from '../../shared/datetime';
+import { poseidonHash } from '../../shared/merkleTree';
+import { hashOffchainMetadata } from '../../shared/offchainMetadata';
+import { EncumbranceStatus, LURRecord, TenureType, UseType } from '../../shared/types';
+import { BLOCKCHAIN_DIR } from '../lib/paths';
 
 const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
 
@@ -330,7 +331,7 @@ async function main() {
   const count = Number(process.argv[2]) || 20;
   const { records, secrets } = await generateMockRecords(count);
 
-  const fixturesDir = path.resolve(__dirname, '../fixtures');
+  const fixturesDir = path.join(BLOCKCHAIN_DIR, 'fixtures');
   fs.mkdirSync(fixturesDir, { recursive: true });
 
   const recordsPath = path.join(fixturesDir, 'mockRecords.json');

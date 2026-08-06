@@ -1,5 +1,5 @@
 /**
- * scripts/transferSmoke.ts
+ * scripts/tools/transferSmoke.ts
  * ─────────────────────────────────────────────────────────────────────────────
  * Drives a full transfer through the Phase 5 API, playing both parties.
  *
@@ -26,14 +26,14 @@ import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { buildTransferInput } from '../shared/circuitInputs';
-import { nowUnixTimestamp } from '../shared/datetime';
-import { poseidonHash } from '../shared/merkleTree';
-import { OwnerSecretFile, Receipt, receiptToLURRecord } from '../shared/receipt';
-import { LURRecord } from '../shared/types';
-import { generateGroth16Proof, getCircuitPaths } from '../shared/zkpHelper';
-import { abort, postJson } from './lib/http';
-import { BLOCKCHAIN_DIR } from './lib/paths';
+import { buildTransferInput } from '../../shared/circuitInputs';
+import { nowUnixTimestamp } from '../../shared/datetime';
+import { poseidonHash } from '../../shared/merkleTree';
+import { OwnerSecretFile, Receipt, receiptToLURRecord } from '../../shared/receipt';
+import { LURRecord } from '../../shared/types';
+import { generateGroth16Proof, getCircuitPaths } from '../../shared/zkpHelper';
+import { abort, postJson } from '../lib/http';
+import { BLOCKCHAIN_DIR } from '../lib/paths';
 
 /** What POST /transfers/preview returns (D28 step 2). */
 interface TransferPreview {

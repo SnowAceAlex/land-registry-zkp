@@ -5,7 +5,7 @@
  * turn it back into an `LURRecord`.
  *
  * WHY THIS IS SHARED. A receipt has one writer (the backend issuance flow) and
- * several readers: `scripts/verifyReceipt.ts`, `scripts/transferSmoke.ts`, and
+ * several readers: `scripts/tools/verifyReceipt.ts`, `scripts/tools/transferSmoke.ts`, and
  * the Phase 9 browser verifier. Each reader has to rebuild the exact leaf the
  * registry hashed, which means naming all ten descriptive fields and applying
  * the `area` conversion below. That reconstruction was written out by hand four

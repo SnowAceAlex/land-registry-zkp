@@ -1,8 +1,8 @@
 /**
- * scripts/setup/sampleWitness.ts
+ * scripts/circuits/sampleWitness.ts
  * ─────────────────────────────────────────────────────────────────────────────
  * Builds ONE valid witness per circuit for the end-to-end prove/verify pass in
- * setupAll.ts + smokeOwnership.ts (and reused by test/zkpHelper.test.ts).
+ * setupAll.ts + smokeOwnership.ts (and reused by test/shared/zkpHelper.test.ts).
  *
  * Everything goes through the D25 builders in shared/circuitInputs.ts — no
  * hand-written witness JSON. The subject record is deterministically valid
@@ -34,7 +34,7 @@ import {
   TenureType,
   UseType,
 } from '../../shared/types';
-import { generateMockRecords } from '../generateMockData';
+import { generateMockRecords } from '../tools/generateMockData';
 
 type CircuitType = ProofPackage['circuitType'];
 

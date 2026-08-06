@@ -1,13 +1,13 @@
 import { expect } from 'chai';
 
-import { generateMockRecords } from '../scripts/generateMockData';
+import { generateMockRecords } from '../../scripts/tools/generateMockData';
 import {
   TREE_DEPTH,
   buildTree,
   generateMerkleProof,
   getMerkleRoot,
   verifyMerkleProof,
-} from '../shared/merkleTree';
+} from '../../shared/merkleTree';
 
 describe('merkleTree (Phase 1)', () => {
   it('builds a tree and produces a non-zero root', async () => {

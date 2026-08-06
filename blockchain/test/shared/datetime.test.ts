@@ -17,7 +17,7 @@ import {
   nowUnixTimestamp,
   toUnixTimestamp,
   fromUnixTimestamp,
-} from '../shared/datetime';
+} from '../../shared/datetime';
 
 const NOW = 1_800_000_000n; // fixed reference so tests don't race the clock
 

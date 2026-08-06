@@ -1,8 +1,8 @@
 /**
- * scripts/smokeDeployment.ts
+ * scripts/chain/smokeDeployment.ts
  * ─────────────────────────────────────────────────────────────────────────────
  * Check a LIVE deployment (local node or Sepolia) end to end, reading the
- * addresses from deployments/<network>.json written by scripts/deploy.ts.
+ * addresses from deployments/<network>.json written by scripts/chain/deploy.ts.
  *
  * Two modes:
  *   default          read-only — prints registry state, the D30 identity anchor
@@ -13,9 +13,9 @@
  *                    generates a real ownership proof and verifies it on-chain.
  *
  * Usage:
- *   pnpm --filter blockchain run smoke:deployment                 # read-only
- *   SMOKE_PUBLISH=1 pnpm --filter blockchain run smoke:deployment # round trip
- *   (PowerShell: $env:SMOKE_PUBLISH=1; pnpm --filter blockchain run smoke:deployment)
+ *   pnpm --filter blockchain run chain:smoke:localhost                 # read-only
+ *   SMOKE_PUBLISH=1 pnpm --filter blockchain run chain:smoke:localhost # round trip
+ *   (PowerShell: $env:SMOKE_PUBLISH=1; pnpm --filter blockchain run chain:smoke:localhost)
  *
  * Add --network localhost / --network sepolia via the package scripts.
  *
@@ -25,12 +25,12 @@
 
 import { ethers, network } from 'hardhat';
 
-import { PUBLIC_SIGNAL_ORDER } from '../shared/circuitInputs';
-import { fromUnixTimestamp } from '../shared/datetime';
-import { loadDeployment } from '../shared/deployments';
-import { generateGroth16Proof, getCircuitPaths, toSolidityCalldata } from '../shared/zkpHelper';
-import { BLOCKCHAIN_DIR } from './lib/paths';
-import { buildSampleInput } from './setup/sampleWitness';
+import { PUBLIC_SIGNAL_ORDER } from '../../shared/circuitInputs';
+import { fromUnixTimestamp } from '../../shared/datetime';
+import { loadDeployment } from '../../shared/deployments';
+import { generateGroth16Proof, getCircuitPaths, toSolidityCalldata } from '../../shared/zkpHelper';
+import { BLOCKCHAIN_DIR } from '../lib/paths';
+import { buildSampleInput } from '../circuits/sampleWitness';
 
 async function main() {
   const deployment = loadDeployment(BLOCKCHAIN_DIR, network.name);

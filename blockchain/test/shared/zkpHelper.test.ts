@@ -1,5 +1,5 @@
 /**
- * test/zkpHelper.test.ts
+ * test/shared/zkpHelper.test.ts
  * ─────────────────────────────────────────────────────────────────────────────
  * Tests for shared/zkpHelper.ts (Phase 3).
  *
@@ -14,18 +14,18 @@ import { expect } from 'chai';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { PUBLIC_SIGNAL_ORDER } from '../shared/circuitInputs';
-import { nowUnixTimestamp } from '../shared/datetime';
-import { Groth16Proof, ProofPackage } from '../shared/types';
+import { PUBLIC_SIGNAL_ORDER } from '../../shared/circuitInputs';
+import { nowUnixTimestamp } from '../../shared/datetime';
+import { Groth16Proof, ProofPackage } from '../../shared/types';
 import {
   assertProofFresh,
   generateGroth16Proof,
   getCircuitPaths,
   toSolidityCalldata,
   verifyGroth16Proof,
-} from '../shared/zkpHelper';
-import { BLOCKCHAIN_DIR } from '../scripts/lib/paths';
-import { buildSampleInput } from '../scripts/setup/sampleWitness';
+} from '../../shared/zkpHelper';
+import { BLOCKCHAIN_DIR } from '../../scripts/lib/paths';
+import { buildSampleInput } from '../../scripts/circuits/sampleWitness';
 
 type CircuitType = ProofPackage['circuitType'];
 const CIRCUITS: CircuitType[] = ['ownership', 'mortgage', 'transfer'];

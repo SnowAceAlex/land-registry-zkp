@@ -1,5 +1,5 @@
 /**
- * scripts/setup/smokeOwnership.ts   (pnpm --filter blockchain run circuits:smoke)
+ * scripts/circuits/smokeOwnership.ts   (pnpm --filter blockchain run circuits:smoke)
  * ─────────────────────────────────────────────────────────────────────────────
  * Fast single-circuit toolchain smoke test (ownership only).
  *

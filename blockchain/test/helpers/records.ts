@@ -3,7 +3,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Fixtures for circuit tests.
  *
- * scripts/generateMockData.ts randomises tenureType, encumbranceStatus and
+ * scripts/tools/generateMockData.ts randomises tenureType, encumbranceStatus and
  * validityPeriod, which is right for tree-shaped tests but useless when a test
  * needs to hit one specific branch ("an expired FIXED_TERM title", "a
  * MORTGAGED title"). These helpers build a record with exactly the fields under
@@ -19,7 +19,7 @@ import {
   LURMerkleTree,
 } from '../../shared/merkleTree';
 import { MerkleProofData } from '../../shared/types';
-import { generateMockRecords } from '../../scripts/generateMockData';
+import { generateMockRecords } from '../../scripts/tools/generateMockData';
 
 export const SECONDS_PER_YEAR = 365n * 24n * 60n * 60n;
 

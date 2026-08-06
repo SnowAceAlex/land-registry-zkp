@@ -1,5 +1,5 @@
 /**
- * scripts/setup/setupAll.ts   (pnpm --filter blockchain run circuits:setup)
+ * scripts/circuits/setupAll.ts   (pnpm --filter blockchain run circuits:setup)
  * ─────────────────────────────────────────────────────────────────────────────
  * Phase 3 — Trusted Setup for all three circuits.
  *

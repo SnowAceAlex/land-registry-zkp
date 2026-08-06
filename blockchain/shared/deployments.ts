@@ -1,12 +1,12 @@
 /**
  * shared/deployments.ts
  * ─────────────────────────────────────────────────────────────────────────────
- * Reads `blockchain/deployments/<network>.json` — the record `scripts/deploy.ts`
+ * Reads `blockchain/deployments/<network>.json` — the record `scripts/chain/deploy.ts`
  * writes — so every consumer talks to the deployment that was actually made
  * rather than to addresses copied into env by hand.
  *
- * WHY THIS IS SHARED. The backend's ChainService, `scripts/smokeDeployment.ts`
- * and `scripts/verifyReceipt.ts` each declared their own `DeploymentRecord` and
+ * WHY THIS IS SHARED. The backend's ChainService, `scripts/chain/smokeDeployment.ts`
+ * and `scripts/tools/verifyReceipt.ts` each declared their own `DeploymentRecord` and
  * their own loader. The three had already drifted — one of them knew about
  * `deployedAt` and the others did not — which is the mild version of the
  * failure mode: the bad version is a consumer reading a field the writer
@@ -23,7 +23,7 @@ import * as path from 'path';
 
 export type ChainNetwork = 'localhost' | 'sepolia' | 'hardhat';
 
-/** The shape `scripts/deploy.ts` writes. Adding a field here is a contract change. */
+/** The shape `scripts/chain/deploy.ts` writes. Adding a field here is a contract change. */
 export interface DeploymentRecord {
   network: string;
   chainId: number;

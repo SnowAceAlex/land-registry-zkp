@@ -1,5 +1,5 @@
 /**
- * scripts/verifyReceipt.ts
+ * scripts/tools/verifyReceipt.ts
  * ─────────────────────────────────────────────────────────────────────────────
  * Checks an issued receipt.json against the live chain — the manual-test
  * counterpart to what the Phase 9 verifier portal will do in the browser.
@@ -22,13 +22,13 @@
 import * as fs from 'fs';
 import { ethers } from 'ethers';
 
-import { loadDeployment, resolveRpcUrl } from '../shared/deployments';
-import { readOrganizationName, verifyIssuerSignature } from '../shared/issuerIdentity';
-import { hashRecord, TREE_DEPTH, verifyMerkleProof } from '../shared/merkleTree';
-import { Receipt, receiptToLURRecord } from '../shared/receipt';
-import { RootRegistry__factory } from '../typechain-types';
-import { BLOCKCHAIN_DIR } from './lib/paths';
-import { CheckReport } from './lib/report';
+import { loadDeployment, resolveRpcUrl } from '../../shared/deployments';
+import { readOrganizationName, verifyIssuerSignature } from '../../shared/issuerIdentity';
+import { hashRecord, TREE_DEPTH, verifyMerkleProof } from '../../shared/merkleTree';
+import { Receipt, receiptToLURRecord } from '../../shared/receipt';
+import { RootRegistry__factory } from '../../typechain-types';
+import { BLOCKCHAIN_DIR } from '../lib/paths';
+import { CheckReport } from '../lib/report';
 
 async function main(): Promise<void> {
   const receiptPath = process.argv[2];

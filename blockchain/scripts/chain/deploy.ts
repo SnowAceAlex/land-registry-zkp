@@ -1,5 +1,5 @@
 /**
- * scripts/deploy.ts
+ * scripts/chain/deploy.ts
  * ─────────────────────────────────────────────────────────────────────────────
  * Phase 4 — deploy the full on-chain stack (D12):
  *   RootRegistry

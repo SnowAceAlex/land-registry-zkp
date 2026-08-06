@@ -1,5 +1,5 @@
 /**
- * scripts/setup/syncVerifiers.ts   (pnpm --filter blockchain run verifiers:sync)
+ * scripts/circuits/syncVerifiers.ts   (pnpm --filter blockchain run verifiers:sync)
  * ─────────────────────────────────────────────────────────────────────────────
  * Phase 4 — copy the snarkjs-generated Groth16 verifiers from
  * circuits/build/<name>/ into contracts/verifiers/ so Hardhat compiles them.
@@ -62,7 +62,7 @@ export function syncVerifier(circuit: string): string {
 
   const renamed = source.replace(marker, `contract ${contractName} {`);
   const header =
-    `// AUTO-GENERATED from circuits/build/${circuit}/ by scripts/setup/syncVerifiers.ts — DO NOT EDIT.\n` +
+    `// AUTO-GENERATED from circuits/build/${circuit}/ by scripts/circuits/syncVerifiers.ts — DO NOT EDIT.\n` +
     `// Regenerate via: pnpm --filter blockchain run circuits:setup   (re-sync only: verifiers:sync)\n` +
     `// Contract renamed from Groth16Verifier to ${contractName} to disambiguate the three circuits.\n`;
 

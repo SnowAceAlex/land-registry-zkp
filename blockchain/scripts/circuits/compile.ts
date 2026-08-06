@@ -1,5 +1,5 @@
 /**
- * scripts/compileCircuits.ts
+ * scripts/circuits/compile.ts
  * ─────────────────────────────────────────────────────────────────────────────
  * Compiles the three top-level circuits to R1CS + WASM + symbols and prints a
  * constraint-count table.
@@ -23,7 +23,7 @@ import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { BLOCKCHAIN_DIR } from './lib/paths';
+import { BLOCKCHAIN_DIR } from '../lib/paths';
 
 const BUILD_DIR = path.join(BLOCKCHAIN_DIR, 'circuits', 'build');
 

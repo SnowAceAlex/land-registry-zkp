@@ -1,5 +1,5 @@
 /**
- * scripts/setup/trustedSetup.ts
+ * scripts/circuits/trustedSetup.ts
  * ─────────────────────────────────────────────────────────────────────────────
  * Reusable Groth16 Phase-2 trusted-setup helpers, shared by circuits:setup
  * (setupAll.ts — all three circuits) and circuits:smoke (smokeOwnership.ts —

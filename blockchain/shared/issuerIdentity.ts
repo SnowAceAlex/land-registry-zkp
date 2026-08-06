@@ -12,7 +12,7 @@
  * deployment.
  *
  * WHY THIS IS SHARED. Three parties verify that chain — the backend at startup,
- * `scripts/verifyReceipt.ts`, and the Phase 9 browser portal. Before this file,
+ * `scripts/tools/verifyReceipt.ts`, and the Phase 9 browser portal. Before this file,
  * the signature format lived as prose in `IssuerService`'s docstring and was
  * re-implemented independently by the script. Prose does not fail a build when
  * the two drift; `issuerSignatureMessage` does.
