@@ -10,7 +10,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
-import { GovernmentService } from './government.service';
+import { BundleClaimService } from './bundle-claim.service';
 
 /**
  * BundlesController — one-time bundle download.
@@ -18,12 +18,16 @@ import { GovernmentService } from './government.service';
  *
  * Deliberately NOT behind the government API key: the recipient is the land
  * owner, not an official. The claim token in the URL is the capability, and it
- * works exactly once (see GovernmentService.claimBundle).
+ * works exactly once (see BundleClaimService.claim).
+ *
+ * Lives in IssuanceModule rather than the government portal because handing a
+ * bundle to its owner is the last step of issuing it, not an act of the state
+ * authority.
  */
 @ApiTags('Bundles')
 @Controller('bundles')
 export class BundlesController {
-  constructor(private readonly government: GovernmentService) {}
+  constructor(private readonly bundles: BundleClaimService) {}
 
   @Get('claim/:token')
   @ApiOperation({
@@ -49,7 +53,7 @@ export class BundlesController {
   @ApiNotFoundResponse({ description: 'Unknown token, or the bundle was already downloaded' })
   @ApiGoneResponse({ description: 'The link expired (7-day TTL) and the bundle was deleted' })
   async claim(@Param('token') token: string, @Res() res: Response): Promise<void> {
-    const { propertyId, zip } = await this.government.claimBundle(token);
+    const { propertyId, zip } = await this.bundles.claim(token);
 
     res.set({
       'Content-Type': 'application/zip',

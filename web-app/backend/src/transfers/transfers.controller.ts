@@ -11,16 +11,14 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 
-import { ApiKeyGuard } from './api-key.guard';
+import { ApiKeyGuard, GOV_API_KEY_SECURITY } from '../common/api-key.guard';
+import { RejectTransferDto, SubmitTransferDto, TransferPreviewDto } from './dto/transfer.dto';
 import {
-  RejectTransferDto,
-  SubmitTransferDto,
-  TransferPreviewDto,
+  TransferApprovalResponseDto,
   TransferPreviewResult,
-} from './dto/transfer.dto';
-import { TransferApprovalResponseDto, TransferRequestDto } from './dto/transfer.response.dto';
+  TransferRequestDto,
+} from './dto/transfer.response.dto';
 import { TransfersService } from './transfers.service';
-import { GOV_API_KEY_SECURITY } from '../swagger';
 
 /**
  * TransfersController — base path /api/transfers.

@@ -5,7 +5,7 @@ import { PDFDocument, PDFFont, PDFPage, rgb } from 'pdf-lib';
 import * as QRCode from 'qrcode';
 import { Receipt, TenureType, fromUnixTimestamp } from '@land-registry/blockchain/shared';
 
-import { landUseCodeLabel } from '../government/land-use-code.map';
+import { landUseCodeLabel } from '../land-law/land-use-code.map';
 
 /**
  * PdfService

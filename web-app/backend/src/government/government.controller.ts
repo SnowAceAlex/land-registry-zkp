@@ -21,22 +21,22 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 
+import { ApiKeyGuard, GOV_API_KEY_HEADER, GOV_API_KEY_SECURITY } from '../common/api-key.guard';
 import { parsePageQuery } from '../common/pagination';
-import { ApiKeyGuard } from './api-key.guard';
 import { GovernmentService } from './government.service';
-import { ImportService } from './import.service';
-import { ImportResult, IssueBatchDto } from './dto/import.dto';
+import { ImportService } from '../import/import.service';
+import { ImportResult } from '../import/dto/import.response.dto';
+import { IssueBatchDto } from './dto/issue-batch.dto';
 import {
   IssueBatchResponseDto,
   PropertyListResponseDto,
   PublishRootResponseDto,
   RegistryStatusResponseDto,
 } from './dto/government.response.dto';
-import { GOV_API_KEY_SECURITY } from '../swagger';
 
 @ApiTags('Government')
 @ApiSecurity(GOV_API_KEY_SECURITY)
-@ApiUnauthorizedResponse({ description: 'Missing or invalid x-gov-api-key header' })
+@ApiUnauthorizedResponse({ description: `Missing or invalid ${GOV_API_KEY_HEADER} header` })
 @Controller('government')
 @UseGuards(ApiKeyGuard)
 export class GovernmentController {

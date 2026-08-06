@@ -4,7 +4,8 @@ import * as Papa from 'papaparse';
 import { TenureType, toUnixTimestamp } from '@land-registry/blockchain/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
-import { ImportResult, ImportRow, ImportRowError, ImportRowWarning } from './dto/import.dto';
+import { ImportRow } from './csv-row';
+import { ImportResult, ImportRowError, ImportRowWarning } from './dto/import.response.dto';
 import {
   LandUserType,
   TenureContext,
@@ -13,12 +14,12 @@ import {
   parseLandUserType,
   resolveTenureType,
   classifyLandUseCode,
-} from './land-use-code.map';
+} from '../land-law/land-use-code.map';
 import {
   AddressValidator,
   AdministrativeUnitsService,
   assertIssuingAuthority,
-} from './administrative-units.service';
+} from '../land-law/administrative-units.service';
 import { encumbranceStatusName, tenureTypeName, useTypeName } from '../records/record.mapper';
 
 /**

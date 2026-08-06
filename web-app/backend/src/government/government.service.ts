@@ -1,16 +1,15 @@
 import {
   BadRequestException,
   ConflictException,
-  GoneException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Property } from '@prisma/client';
-import { randomBytes } from 'crypto';
 
 import { ChainService } from '../chain/chain.service';
 import { PaginationParams, pageArgs, serializeProperty } from '../common/pagination';
+import { BundleClaimService } from '../issuance/bundle-claim.service';
 import { IssuanceService } from '../issuance/issuance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RootService } from './root.service';
@@ -34,9 +33,11 @@ import {
  *      (batching is why this is cheap: N properties, one publishRoot)
  *   3. build one bundle per property and store it against a one-time claim
  *      token; each owner downloads only their own
+ *
+ * Steps 1 and 3 belong to IssuanceModule — building bundles and deciding how
+ * long a secret exists server-side are its concern, not the portal's. What is
+ * orchestrated here is the ORDER, which is the part that matters.
  */
-
-const BUNDLE_TTL_DAYS = 7;
 
 @Injectable()
 export class GovernmentService {
@@ -47,6 +48,7 @@ export class GovernmentService {
     private readonly tree: TreeService,
     private readonly chain: ChainService,
     private readonly issuance: IssuanceService,
+    private readonly bundles: BundleClaimService,
     private readonly roots: RootService,
   ) {}
 
@@ -87,7 +89,8 @@ export class GovernmentService {
     });
 
     const issuedAt = new Date();
-    const expiresAt = new Date(issuedAt.getTime() + BUNDLE_TTL_DAYS * 24 * 60 * 60 * 1000);
+    const expiresAt = this.bundles.expiryFrom(issuedAt);
+    const issuedIds = withCommitments.map((p) => p.propertyId);
 
     try {
       await this.prisma.$transaction([
@@ -99,27 +102,14 @@ export class GovernmentService {
         ),
         this.roots.recordRootStatement(published),
         ...(await this.roots.proofCacheStatements(tree, properties, published.version)),
-        ...bundles.map((bundle) =>
-          this.prisma.issuedBundle.create({
-            data: {
-              propertyId: bundle.propertyId,
-              claimToken: randomBytes(32).toString('hex'),
-              // Prisma's Bytes maps to Uint8Array; Buffer is one, but its
-              // generic ArrayBufferLike does not narrow automatically.
-              bundleZip: new Uint8Array(bundle.zip),
-              expiresAt,
-            },
-          }),
-        ),
+        ...this.bundles.createStatements(bundles, expiresAt),
       ]);
     } catch (error) {
       this.roots.warnChainAheadOfDatabase(published.txHash, error);
       throw error;
     }
 
-    const stored = await this.prisma.issuedBundle.findMany({
-      where: { propertyId: { in: withCommitments.map((p) => p.propertyId) } },
-    });
+    const stored = await this.bundles.findByPropertyIds(issuedIds);
 
     this.logger.log(
       `issued ${bundles.length} bundle(s) under root version ${published.version} ` +
@@ -136,36 +126,6 @@ export class GovernmentService {
         expiresAt: bundle.expiresAt,
       })),
     };
-  }
-
-  /**
-   * Hand a bundle over exactly once. The row is deleted in the same
-   * transaction that reads it, so a second request — including a replayed link
-   * — finds nothing. This is what bounds the window in which an ownerSecret
-   * exists server-side (D34).
-   */
-  async claimBundle(claimToken: string): Promise<{ propertyId: string; zip: Buffer }> {
-    const bundle = await this.prisma.issuedBundle.findUnique({ where: { claimToken } });
-    if (!bundle) {
-      throw new NotFoundException(
-        'This download link is not valid. It may have already been used — ' +
-          'bundles can only be downloaded once.',
-      );
-    }
-
-    if (bundle.expiresAt.getTime() < Date.now()) {
-      await this.prisma.issuedBundle.delete({ where: { id: bundle.id } });
-      throw new GoneException(
-        `This download link expired on ${bundle.expiresAt.toISOString()}. ` +
-          `Ask the issuing authority to re-issue the bundle.`,
-      );
-    }
-
-    // Delete first: if the response fails midway the bundle is gone either way,
-    // and that is the safer failure — a link that can be replayed is not.
-    await this.prisma.issuedBundle.delete({ where: { id: bundle.id } });
-
-    return { propertyId: bundle.propertyId, zip: Buffer.from(bundle.bundleZip) };
   }
 
   /** Rebuild from DB state and publish — used after edits, or to re-sync. */
@@ -254,14 +214,9 @@ export class GovernmentService {
       );
     }
 
-    const pending = await this.prisma.issuedBundle.findMany({
-      where: { propertyId: { in: unique } },
-      select: { propertyId: true },
-    });
+    const pending = await this.bundles.pendingPropertyIds(unique);
     if (pending.length > 0) {
-      throw new ConflictException(
-        `Bundle(s) still awaiting download for: ${pending.map((p) => p.propertyId).join(', ')}`,
-      );
+      throw new ConflictException(`Bundle(s) still awaiting download for: ${pending.join(', ')}`);
     }
 
     if (properties.length === 0) {

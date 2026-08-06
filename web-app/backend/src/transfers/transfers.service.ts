@@ -18,10 +18,14 @@ import {
 import { ChainService, ProofRejectedError, RootPublishError } from '../chain/chain.service';
 import { blockchainDir } from '../common/paths';
 import { PrismaService } from '../prisma/prisma.service';
-import { RootService } from './root.service';
+import { RootService } from '../government/root.service';
 import { TreeService } from '../tree/tree.service';
-import { SubmitTransferDto, TransferPreviewDto, TransferPreviewResult } from './dto/transfer.dto';
-import { TransferApprovalResponseDto, TransferRequestDto } from './dto/transfer.response.dto';
+import { SubmitTransferDto, TransferPreviewDto } from './dto/transfer.dto';
+import {
+  TransferApprovalResponseDto,
+  TransferPreviewResult,
+  TransferRequestDto,
+} from './dto/transfer.response.dto';
 
 /**
  * TransfersService — the two-part transfer flow of D28.

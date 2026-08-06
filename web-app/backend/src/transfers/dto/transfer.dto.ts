@@ -78,36 +78,3 @@ export class RejectTransferDto {
   @MaxLength(500)
   reason?: string;
 }
-
-/**
- * What the registry hands back so both parties can build a transfer witness
- * (D28 step 2). Without the projected path they simply cannot run
- * transfer.circom — only the registry can compute it.
- */
-export class TransferPreviewResult {
-  @ApiProperty({ example: '1' })
-  propertyId!: string;
-
-  /** Current on-chain root version the old path was computed against. */
-  @ApiProperty({ example: 1 })
-  rootVersion!: number;
-
-  @ApiProperty({ description: 'Current root — must still be latest when the proof is submitted' })
-  oldMerkleRoot!: string;
-
-  /** Root that WOULD result from this transfer; published only on approval. */
-  @ApiProperty()
-  newMerkleRoot!: string;
-
-  @ApiProperty({ type: [String], minItems: 20, maxItems: 20 })
-  oldSiblings!: string[];
-
-  @ApiProperty({ type: [Number], minItems: 20, maxItems: 20, example: [0, 1, 0] })
-  oldPathIndices!: number[];
-
-  @ApiProperty({ type: [String], minItems: 20, maxItems: 20 })
-  newSiblings!: string[];
-
-  @ApiProperty({ type: [Number], minItems: 20, maxItems: 20 })
-  newPathIndices!: number[];
-}

@@ -5,6 +5,16 @@ import { timingSafeEqual } from 'crypto';
 export const GOV_API_KEY_HEADER = 'x-gov-api-key';
 
 /**
+ * The OpenAPI security scheme name for {@link ApiKeyGuard}.
+ *
+ * Kept here rather than in swagger.ts because `@ApiSecurity(GOV_API_KEY_SECURITY)`
+ * has to mirror `@UseGuards(ApiKeyGuard)` on every route, and nothing enforces
+ * that — a route can be guarded but undocumented, or documented but open. Having
+ * one import site for both makes the pairing visible at the point of use.
+ */
+export const GOV_API_KEY_SECURITY = 'gov-api-key';
+
+/**
  * ApiKeyGuard
  * ─────────────────────────────────────────────────────────────────────────────
  * Guards the state-authority endpoints with a static API key (D14 — the
@@ -14,6 +24,10 @@ export const GOV_API_KEY_HEADER = 'x-gov-api-key';
  * This is what separates "anyone can compute a projected root" (public, no
  * judgement involved) from "someone approves a transfer and publishes it"
  * (D28 — the step that deliberately requires a human with authority).
+ *
+ * Lives in common/ because it guards two modules — GovernmentController wholly,
+ * TransfersController per-method (D28: preview/submit public, approve/reject
+ * gated) — so it belongs to neither.
  */
 @Injectable()
 export class ApiKeyGuard implements CanActivate {

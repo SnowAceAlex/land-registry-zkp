@@ -1,5 +1,13 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayNotEmpty, IsArray, IsString, Matches } from 'class-validator';
+/**
+ * import/csv-row.ts
+ * ─────────────────────────────────────────────────────────────────────────────
+ * The shape of a bulk-import CSV row.
+ *
+ * Not a DTO: nothing here is validated by class-validator or documented in
+ * OpenAPI, because the request body is a multipart file, not JSON. These are the
+ * column names the parser reads — a description of the FILE format, which is why
+ * they live beside the service that parses them rather than in dto/.
+ */
 
 /**
  * One row of the bulk-import CSV. Column names are the CSV headers.
@@ -64,62 +72,3 @@ export const IMPORT_COLUMNS: (keyof ImportRow)[] = [
   'encumbranceStatus',
   'isLongTermInvestmentProject',
 ];
-
-export class IssueBatchDto {
-  /**
-   * Properties to issue together. One Merkle root publish covers the whole
-   * batch — the point of batching (gas) — and every owner in it gets their own
-   * bundle afterwards.
-   */
-  @ApiProperty({ example: ['1', '2', '3'], description: 'Decimal-string property ids' })
-  @IsArray()
-  @ArrayNotEmpty()
-  @IsString({ each: true })
-  @Matches(/^\d+$/, { each: true, message: 'propertyId must be a decimal integer string' })
-  propertyIds!: string[];
-}
-
-export class ImportRowError {
-  /** 1-based line number in the uploaded file, counting the header line. */
-  @ApiProperty({ example: 3 })
-  row!: number;
-
-  @ApiPropertyOptional({ example: '2' })
-  propertyId?: string;
-
-  @ApiProperty({ example: "Unknown landUseCode 'ZZZ'" })
-  message!: string;
-}
-
-export class ImportRowWarning {
-  @ApiProperty({ example: 5 })
-  row!: number;
-
-  @ApiPropertyOptional({ example: '5' })
-  propertyId?: string;
-
-  @ApiProperty({ example: "ward 'Đa Kao' is not in the current administrative catalog" })
-  message!: string;
-}
-
-export class ImportResult {
-  /** Rows written to the registry. */
-  @ApiProperty({ example: 8 })
-  imported!: number;
-
-  /** Rows skipped because that propertyId already exists. */
-  @ApiProperty({ example: 0 })
-  skipped!: number;
-
-  /** Rows rejected, reported individually so one bad line does not fail the file. */
-  @ApiProperty({ type: [ImportRowError] })
-  errors!: ImportRowError[];
-
-  /**
-   * Rows that imported but look questionable. Used where the reference data
-   * shipped with the project is incomplete (the ward catalog), so rejecting
-   * would risk refusing valid records — review these before issuing.
-   */
-  @ApiProperty({ type: [ImportRowWarning] })
-  warnings!: ImportRowWarning[];
-}

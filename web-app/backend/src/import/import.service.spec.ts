@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 
 import { ImportService, parseVietnameseDate } from './import.service';
-import { AdministrativeUnitsService } from './administrative-units.service';
+import { AdministrativeUnitsService } from '../land-law/administrative-units.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
