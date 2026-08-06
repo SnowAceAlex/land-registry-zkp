@@ -124,7 +124,7 @@ deployment record → deployments\localhost.json
 ### 1.3 Kiểm tra deployment (read-only, không tốn gas)
 
 ```bash
-pnpm --filter blockchain run smoke:localhost
+pnpm --filter blockchain run chain:smoke:localhost
 ```
 
 Script đọc `deployments/localhost.json` rồi kiểm: contract có code thật không, `rootVersion`/`latestRoot`, cơ quan có `STATE_AUTHORITY_ROLE` chưa, `authorityInstitute` có khớp `keccak256(orgName)` không (D30), và dispatcher có trỏ đúng 3 verifier không.
@@ -132,10 +132,10 @@ Script đọc `deployments/localhost.json` rồi kiểm: contract có code thậ
 ### 1.4 Chạy vòng đầy-đủ: publish root + tạo proof thật + verify on-chain
 
 ```bash
-$env:SMOKE_PUBLISH='1'; pnpm --filter blockchain run smoke:localhost
+$env:SMOKE_PUBLISH='1'; pnpm --filter blockchain run chain:smoke:localhost
 ```
 
-(Git Bash: `SMOKE_PUBLISH=1 pnpm --filter blockchain run smoke:localhost`)
+(Git Bash: `SMOKE_PUBLISH=1 pnpm --filter blockchain run chain:smoke:localhost`)
 
 Đây là màn demo đầu-cuối: dựng cây Merkle thật từ mock record → `publishRoot()` → sinh Groth16 proof bằng snarkjs → gọi `verifyOwnership()` on-chain.
 
@@ -209,13 +209,13 @@ Chậm hơn local nhiều (mỗi contract chờ 1 block ~12s). Script ghi `block
 ### 2.4 Kiểm tra
 
 ```bash
-pnpm --filter blockchain run smoke:sepolia
+pnpm --filter blockchain run chain:smoke:sepolia
 ```
 
 Rồi vòng đầy đủ (tốn thêm 1 tx):
 
 ```bash
-$env:SMOKE_PUBLISH='1'; pnpm --filter blockchain run smoke:sepolia
+$env:SMOKE_PUBLISH='1'; pnpm --filter blockchain run chain:smoke:sepolia
 ```
 
 ### 2.5 Verify source code trên Etherscan
@@ -349,14 +349,14 @@ cd <path-to>/land-registry-zkp; pnpm --filter blockchain run node
 # Local — terminal 2
 cd <path-to>/land-registry-zkp
 pnpm --filter blockchain run deploy:localhost
-pnpm --filter blockchain run smoke:localhost      # read-only
-$env:SMOKE_PUBLISH='1'; pnpm --filter blockchain run smoke:localhost   # vòng đầy đủ
+pnpm --filter blockchain run chain:smoke:localhost      # read-only
+$env:SMOKE_PUBLISH='1'; pnpm --filter blockchain run chain:smoke:localhost   # vòng đầy đủ
 $env:SMOKE_PUBLISH=''                             # tắt lại khi xong
 ```
 
 ```bash
 # Sepolia
 pnpm --filter blockchain run deploy:sepolia
-pnpm --filter blockchain run smoke:sepolia
+pnpm --filter blockchain run chain:smoke:sepolia
 cd blockchain; npx hardhat verify --network sepolia <address> <args...>
 ```

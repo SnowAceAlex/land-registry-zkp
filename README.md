@@ -122,7 +122,7 @@ pnpm --filter blockchain run node          # terminal 1 — local chain, leave r
 
 ```bash
 pnpm --filter blockchain run deploy:localhost   # terminal 2
-pnpm --filter blockchain run smoke:localhost    # health check
+pnpm --filter blockchain run chain:smoke:localhost    # health check
 ```
 
 See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the full runbook, including Sepolia and Etherscan verification.
@@ -155,8 +155,8 @@ pnpm run test:blockchain                          # full test suite
 pnpm --filter blockchain run node                 # local chain on 127.0.0.1:8545
 pnpm --filter blockchain run deploy:localhost     # deploy to that chain
 pnpm --filter blockchain run deploy:sepolia       # deploy to Sepolia
-pnpm --filter blockchain run smoke:localhost      # verify a live deployment
-pnpm --filter blockchain run smoke:sepolia
+pnpm --filter blockchain run chain:smoke:localhost      # verify a live deployment
+pnpm --filter blockchain run chain:smoke:sepolia
 
 # Web app (scaffolded, service bodies pending)
 pnpm run db:up / db:down                          # docker compose
@@ -197,4 +197,4 @@ See [`.env.example`](./.env.example) for the full list.
 | Frontend        | Next.js 16 (App Router) + React 19 + wagmi + RainbowKit                  |
 | Package Manager | pnpm workspaces                                                          |
 
-> The Merkle tree is deliberately **not** `merkletreejs`: that library pads to the next power of two, while the circuits need a fixed depth of 20 regardless of record count. The package is still listed as a dependency but is never imported.
+> The Merkle tree is deliberately **not** `merkletreejs`: that library pads to the next power of two, while the circuits need a fixed depth of 20 regardless of record count. The package was removed from the dependencies once it was confirmed to have zero imports.
