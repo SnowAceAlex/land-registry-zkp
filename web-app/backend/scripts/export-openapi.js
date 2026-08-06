@@ -18,7 +18,7 @@ async function main() {
   if (!response.ok) {
     throw new Error(
       `${URL} returned HTTP ${response.status}. ` +
-      `Swagger is disabled when NODE_ENV=production unless ENABLE_SWAGGER=1.`,
+        `Swagger is disabled when NODE_ENV=production unless ENABLE_SWAGGER=1.`,
     );
   }
 
@@ -31,7 +31,7 @@ async function main() {
   if (schemaCount === 0) {
     console.warn(
       'WARNING: no component schemas in the spec. The @nestjs/swagger plugin ' +
-      'may not be enabled in nest-cli.json, or the server is running stale build output.',
+        'may not be enabled in nest-cli.json, or the server is running stale build output.',
     );
   }
 

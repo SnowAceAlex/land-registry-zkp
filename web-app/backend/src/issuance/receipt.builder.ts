@@ -82,10 +82,7 @@ export function buildReceipt(input: BuildReceiptInput): Receipt {
 
   // A short proof would be silently unusable: the circuits are compiled for a
   // fixed depth and the owner would only find out when proving fails.
-  if (
-    merkleProof.siblings.length !== TREE_DEPTH ||
-    merkleProof.pathIndices.length !== TREE_DEPTH
-  ) {
+  if (merkleProof.siblings.length !== TREE_DEPTH || merkleProof.pathIndices.length !== TREE_DEPTH) {
     throw new Error(
       `buildReceipt: expected a depth-${TREE_DEPTH} Merkle proof for property ` +
         `${property.propertyId}, got ${merkleProof.siblings.length} siblings`,

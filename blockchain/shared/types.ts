@@ -36,10 +36,10 @@ export enum UseType {
  * Encumbrance / mortgage status of a property.
  */
 export enum EncumbranceStatus {
-  FREE = 0,           // No encumbrance
-  MORTGAGED = 1,      // Under mortgage
-  LITIGATED = 2,      // Subject to legal dispute
-  RESTRICTED = 3,     // Restricted transfer (e.g., planning zone)
+  FREE = 0, // No encumbrance
+  MORTGAGED = 1, // Under mortgage
+  LITIGATED = 2, // Subject to legal dispute
+  RESTRICTED = 3, // Restricted transfer (e.g., planning zone)
 }
 
 /**
@@ -49,9 +49,9 @@ export enum EncumbranceStatus {
  * backend at record-issue time based on the detailed land use code.
  */
 export enum TenureType {
-  PERPETUAL = 0,          // ONT, ODT, community agricultural land — no time-check
-  FIXED_TERM = 1,         // annual/perennial crop land, production forest, aquaculture/salt — 50 years
-  PROJECT_LEASEHOLD = 2,  // TMD, SKC — up to 50/70 years depending on project
+  PERPETUAL = 0, // ONT, ODT, community agricultural land — no time-check
+  FIXED_TERM = 1, // annual/perennial crop land, production forest, aquaculture/salt — 50 years
+  PROJECT_LEASEHOLD = 2, // TMD, SKC — up to 50/70 years depending on project
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

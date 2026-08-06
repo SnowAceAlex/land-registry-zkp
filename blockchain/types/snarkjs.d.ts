@@ -7,7 +7,9 @@
  */
 declare module 'snarkjs' {
   /** A logger shaped like console — snarkjs calls .info/.debug/.error on it. */
-  export type SnarkjsLogger = Partial<Record<'debug' | 'info' | 'warn' | 'error', (...args: unknown[]) => void>>;
+  export type SnarkjsLogger = Partial<
+    Record<'debug' | 'info' | 'warn' | 'error', (...args: unknown[]) => void>
+  >;
 
   export interface R1csInfo {
     nVars: number;

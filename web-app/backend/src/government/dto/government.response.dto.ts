@@ -11,8 +11,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
  * values from a local run, so the format is unambiguous.
  */
 
-const EXAMPLE_ROOT =
-  '5677530015593700534173836181788122415198283309363871298832210090950018556857';
+const EXAMPLE_ROOT = '5677530015593700534173836181788122415198283309363871298832210090950018556857';
 const EXAMPLE_TX = '0xf4b4d599f894d6304bc42ed63af6259fe0492cd37437cbc46bc8fa398cfbbe5c';
 
 export class ChainRootStateDto {

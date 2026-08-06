@@ -42,7 +42,7 @@ export class ImportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly administrativeUnits: AdministrativeUnitsService,
-  ) { }
+  ) {}
 
   async importCsv(csv: string): Promise<ImportResult> {
     const parsed = Papa.parse<ImportRow>(csv, {
@@ -139,7 +139,7 @@ export class ImportService {
     if (!CERTIFICATE_SERIAL_PATTERN.test(certificateSerial)) {
       throw new Error(
         `certificateSerial must be 2 letters followed by 6 digits (e.g. 'CT 100001'), ` +
-        `got '${certificateSerial}'`,
+          `got '${certificateSerial}'`,
       );
     }
 
@@ -205,7 +205,7 @@ export class ImportService {
       if (hasExpiry) {
         throw new Error(
           `landUseCode '${row.landUseCode}' is being registered as perpetual tenure, which has ` +
-          `no expiry date, but expiryDate='${row.expiryDate}' was given`,
+            `no expiry date, but expiryDate='${row.expiryDate}' was given`,
         );
       }
       return '0';
@@ -220,16 +220,13 @@ export class ImportService {
     const expiryDate = parseVietnameseDate(row.expiryDate!);
 
     if (expiryDate.getTime() <= issueDate.getTime()) {
-      throw new Error(
-        `expiryDate (${row.expiryDate}) must be after issueDate (${row.issueDate})`,
-      );
+      throw new Error(`expiryDate (${row.expiryDate}) must be after issueDate (${row.issueDate})`);
     }
 
     this.assertStatutoryTerm(row, tenureType, issueDate, expiryDate, landUseCode, landUserType);
 
     return toUnixTimestamp(expiryDate).toString();
   }
-
 
   private assertStatutoryTerm(
     row: ImportRow,
@@ -253,9 +250,9 @@ export class ImportService {
       if (Math.abs(years - INDIVIDUAL_AGRICULTURAL_TERM_YEARS) > toleranceYears) {
         throw new Error(
           `term is ${years.toFixed(1)} years, but allocation/recognition to an individual is ` +
-          `${INDIVIDUAL_AGRICULTURAL_TERM_YEARS} years (Điều 172 khoản 1 điểm a Luật Đất đai 2024). ` +
-          `Set expiryDate to ${INDIVIDUAL_AGRICULTURAL_TERM_YEARS} years after issueDate, or set ` +
-          `landUserType if the land is leased or held by an organisation`,
+            `${INDIVIDUAL_AGRICULTURAL_TERM_YEARS} years (Điều 172 khoản 1 điểm a Luật Đất đai 2024). ` +
+            `Set expiryDate to ${INDIVIDUAL_AGRICULTURAL_TERM_YEARS} years after issueDate, or set ` +
+            `landUserType if the land is leased or held by an organisation`,
         );
       }
       return;
@@ -267,11 +264,11 @@ export class ImportService {
       if (years > cap + toleranceYears) {
         throw new Error(
           `term is ${years.toFixed(1)} years, which exceeds the ${cap}-year cap for a project ` +
-          `lease (Điều 172 khoản 1 điểm c)` +
-          (isLongTerm
-            ? ''
-            : `. Set isLongTermInvestmentProject=true if the investment project runs over ` +
-            `${PROJECT_TERM_YEARS} years under Luật Đầu tư`),
+            `lease (Điều 172 khoản 1 điểm c)` +
+            (isLongTerm
+              ? ''
+              : `. Set isLongTermInvestmentProject=true if the investment project runs over ` +
+                `${PROJECT_TERM_YEARS} years under Luật Đầu tư`),
         );
       }
     }

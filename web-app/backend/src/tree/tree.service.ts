@@ -58,7 +58,9 @@ export class TreeService {
    * to the DB only after the root publishes successfully).
    * Re-sorts, so callers cannot accidentally supply a different leaf order.
    */
-  async buildFrom(properties: Property[]): Promise<{ tree: LURMerkleTree; properties: Property[] }> {
+  async buildFrom(
+    properties: Property[],
+  ): Promise<{ tree: LURMerkleTree; properties: Property[] }> {
     const ordered = sortByPropertyId(properties);
     return { tree: await buildTree(ordered.map(toLURRecord)), properties: ordered };
   }

@@ -53,7 +53,7 @@ export class IssuanceService {
     private readonly issuer: IssuerService,
     private readonly pdf: PdfService,
     private readonly zip: ZipService,
-  ) { }
+  ) {}
 
   /**
    * A fresh owner secret. Uses 31 bytes (248 bits) so the value is always below
@@ -117,11 +117,7 @@ export class IssuanceService {
       { name: 'receipt.json', content: JSON.stringify(receipt, null, 2) },
       {
         name: 'secret.json',
-        content: JSON.stringify(
-          buildSecretFile(record.propertyId, source.ownerSecret),
-          null,
-          2,
-        ),
+        content: JSON.stringify(buildSecretFile(record.propertyId, source.ownerSecret), null, 2),
       },
       { name: 'certificate.pdf', content: pdf },
       { name: 'README.txt', content: OWNER_README },

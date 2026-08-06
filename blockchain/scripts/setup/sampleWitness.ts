@@ -20,7 +20,12 @@ import {
   buildTransferInput,
 } from '../../shared/circuitInputs';
 import { nowUnixTimestamp } from '../../shared/datetime';
-import { LURMerkleTree, buildTree, generateMerkleProof, poseidonHash } from '../../shared/merkleTree';
+import {
+  LURMerkleTree,
+  buildTree,
+  generateMerkleProof,
+  poseidonHash,
+} from '../../shared/merkleTree';
 import {
   EncumbranceStatus,
   LURRecord,
@@ -100,7 +105,9 @@ export async function buildSampleInput(
     });
     return {
       input,
-      expectedPublicSignals: [tree.root, record.propertyId, record.ownerCommitment, now].map(String),
+      expectedPublicSignals: [tree.root, record.propertyId, record.ownerCommitment, now].map(
+        String,
+      ),
     };
   }
 
@@ -127,9 +134,7 @@ export async function buildSampleInput(
   // transfer: swap ownerCommitment, rebuild the tree preserving order —
   // exactly the operation Phase 5's publish step performs.
   const newRecord: LURRecord = { ...record, ownerCommitment: await poseidonHash([BUYER_SECRET]) };
-  const newRecords = allRecords.map((r) =>
-    r.propertyId === record.propertyId ? newRecord : r,
-  );
+  const newRecords = allRecords.map((r) => (r.propertyId === record.propertyId ? newRecord : r));
   const newTree = await buildTree(newRecords);
   const newProof = await generateMerkleProof(newTree, newRecord);
 

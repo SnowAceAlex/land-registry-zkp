@@ -163,7 +163,9 @@ describe('contracts/LandRegistryVerifier — real proofs (integration, Phase 4)'
         // Any mutated public signal breaks the pairing check before the root
         // or timestamp checks are even reached.
         const tampered = [...pkg.publicSignals];
-        tampered[rootIndex === 0 ? 1 : 0] = (BigInt(tampered[rootIndex === 0 ? 1 : 0]) + 1n).toString();
+        tampered[rootIndex === 0 ? 1 : 0] = (
+          BigInt(tampered[rootIndex === 0 ? 1 : 0]) + 1n
+        ).toString();
         await expect(dispatcher[fn](a, b, c, tampered)).to.be.revertedWithCustomError(
           dispatcher,
           'InvalidProof',

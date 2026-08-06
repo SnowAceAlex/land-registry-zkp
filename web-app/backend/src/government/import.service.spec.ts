@@ -12,9 +12,9 @@ import { PrismaService } from '../prisma/prisma.service';
 const CATALOG = ['Sài Gòn', 'Tân Định', 'Bình Mỹ'];
 
 function makeService({ catalog = CATALOG }: { catalog?: string[] } = {}) {
-  const createMany = jest.fn(
-    async ({ data }: { data: Prisma.PropertyCreateManyInput[] }) => ({ count: data.length }),
-  );
+  const createMany = jest.fn(async ({ data }: { data: Prisma.PropertyCreateManyInput[] }) => ({
+    count: data.length,
+  }));
   const findMany = jest.fn(async () => catalog.map((name) => ({ name })));
   const prisma = {
     property: { createMany },
@@ -83,7 +83,10 @@ describe('ImportService', () => {
     const { service, created } = makeService();
 
     await service.importCsv(
-      [HEADER, row({ landUseCode: 'RSX', landUserType: 'CNV', expiryDate: FIFTY_YEARS_LATER })].join('\n'),
+      [
+        HEADER,
+        row({ landUseCode: 'RSX', landUserType: 'CNV', expiryDate: FIFTY_YEARS_LATER }),
+      ].join('\n'),
     );
 
     expect(created()[0]).toMatchObject({
@@ -281,17 +284,19 @@ describe('ImportService', () => {
       // CNT is new in Luật 2024 Điều 9 and điểm a does not list it, so a term
       // that is not exactly 50 years must be accepted.
       await service.importCsv(
-        [HEADER, row({ landUseCode: 'CNT', issueDate: '15/01/2016', expiryDate: '15/01/2046' })].join(
-          '\n',
-        ),
+        [
+          HEADER,
+          row({ landUseCode: 'CNT', issueDate: '15/01/2016', expiryDate: '15/01/2046' }),
+        ].join('\n'),
       );
       expect(created()).toHaveLength(1);
 
       // …while a code that IS listed still has to be exactly 50.
       const listed = await service.importCsv(
-        [HEADER, row({ landUseCode: 'CLN', issueDate: '15/01/2016', expiryDate: '15/01/2046' })].join(
-          '\n',
-        ),
+        [
+          HEADER,
+          row({ landUseCode: 'CLN', issueDate: '15/01/2016', expiryDate: '15/01/2046' }),
+        ].join('\n'),
       );
       expect(listed.errors[0].message).toMatch(/Điều 172 khoản 1 điểm a/);
     });
@@ -310,14 +315,20 @@ describe('ImportService', () => {
       const { service, created } = makeService();
 
       await service.importCsv(
-        [HEADER, row({ landUseCode: 'LUC', issueDate: '15/01/2016', expiryDate: FIFTY_YEARS_LATER })].join('\n'),
+        [
+          HEADER,
+          row({ landUseCode: 'LUC', issueDate: '15/01/2016', expiryDate: FIFTY_YEARS_LATER }),
+        ].join('\n'),
       );
       expect(created()).toHaveLength(1);
 
       // The defect the audit found in the old fixture: ~28 years on land the
       // law grants for 50.
       const short = await service.importCsv(
-        [HEADER, row({ landUseCode: 'LUC', issueDate: '05/08/2019', expiryDate: '29/07/2047' })].join('\n'),
+        [
+          HEADER,
+          row({ landUseCode: 'LUC', issueDate: '05/08/2019', expiryDate: '29/07/2047' }),
+        ].join('\n'),
       );
       expect(short.errors[0].message).toMatch(/Điều 172 khoản 1 điểm a/);
     });
@@ -351,7 +362,10 @@ describe('ImportService', () => {
       const { service } = makeService();
 
       const result = await service.importCsv(
-        [HEADER, row({ landUseCode: 'LUC', issueDate: '15/01/2016', expiryDate: '15/01/2010' })].join('\n'),
+        [
+          HEADER,
+          row({ landUseCode: 'LUC', issueDate: '15/01/2016', expiryDate: '15/01/2010' }),
+        ].join('\n'),
       );
 
       expect(result.errors[0].message).toMatch(/must be after issueDate/);

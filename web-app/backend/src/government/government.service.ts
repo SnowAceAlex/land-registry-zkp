@@ -47,7 +47,7 @@ export class GovernmentService {
     private readonly chain: ChainService,
     private readonly issuance: IssuanceService,
     private readonly roots: RootService,
-  ) { }
+  ) {}
 
   async issueBatch(propertyIds: string[]): Promise<IssueBatchResponseDto> {
     const batch = await this.loadIssuableBatch(propertyIds);
@@ -122,7 +122,7 @@ export class GovernmentService {
 
     this.logger.log(
       `issued ${bundles.length} bundle(s) under root version ${published.version} ` +
-      `(tx ${published.txHash})`,
+        `(tx ${published.txHash})`,
     );
 
     return {
@@ -148,7 +148,7 @@ export class GovernmentService {
     if (!bundle) {
       throw new NotFoundException(
         'This download link is not valid. It may have already been used — ' +
-        'bundles can only be downloaded once.',
+          'bundles can only be downloaded once.',
       );
     }
 
@@ -156,7 +156,7 @@ export class GovernmentService {
       await this.prisma.issuedBundle.delete({ where: { id: bundle.id } });
       throw new GoneException(
         `This download link expired on ${bundle.expiresAt.toISOString()}. ` +
-        `Ask the issuing authority to re-issue the bundle.`,
+          `Ask the issuing authority to re-issue the bundle.`,
       );
     }
 
@@ -257,7 +257,7 @@ export class GovernmentService {
     if (alreadyIssued.length > 0) {
       throw new ConflictException(
         `Already issued: ${alreadyIssued.map((p) => p.propertyId).join(', ')}. ` +
-        `Re-issuing would replace the owner's secret and invalidate their bundle.`,
+          `Re-issuing would replace the owner's secret and invalidate their bundle.`,
       );
     }
 

@@ -33,9 +33,7 @@ export function repoRoot(): string {
     current = parent;
   }
 
-  throw new Error(
-    `Could not locate the monorepo root (no pnpm-workspace.yaml above ${__dirname})`,
-  );
+  throw new Error(`Could not locate the monorepo root (no pnpm-workspace.yaml above ${__dirname})`);
 }
 
 /** blockchain/ — holds deployments/<network>.json and circuits/build/. */

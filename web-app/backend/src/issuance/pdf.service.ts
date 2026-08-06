@@ -74,9 +74,15 @@ export class PdfService {
       ['Số vào sổ cấp GCN', receipt.record.bookEntryNumber],
       ['Địa chỉ', receipt.record.address],
       ['Diện tích', `${receipt.record.area.toLocaleString('vi-VN')} m²`],
-      ['Mục đích sử dụng', `${receipt.record.landUseCode} — ${landUseCodeLabel(receipt.record.landUseCode)}`],
+      [
+        'Mục đích sử dụng',
+        `${receipt.record.landUseCode} — ${landUseCodeLabel(receipt.record.landUseCode)}`,
+      ],
       ['Hình thức sử dụng', TENURE_LABEL[receipt.record.tenureType] ?? '—'],
-      ['Thời hạn sử dụng', formatValidity(receipt.record.validityPeriod, receipt.record.tenureType)],
+      [
+        'Thời hạn sử dụng',
+        formatValidity(receipt.record.validityPeriod, receipt.record.tenureType),
+      ],
       ['Nguồn gốc sử dụng đất', receipt.record.landOrigin ?? '—'],
       ['Tình trạng pháp lý', ENCUMBRANCE_LABEL[receipt.record.encumbranceStatus] ?? '—'],
       ['Cơ quan cấp', receipt.record.issuingAuthority],

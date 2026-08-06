@@ -21,11 +21,12 @@ land-registry-zkp/
 **Design principle**: All Merkle tree / Poseidon hash logic lives exclusively in `blockchain/shared/`. Both `backend` and `frontend` import it from the `@land-registry/blockchain` workspace package — no logic duplication.
 
 **Companion docs**
-| Document | What it covers |
-|---|---|
-| [`DEPLOYMENT.md`](./DEPLOYMENT.md) | Deploy runbook: local node → Sepolia trial → Sepolia official, plus troubleshooting |
-| `CODING_ROADMAP.md` | Locked technical design: schema, circuit layout, contract architecture, and the binding Design Decisions Log (D1–D33) — *author's working copy, not committed* |
-| `THESIS_IMPLEMENTATION_GUIDE.md` | Academic framing, timeline, evaluation checklist — *author's working copy, not committed* |
+
+| Document                           | What it covers                                                                                                                                                 |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`DEPLOYMENT.md`](./DEPLOYMENT.md) | Deploy runbook: local node → Sepolia trial → Sepolia official, plus troubleshooting                                                                            |
+| `CODING_ROADMAP.md`                | Locked technical design: schema, circuit layout, contract architecture, and the binding Design Decisions Log (D1–D33) — _author's working copy, not committed_ |
+| `THESIS_IMPLEMENTATION_GUIDE.md`   | Academic framing, timeline, evaluation checklist — _author's working copy, not committed_                                                                      |
 
 ---
 
@@ -33,16 +34,16 @@ land-registry-zkp/
 
 Phases 0–4 of the roadmap are implemented and tested. The cryptographic and on-chain layers are complete; the web application is scaffolded but its service bodies are not written yet.
 
-| Phase | Area | Status |
-|---|---|---|
-| 0 | Mock data generator, UTC+7 datetime utils | ✅ Done |
-| 1 | Merkle layer — Poseidon, fixed-depth-20 sparse tree | ✅ Done |
-| 2 | Circuits — `ownership`, `mortgage`, `transfer` (+3 shared templates) | ✅ Done |
-| 3 | Trusted setup — Groth16 zkey/vkey/verifier export, prove + verify E2E | ✅ Done |
-| 4 | Smart contracts — `RootRegistry`, `LandRegistryVerifier`, deploy scripts | ✅ Done |
-| 5–6 | Backend — government portal API, owner/proof API | ⬜ Not started |
-| 7–9 | Frontend — government / owner / verifier portals | ⬜ Not started |
-| 10–11 | E2E integration, evaluation metrics, thesis writing | ⬜ Not started |
+| Phase | Area                                                                     | Status         |
+| ----- | ------------------------------------------------------------------------ | -------------- |
+| 0     | Mock data generator, UTC+7 datetime utils                                | ✅ Done        |
+| 1     | Merkle layer — Poseidon, fixed-depth-20 sparse tree                      | ✅ Done        |
+| 2     | Circuits — `ownership`, `mortgage`, `transfer` (+3 shared templates)     | ✅ Done        |
+| 3     | Trusted setup — Groth16 zkey/vkey/verifier export, prove + verify E2E    | ✅ Done        |
+| 4     | Smart contracts — `RootRegistry`, `LandRegistryVerifier`, deploy scripts | ✅ Done        |
+| 5–6   | Backend — government portal API, owner/proof API                         | ⬜ Not started |
+| 7–9   | Frontend — government / owner / verifier portals                         | ⬜ Not started |
+| 10–11 | E2E integration, evaluation metrics, thesis writing                      | ⬜ Not started |
 
 **Test suite**: 101 passing (`pnpm run test:blockchain`). On a checkout without trusted-setup artifacts the proof-dependent tests self-skip → 85 passing + 16 pending, never failing.
 
@@ -50,13 +51,13 @@ Phases 0–4 of the roadmap are implemented and tested. The cryptographic and on
 
 ## Prerequisites
 
-| Tool | Version | Install |
-|------|---------|---------|
-| Node.js | ≥ 20 | https://nodejs.org |
-| pnpm | ≥ 8 | `npm i -g pnpm` |
-| Rust + Cargo | stable | https://rustup.rs |
-| **circom compiler** | ≥ 2.x | `cargo install circom` *(see note)* |
-| Docker Desktop | latest | https://www.docker.com/products/docker-desktop — *only needed from Phase 5* |
+| Tool                | Version | Install                                                                     |
+| ------------------- | ------- | --------------------------------------------------------------------------- |
+| Node.js             | ≥ 20    | https://nodejs.org                                                          |
+| pnpm                | ≥ 8     | `npm i -g pnpm`                                                             |
+| Rust + Cargo        | stable  | https://rustup.rs                                                           |
+| **circom compiler** | ≥ 2.x   | `cargo install circom` _(see note)_                                         |
+| Docker Desktop      | latest  | https://www.docker.com/products/docker-desktop — _only needed from Phase 5_ |
 
 > ⚠️ **circom is a Rust binary, NOT an npm package.**  
 > Install with `cargo install circom`, verify with `circom --version`.  
@@ -93,7 +94,7 @@ Outputs `.r1cs` / `.wasm` / `.sym` into `blockchain/circuits/build/<name>/` and 
 pnpm --filter blockchain run circuits:setup
 ```
 
-⚠️ **Do not skip this.** It produces the proving keys *and* the three generated `Groth16Verifier*.sol` contracts, all of which are gitignored — a fresh clone does not have them. The step downloads two public Powers-of-Tau files (~18 MB and ~36 MB, cached afterwards), runs the circuit-specific Phase-2 setup, then proves and verifies each circuit end to end.
+⚠️ **Do not skip this.** It produces the proving keys _and_ the three generated `Groth16Verifier*.sol` contracts, all of which are gitignored — a fresh clone does not have them. The step downloads two public Powers-of-Tau files (~18 MB and ~36 MB, cached afterwards), runs the circuit-specific Phase-2 setup, then proves and verifies each circuit end to end.
 
 It also auto-syncs the generated verifiers into `blockchain/contracts/verifiers/` so Hardhat can compile them.
 
@@ -169,31 +170,31 @@ pnpm run dev:frontend                             # Next.js, port 3000
 
 See [`.env.example`](./.env.example) for the full list.
 
-| Variable | Description | Needed for |
-|----------|-------------|-----------|
-| `SEPOLIA_RPC_URL` | Alchemy/Infura RPC for Sepolia | Sepolia deploy |
-| `PRIVATE_KEY` | Deployer wallet private key | Sepolia deploy |
-| `ETHERSCAN_API_KEY` | Source verification via `hardhat verify` | Sepolia deploy |
-| `AUTHORITY_ADDRESS` | Account granted `STATE_AUTHORITY_ROLE` — blank = deployer | Any deploy |
-| `AUTHORITY_ORG_NAME` | X.509 Subject `O` anchored on-chain (D30) | Any deploy |
-| `DATABASE_URL` | PostgreSQL connection (port 5433 via Docker) | Phase 5+ |
-| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Deployed `RootRegistry` address | Phase 7+ |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | From cloud.walletconnect.com | Phase 7+ |
+| Variable                               | Description                                               | Needed for     |
+| -------------------------------------- | --------------------------------------------------------- | -------------- |
+| `SEPOLIA_RPC_URL`                      | Alchemy/Infura RPC for Sepolia                            | Sepolia deploy |
+| `PRIVATE_KEY`                          | Deployer wallet private key                               | Sepolia deploy |
+| `ETHERSCAN_API_KEY`                    | Source verification via `hardhat verify`                  | Sepolia deploy |
+| `AUTHORITY_ADDRESS`                    | Account granted `STATE_AUTHORITY_ROLE` — blank = deployer | Any deploy     |
+| `AUTHORITY_ORG_NAME`                   | X.509 Subject `O` anchored on-chain (D30)                 | Any deploy     |
+| `DATABASE_URL`                         | PostgreSQL connection (port 5433 via Docker)              | Phase 5+       |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS`         | Deployed `RootRegistry` address                           | Phase 7+       |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | From cloud.walletconnect.com                              | Phase 7+       |
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| ZKP Circuits | circom 2.2.3 |
-| Proof System | snarkjs (Groth16), Powers-of-Tau from the public Hermez/iden3 ceremony |
-| Merkle Tree | Hand-written fixed-depth-20 **sparse** tree + Poseidon via `circomlibjs` |
-| Smart Contracts | Solidity 0.8.36 + OpenZeppelin 5 |
-| Contract Dev | Hardhat 2 (TypeScript) + TypeChain |
-| Backend | NestJS 10 + Prisma 7 + ethers v6 |
-| Database | PostgreSQL 16 |
-| Frontend | Next.js 16 (App Router) + React 19 + wagmi + RainbowKit |
-| Package Manager | pnpm workspaces |
+| Layer           | Technology                                                               |
+| --------------- | ------------------------------------------------------------------------ |
+| ZKP Circuits    | circom 2.2.3                                                             |
+| Proof System    | snarkjs (Groth16), Powers-of-Tau from the public Hermez/iden3 ceremony   |
+| Merkle Tree     | Hand-written fixed-depth-20 **sparse** tree + Poseidon via `circomlibjs` |
+| Smart Contracts | Solidity 0.8.36 + OpenZeppelin 5                                         |
+| Contract Dev    | Hardhat 2 (TypeScript) + TypeChain                                       |
+| Backend         | NestJS 10 + Prisma 7 + ethers v6                                         |
+| Database        | PostgreSQL 16                                                            |
+| Frontend        | Next.js 16 (App Router) + React 19 + wagmi + RainbowKit                  |
+| Package Manager | pnpm workspaces                                                          |
 
 > The Merkle tree is deliberately **not** `merkletreejs`: that library pads to the next power of two, while the circuits need a fixed depth of 20 regardless of record count. The package is still listed as a dependency but is never imported.

@@ -58,9 +58,7 @@ function normaliseKey(key: string): string {
  * "Mã số ĐVHC (theo Quyết định 19/2025/QĐ-TTg)" for `ma`.
  */
 function pickColumn(row: Record<string, string>, keys: string[]): string | undefined {
-  const entries = Object.entries(row).map(
-    ([key, value]) => [normaliseKey(key), value] as const,
-  );
+  const entries = Object.entries(row).map(([key, value]) => [normaliseKey(key), value] as const);
 
   for (const key of keys) {
     const exact = entries.find(([column]) => column === key);
@@ -148,8 +146,8 @@ function toUnits(raw: Record<string, string>[], defaultProvince?: string): UnitR
     // addresses later, far from the cause.
     throw new Error(
       `Could not read ${problems.length} row(s):\n  ${problems.slice(0, 10).join('\n  ')}` +
-      (problems.length > 10 ? `\n  … and ${problems.length - 10} more` : '') +
-      `\n\nColumns seen: ${Object.keys(raw[0] ?? {}).join(', ')}`,
+        (problems.length > 10 ? `\n  … and ${problems.length - 10} more` : '') +
+        `\n\nColumns seen: ${Object.keys(raw[0] ?? {}).join(', ')}`,
     );
   }
   return units;
@@ -169,7 +167,9 @@ function readFile(filePath: string, defaultProvince?: string): UnitRow[] {
 
   const headerOffset = findHeaderOffset(content);
   if (headerOffset > 0) {
-    console.log(`Header found on line ${headerOffset + 1}; skipping the ${headerOffset} line(s) above it.`);
+    console.log(
+      `Header found on line ${headerOffset + 1}; skipping the ${headerOffset} line(s) above it.`,
+    );
   }
   const body = content.split(/\r?\n/).slice(headerOffset).join('\n');
 

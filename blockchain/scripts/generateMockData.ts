@@ -143,24 +143,94 @@ const IMPORT_CSV_COLUMNS = [
  *   - PERPETUAL carries no expiry date at all (D5)
  */
 const LAND_PROFILES = [
-  { code: 'ONT', tenure: 'PERPETUAL', userType: '', origin: 'Nhà nước công nhận quyền sử dụng đất' },
-  { code: 'ODT', tenure: 'PERPETUAL', userType: '', origin: 'Nhà nước công nhận quyền sử dụng đất' },
-  { code: 'LUC', tenure: 'FIXED_TERM', userType: 'CNV', origin: 'Nhà nước giao đất không thu tiền sử dụng đất' },
-  { code: 'LUK', tenure: 'FIXED_TERM', userType: 'CNV', origin: 'Nhà nước giao đất không thu tiền sử dụng đất' },
-  { code: 'CLN', tenure: 'FIXED_TERM', userType: 'CNV', origin: 'Nhà nước công nhận quyền sử dụng đất' },
-  { code: 'HNK', tenure: 'FIXED_TERM', userType: 'CNV', origin: 'Nhà nước giao đất không thu tiền sử dụng đất' },
-  { code: 'CNT', tenure: 'FIXED_TERM', userType: 'CNV', origin: 'Nhà nước cho thuê đất trả tiền hằng năm' },
-  { code: 'NTS', tenure: 'FIXED_TERM', userType: 'CNV', origin: 'Nhà nước giao đất không thu tiền sử dụng đất' },
-  { code: 'LMU', tenure: 'FIXED_TERM', userType: 'CNV', origin: 'Nhà nước giao đất không thu tiền sử dụng đất' },
+  {
+    code: 'ONT',
+    tenure: 'PERPETUAL',
+    userType: '',
+    origin: 'Nhà nước công nhận quyền sử dụng đất',
+  },
+  {
+    code: 'ODT',
+    tenure: 'PERPETUAL',
+    userType: '',
+    origin: 'Nhà nước công nhận quyền sử dụng đất',
+  },
+  {
+    code: 'LUC',
+    tenure: 'FIXED_TERM',
+    userType: 'CNV',
+    origin: 'Nhà nước giao đất không thu tiền sử dụng đất',
+  },
+  {
+    code: 'LUK',
+    tenure: 'FIXED_TERM',
+    userType: 'CNV',
+    origin: 'Nhà nước giao đất không thu tiền sử dụng đất',
+  },
+  {
+    code: 'CLN',
+    tenure: 'FIXED_TERM',
+    userType: 'CNV',
+    origin: 'Nhà nước công nhận quyền sử dụng đất',
+  },
+  {
+    code: 'HNK',
+    tenure: 'FIXED_TERM',
+    userType: 'CNV',
+    origin: 'Nhà nước giao đất không thu tiền sử dụng đất',
+  },
+  {
+    code: 'CNT',
+    tenure: 'FIXED_TERM',
+    userType: 'CNV',
+    origin: 'Nhà nước cho thuê đất trả tiền hằng năm',
+  },
+  {
+    code: 'NTS',
+    tenure: 'FIXED_TERM',
+    userType: 'CNV',
+    origin: 'Nhà nước giao đất không thu tiền sử dụng đất',
+  },
+  {
+    code: 'LMU',
+    tenure: 'FIXED_TERM',
+    userType: 'CNV',
+    origin: 'Nhà nước giao đất không thu tiền sử dụng đất',
+  },
   // Điều 171 khoản 3 — production forest is perpetual only for a body assigned
   // to manage it, not for an economic organisation producing on it.
-  { code: 'RSX', tenure: 'PERPETUAL', userType: 'TCN', origin: 'Nhà nước giao đất không thu tiền sử dụng đất' },
+  {
+    code: 'RSX',
+    tenure: 'PERPETUAL',
+    userType: 'TCN',
+    origin: 'Nhà nước giao đất không thu tiền sử dụng đất',
+  },
   // Natural production forest — a separate code from planted forest (RSX).
-  { code: 'RSN', tenure: 'FIXED_TERM', userType: 'TKT', origin: 'Nhà nước cho thuê đất trả tiền hằng năm' },
-  { code: 'TMD', tenure: 'PROJECT_LEASEHOLD', userType: 'TKT', origin: 'Nhà nước cho thuê đất trả tiền một lần' },
+  {
+    code: 'RSN',
+    tenure: 'FIXED_TERM',
+    userType: 'TKT',
+    origin: 'Nhà nước cho thuê đất trả tiền hằng năm',
+  },
+  {
+    code: 'TMD',
+    tenure: 'PROJECT_LEASEHOLD',
+    userType: 'TKT',
+    origin: 'Nhà nước cho thuê đất trả tiền một lần',
+  },
   // Điều 171 khoản 4 — commercial land recognised for an individual is perpetual.
-  { code: 'SKC', tenure: 'PERPETUAL', userType: 'CNV', origin: 'Nhà nước công nhận quyền sử dụng đất' },
-  { code: 'SKK', tenure: 'PROJECT_LEASEHOLD', userType: 'TKT', origin: 'Nhà nước cho thuê đất trả tiền một lần' },
+  {
+    code: 'SKC',
+    tenure: 'PERPETUAL',
+    userType: 'CNV',
+    origin: 'Nhà nước công nhận quyền sử dụng đất',
+  },
+  {
+    code: 'SKK',
+    tenure: 'PROJECT_LEASEHOLD',
+    userType: 'TKT',
+    origin: 'Nhà nước cho thuê đất trả tiền một lần',
+  },
   // Điều 171 khoản 2 → Điều 178 khoản 4 — community land is perpetual only when
   // it is held to preserve ethnic cultural identity.
   {
@@ -192,7 +262,6 @@ const RURAL_LOCATIONS = [
 ] as const;
 
 const URBAN_CODES = ['ONT', 'ODT', 'TMD', 'SKC', 'SKK'];
-
 
 function pick<T>(values: readonly T[]): T {
   return values[Math.floor(Math.random() * values.length)];
@@ -236,7 +305,8 @@ function buildImportCsv(count: number): string {
       landUseCode: profile.code,
       tenureType: profile.tenure,
       landUserType: profile.userType,
-      culturalPreservation: 'culturalPreservation' in profile && profile.culturalPreservation ? 'true' : '',
+      culturalPreservation:
+        'culturalPreservation' in profile && profile.culturalPreservation ? 'true' : '',
       certificateSerial: `CT ${String(100000 + i)}`,
       bookEntryNumber: `CS${String(20000 + i)}`,
       mapSheetNumber: String(((i - 1) % 40) + 1),

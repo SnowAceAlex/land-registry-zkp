@@ -46,10 +46,7 @@ const ORGANISATION_USER_TYPES: readonly LandUserType[] = [
  * 50-year lease be recorded as perpetual — and the tenure goes into an
  * immutable leaf, so the conservative reading is the correct default.
  */
-const FOREST_MANAGEMENT_USER_TYPES: readonly LandUserType[] = [
-  LandUserType.TCN,
-  LandUserType.TSN,
-];
+const FOREST_MANAGEMENT_USER_TYPES: readonly LandUserType[] = [LandUserType.TCN, LandUserType.TSN];
 
 /**
  * Facts about the grant that decide which tenures are lawful. Kept separate
@@ -89,9 +86,7 @@ const { PERPETUAL, FIXED_TERM, PROJECT_LEASEHOLD } = TenureType;
  * its own is an ordinary agricultural term.
  */
 const communityCulturalPerpetual = (context: TenureContext): readonly TenureType[] =>
-  context.landUserType === LandUserType.CDS && context.culturalPreservation
-    ? [PERPETUAL]
-    : [];
+  context.landUserType === LandUserType.CDS && context.culturalPreservation ? [PERPETUAL] : [];
 
 /** Điều 171 khoản 3 — production forest land held by a body assigned to manage it. */
 const forestManagementPerpetual = (context: TenureContext): readonly TenureType[] =>
@@ -247,10 +242,7 @@ export function classifyLandUseCode(code: string): LandUseCodeClassification {
 }
 
 /** Tenures lawful for a code given the circumstances of the grant. */
-export function allowedTenures(
-  code: string,
-  context: TenureContext = {},
-): readonly TenureType[] {
+export function allowedTenures(code: string, context: TenureContext = {}): readonly TenureType[] {
   const classification = classifyLandUseCode(code);
   const extra = classification.conditionalTenures?.(context) ?? [];
   return Array.from(new Set([...classification.tenures, ...extra]));

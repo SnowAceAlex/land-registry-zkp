@@ -23,7 +23,7 @@ import { GovernmentService } from './government.service';
 @ApiTags('Bundles')
 @Controller('bundles')
 export class BundlesController {
-  constructor(private readonly government: GovernmentService) { }
+  constructor(private readonly government: GovernmentService) {}
 
   @Get('claim/:token')
   @ApiOperation({

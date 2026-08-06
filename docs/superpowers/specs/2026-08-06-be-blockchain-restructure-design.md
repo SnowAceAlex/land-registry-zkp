@@ -10,8 +10,8 @@ Kiến trúc tổng thể đúng (module-per-domain, `shared/` là single source
 Merkle/Poseidon), nhưng có ba tầng vấn đề tích tụ sau Phase 5:
 
 1. **Trùng lặp có rủi ro đúng-sai.** Việc dựng lại `LURRecord` từ `receipt.json` bị
-   chép tay ở 4 nơi. `CLAUDE.md` đã cảnh báo lệch ở đây *"would not throw, it would
-   silently produce a leaf that is not in the tree"* — nhưng chưa có test nào bảo vệ
+   chép tay ở 4 nơi. `CLAUDE.md` đã cảnh báo lệch ở đây _"would not throw, it would
+   silently produce a leaf that is not in the tree"_ — nhưng chưa có test nào bảo vệ
    bất biến đó. `DeploymentRecord` có 3 bản và **đã lệch thật** (trường `deployedAt`).
 2. **`government/` gánh 4 domain** — 3 controller + 5 service + 4 file DTO, trong đó
    820 dòng quy tắc pháp lý Việt Nam nằm chung folder với logic publish root.

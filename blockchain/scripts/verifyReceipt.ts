@@ -125,7 +125,7 @@ async function main(): Promise<void> {
     note(
       'root is STALE — someone published since this bundle was issued',
       `receipt v${receipt.rootVersion} vs on-chain v${latestVersion}. ` +
-      'Expected after any transfer; the owner needs a refreshed Merkle proof (§3.1).',
+        'Expected after any transfer; the owner needs a refreshed Merkle proof (§3.1).',
     );
   }
 
@@ -243,11 +243,7 @@ async function main(): Promise<void> {
   // certificate against a trusted CA (D30 / Scope 1.5 — it is self-signed).
   note('certificate chain is self-signed', 'no CA validation in the PoC');
 
-  console.log(
-    failures === 0
-      ? '\nAll checks passed.\n'
-      : `\n${failures} check(s) FAILED.\n`,
-  );
+  console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} check(s) FAILED.\n`);
   process.exit(failures === 0 ? 0 : 1);
 }
 

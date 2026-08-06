@@ -11,13 +11,13 @@
  * realistic rather than a degenerate single-leaf path.
  */
 
+import { EncumbranceStatus, LURRecord, TenureType, UseType } from '../../shared/types';
 import {
-  EncumbranceStatus,
-  LURRecord,
-  TenureType,
-  UseType,
-} from '../../shared/types';
-import { buildTree, generateMerkleProof, poseidonHash, LURMerkleTree } from '../../shared/merkleTree';
+  buildTree,
+  generateMerkleProof,
+  poseidonHash,
+  LURMerkleTree,
+} from '../../shared/merkleTree';
 import { MerkleProofData } from '../../shared/types';
 import { generateMockRecords } from '../../scripts/generateMockData';
 

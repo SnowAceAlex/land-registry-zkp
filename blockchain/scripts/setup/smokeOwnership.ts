@@ -67,7 +67,9 @@ async function main(): Promise<void> {
   console.log(`  proof time         ${proveMs} ms`);
   console.log(`  verify time        ${verifyMs} ms`);
   console.log(`  proof size         ${proofBytes} bytes`);
-  console.log(`  public signals     ${pkg.publicSignals.length} (${PUBLIC_SIGNAL_ORDER.ownership.join(', ')})`);
+  console.log(
+    `  public signals     ${pkg.publicSignals.length} (${PUBLIC_SIGNAL_ORDER.ownership.join(', ')})`,
+  );
   console.log(`  verified           ${verified}`);
   console.log('─────────────────────────────────────────────');
   console.log('\nPipeline circom -> zkpHelper(snarkjs) -> verify is working end to end.');

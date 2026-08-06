@@ -52,9 +52,7 @@ export class RootService {
 
     if (tree.root === latestRoot) {
       const version = await this.chain.getRootVersion();
-      await this.prisma.$transaction(
-        await this.proofCacheStatements(tree, properties, version),
-      );
+      await this.prisma.$transaction(await this.proofCacheStatements(tree, properties, version));
       this.logger.log(`root unchanged (version ${version}) — refreshed proof cache only`);
       return { root: tree.root, version, txHash: null, published: false };
     }

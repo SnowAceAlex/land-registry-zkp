@@ -8,11 +8,7 @@ import {
   RootRegistry,
   RootRegistry__factory,
 } from '@land-registry/blockchain/typechain-types';
-import {
-  Groth16Proof,
-  PublicSignals,
-  toSolidityCalldata,
-} from '@land-registry/blockchain/shared';
+import { Groth16Proof, PublicSignals, toSolidityCalldata } from '@land-registry/blockchain/shared';
 
 import { blockchainDir } from '../common/paths';
 
@@ -80,7 +76,7 @@ export class ChainService implements OnModuleInit {
     if (!privateKey) {
       throw new Error(
         'AUTHORITY_PRIVATE_KEY (or PRIVATE_KEY) must be set — it signs publishRoot() and ' +
-        'must be an account registered via registerAuthority()',
+          'must be an account registered via registerAuthority()',
       );
     }
 
@@ -91,14 +87,13 @@ export class ChainService implements OnModuleInit {
       this.signer,
     );
     this.verifier = LandRegistryVerifier__factory.connect(
-      process.env.LAND_REGISTRY_VERIFIER_ADDRESS ??
-      this.deployment.contracts.LandRegistryVerifier,
+      process.env.LAND_REGISTRY_VERIFIER_ADDRESS ?? this.deployment.contracts.LandRegistryVerifier,
       this.signer,
     );
 
     this.logger.log(
       `connected to ${network} (${rpcUrl}) as ${this.signer.address}; ` +
-      `RootRegistry=${await this.registry.getAddress()}`,
+        `RootRegistry=${await this.registry.getAddress()}`,
     );
 
     await this.warnIfNotAuthority();
@@ -194,7 +189,7 @@ export class ChainService implements OnModuleInit {
           return new RootPublishError(
             'Unauthorized',
             `Signer ${this.signer.address} does not hold STATE_AUTHORITY_ROLE — ` +
-            'register it with registerAuthority() (see DEPLOYMENT.md)',
+              'register it with registerAuthority() (see DEPLOYMENT.md)',
           );
         }
         return new RootPublishError('Unknown', `publishRoot failed: ${message}`);
@@ -216,7 +211,7 @@ export class ChainService implements OnModuleInit {
         return new ProofRejectedError(
           'RootMismatch',
           'The proof was generated against a root that is no longer current — ' +
-          'the registry moved on, so the transfer must be re-proven',
+            'the registry moved on, so the transfer must be re-proven',
           { expected, actual },
         );
       }
@@ -241,8 +236,8 @@ export class ChainService implements OnModuleInit {
       if (!(await this.hasAuthorityRole(this.signer.address))) {
         this.logger.error(
           `signer ${this.signer.address} does NOT hold STATE_AUTHORITY_ROLE on ` +
-          `${await this.registry.getAddress()} — publishRoot() will revert. ` +
-          `Run registerAuthority() for this account (see DEPLOYMENT.md).`,
+            `${await this.registry.getAddress()} — publishRoot() will revert. ` +
+            `Run registerAuthority() for this account (see DEPLOYMENT.md).`,
         );
       }
     } catch (error) {
@@ -275,7 +270,7 @@ function loadDeployment(network: ChainNetwork): DeploymentRecord {
   if (!fs.existsSync(recordPath)) {
     throw new Error(
       `No deployment record at ${recordPath}. Deploy first ` +
-      `(pnpm --filter blockchain run deploy:${network}) — see DEPLOYMENT.md.`,
+        `(pnpm --filter blockchain run deploy:${network}) — see DEPLOYMENT.md.`,
     );
   }
   return JSON.parse(fs.readFileSync(recordPath, 'utf8'));

@@ -32,7 +32,7 @@ import { GOV_API_KEY_SECURITY } from '../swagger';
 @ApiTags('Transfers')
 @Controller('transfers')
 export class TransfersController {
-  constructor(private readonly transfers: TransfersService) { }
+  constructor(private readonly transfers: TransfersService) {}
 
   @Post('preview')
   @ApiOperation({

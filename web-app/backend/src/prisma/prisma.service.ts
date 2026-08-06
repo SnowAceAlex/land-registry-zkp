@@ -20,10 +20,7 @@ import { Pool } from 'pg';
  * without importing PrismaModule in each feature module.
  */
 @Injectable()
-export class PrismaService
-  extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy
-{
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor() {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {

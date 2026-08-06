@@ -42,7 +42,7 @@ export class GovernmentController {
   constructor(
     private readonly government: GovernmentService,
     private readonly importService: ImportService,
-  ) { }
+  ) {}
 
   @Get('status')
   @ApiOperation({

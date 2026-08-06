@@ -21,10 +21,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RootService } from './root.service';
 import { TreeService } from '../tree/tree.service';
 import { SubmitTransferDto, TransferPreviewDto, TransferPreviewResult } from './dto/transfer.dto';
-import {
-  TransferApprovalResponseDto,
-  TransferRequestDto,
-} from './dto/transfer.response.dto';
+import { TransferApprovalResponseDto, TransferRequestDto } from './dto/transfer.response.dto';
 
 /**
  * TransfersService — the two-part transfer flow of D28.
@@ -289,9 +286,7 @@ export class TransfersService {
       );
     }
     if (publicSignals[NEW_OWNER_COMMITMENT] !== dto.newOwnerCommitment) {
-      throw new BadRequestException(
-        'publicSignals newOwnerCommitment does not match the request',
-      );
+      throw new BadRequestException('publicSignals newOwnerCommitment does not match the request');
     }
   }
 

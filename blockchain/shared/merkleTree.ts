@@ -204,7 +204,8 @@ export async function generateMerkleProof(
 
     const siblingIndex = isRightChild ? currentIndex - 1 : currentIndex + 1;
     const levelNodes = tree.layers[level];
-    const sibling = siblingIndex < levelNodes.length ? levelNodes[siblingIndex] : tree.zeroHashes[level];
+    const sibling =
+      siblingIndex < levelNodes.length ? levelNodes[siblingIndex] : tree.zeroHashes[level];
     siblings.push(sibling);
 
     currentIndex = Math.floor(currentIndex / 2);

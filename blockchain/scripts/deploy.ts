@@ -55,7 +55,9 @@ async function main() {
 
   console.log(`network:   ${network.name}`);
   console.log(`deployer:  ${deployer.address}`);
-  console.log(`balance:   ${ethers.formatEther(await deployer.provider.getBalance(deployer.address))} ETH`);
+  console.log(
+    `balance:   ${ethers.formatEther(await deployer.provider.getBalance(deployer.address))} ETH`,
+  );
   console.log(`authority: ${authorityAddress}`);
   console.log(`org name:  "${orgName}"\n           → ${instituteHash}\n`);
 

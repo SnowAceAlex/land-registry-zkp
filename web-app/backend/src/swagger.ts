@@ -43,10 +43,7 @@ export function setupSwagger(app: INestApplication): string | null {
       ].join('\n'),
     )
     .setVersion('0.1.0')
-    .addApiKey(
-      { type: 'apiKey', name: 'x-gov-api-key', in: 'header' },
-      GOV_API_KEY_SECURITY,
-    )
+    .addApiKey({ type: 'apiKey', name: 'x-gov-api-key', in: 'header' }, GOV_API_KEY_SECURITY)
     .addTag('Government', 'State authority: bulk import, batch issuance, root publishing')
     .addTag('Transfers', 'Two-step transfer flow — automatic preview, human approval')
     .addTag('Bundles', 'One-time owner bundle download')

@@ -19,13 +19,7 @@ describe('leaf ordering (D24)', () => {
       makeProperty({ propertyId: '9' }),
     ];
 
-    expect(sortByPropertyId(rows).map((r) => r.propertyId)).toEqual([
-      '1',
-      '2',
-      '9',
-      '10',
-      '100',
-    ]);
+    expect(sortByPropertyId(rows).map((r) => r.propertyId)).toEqual(['1', '2', '9', '10', '100']);
   });
 
   it('handles propertyIds far beyond Number.MAX_SAFE_INTEGER', () => {
@@ -64,9 +58,7 @@ describe('leaf ordering (D24)', () => {
     const numericOrder = await buildTree(sortByPropertyId(rows).map(toLURRecord));
     // What a Postgres `ORDER BY "propertyId"` on a String column would give:
     const lexicographicOrder = await buildTree(
-      [...rows]
-        .sort((a, b) => a.propertyId.localeCompare(b.propertyId))
-        .map(toLURRecord),
+      [...rows].sort((a, b) => a.propertyId.localeCompare(b.propertyId)).map(toLURRecord),
     );
 
     expect(lexicographicOrder.root).not.toBe(numericOrder.root);

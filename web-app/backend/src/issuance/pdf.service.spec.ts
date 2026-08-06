@@ -71,7 +71,10 @@ describe('PdfService (D17)', () => {
   });
 
   it('embeds a QR code, so the PDF grows relative to a text-only render', async () => {
-    const pdf = await service.renderCertificate(makeReceipt(), 'https://sepolia.etherscan.io/tx/0xabc');
+    const pdf = await service.renderCertificate(
+      makeReceipt(),
+      'https://sepolia.etherscan.io/tx/0xabc',
+    );
 
     expect(pdf.length).toBeGreaterThan(5000);
   }, 30_000);

@@ -93,7 +93,9 @@ async function main() {
   console.log(`  latestRoot:        ${latestRoot}`);
   console.log(
     `  lastUpdatedAt:     ${
-      lastUpdatedAt === 0n ? '(never published)' : fromUnixTimestamp(lastUpdatedAt, 'DD/MM/YYYY HH:mm')
+      lastUpdatedAt === 0n
+        ? '(never published)'
+        : fromUnixTimestamp(lastUpdatedAt, 'DD/MM/YYYY HH:mm')
     }`,
   );
 
@@ -140,7 +142,9 @@ async function main() {
   console.log('  wiring:            matches deployments record ✓');
 
   if (process.env.SMOKE_PUBLISH !== '1') {
-    console.log('\nRead-only checks passed. Set SMOKE_PUBLISH=1 for the full publish+prove+verify round trip.\n');
+    console.log(
+      '\nRead-only checks passed. Set SMOKE_PUBLISH=1 for the full publish+prove+verify round trip.\n',
+    );
     return;
   }
 

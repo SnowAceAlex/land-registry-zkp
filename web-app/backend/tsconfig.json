@@ -20,21 +20,11 @@
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
-    "types": [
-      "node",
-      "jest",
-      "multer"
-    ],
+    "types": ["node", "jest", "multer"],
     "paths": {
-      "@land-registry/blockchain/shared": [
-        "../../blockchain/shared/index.ts"
-      ],
-      "@land-registry/blockchain/typechain-types": [
-        "../../blockchain/typechain-types/index.ts"
-      ],
-      "@land-registry/blockchain": [
-        "../../blockchain/shared/index.ts"
-      ]
+      "@land-registry/blockchain/shared": ["../../blockchain/shared/index.ts"],
+      "@land-registry/blockchain/typechain-types": ["../../blockchain/typechain-types/index.ts"],
+      "@land-registry/blockchain": ["../../blockchain/shared/index.ts"]
     }
   }
 }
