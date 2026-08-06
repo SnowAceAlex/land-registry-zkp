@@ -3,9 +3,11 @@ import {
   EncumbranceStatus,
   LURRecord,
   OffchainMetadata,
+  ReceiptDescriptiveFields,
   TenureType,
   UseType,
   hashOffchainMetadata,
+  receiptOffchainMetadata,
 } from '@land-registry/blockchain/shared';
 
 /**
@@ -97,12 +99,17 @@ export function toLURRecord(property: Property): LURRecord {
 }
 
 /**
- * The descriptive certificate fields, in the exact shape the shared digest
- * expects. Deriving it here — rather than at each call site — is what keeps the
- * backend and the verifier hashing the same bytes: a mismatch would not throw,
- * it would silently produce a leaf that is not in the tree.
+ * The descriptive certificate fields of a DB row, in the shape `receipt.json`
+ * carries them.
+ *
+ * This is the ONLY place the backend names those ten fields. Both the leaf hash
+ * (through {@link toOffchainMetadata}) and the receipt body are derived from it,
+ * so the certificate cannot end up describing something other than what the
+ * commitment attests — previously the two lists were maintained separately, and
+ * a divergence would not throw, it would silently produce a leaf that is not in
+ * the tree.
  */
-export function toOffchainMetadata(property: Property): OffchainMetadata {
+export function toReceiptDescriptiveFields(property: Property): ReceiptDescriptiveFields {
   return {
     landUseCode: property.landUseCode,
     landUserType: property.landUserType ?? null,
@@ -111,11 +118,18 @@ export function toOffchainMetadata(property: Property): OffchainMetadata {
     mapSheetNumber: property.mapSheetNumber ?? null,
     landOrigin: property.landOrigin ?? null,
     address: property.address,
-    // Prisma Decimal → fixed 2dp string, matching what the receipt carries.
-    area: Number(property.area).toFixed(2),
+    // Prisma Decimal → JSON number, which is the receipt's wire format. The
+    // conversion to the 2dp string the digest needs happens in the shared
+    // receiptOffchainMetadata(), so it exists once for every reader.
+    area: Number(property.area),
     issuingAuthority: property.issuingAuthority,
     issueDate: property.issueDate.toISOString().slice(0, 10),
   };
+}
+
+/** The same fields in the exact shape the shared commitment digest expects. */
+export function toOffchainMetadata(property: Property): OffchainMetadata {
+  return receiptOffchainMetadata(toReceiptDescriptiveFields(property));
 }
 
 /** The 6 on-chain leaf fields as JSON-safe values, for receipt.json (§3.1). */

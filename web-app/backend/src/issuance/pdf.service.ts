@@ -3,9 +3,8 @@ import * as fs from 'fs';
 import fontkit from '@pdf-lib/fontkit';
 import { PDFDocument, PDFFont, PDFPage, rgb } from 'pdf-lib';
 import * as QRCode from 'qrcode';
-import { TenureType, fromUnixTimestamp } from '@land-registry/blockchain/shared';
+import { Receipt, TenureType, fromUnixTimestamp } from '@land-registry/blockchain/shared';
 
-import { Receipt } from './receipt.builder';
 import { landUseCodeLabel } from '../government/land-use-code.map';
 
 /**

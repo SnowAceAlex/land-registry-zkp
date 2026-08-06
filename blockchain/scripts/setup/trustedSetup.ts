@@ -24,8 +24,12 @@ import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import * as snarkjs from 'snarkjs';
 
-/** Root of the blockchain/ package — build artifacts and ptau live under here. */
-export const BLOCKCHAIN_DIR = path.resolve(__dirname, '../..');
+import { BLOCKCHAIN_DIR, buildDirFor } from '../lib/paths';
+
+// Re-exported so the setup entry points keep importing these from one place;
+// they are defined in scripts/lib/paths.ts.
+export { BLOCKCHAIN_DIR, buildDirFor };
+
 const PTAU_DIR = path.join(BLOCKCHAIN_DIR, 'ptau');
 const PTAU_BASE_URL = 'https://storage.googleapis.com/zkevm/ptau';
 
@@ -38,11 +42,6 @@ export interface CircuitSetupResult {
     vkeyPath: string;
     verifierSolPath: string;
   };
-}
-
-/** circuits/build/<circuit>/ — where compile + setup artifacts land. */
-export function buildDirFor(circuit: string): string {
-  return path.join(BLOCKCHAIN_DIR, 'circuits', 'build', circuit);
 }
 
 /** Smallest Powers-of-Tau exponent whose domain covers this circuit. */

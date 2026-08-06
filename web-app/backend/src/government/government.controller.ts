@@ -21,6 +21,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 
+import { parsePageQuery } from '../common/pagination';
 import { ApiKeyGuard } from './api-key.guard';
 import { GovernmentService } from './government.service';
 import { ImportService } from './import.service';
@@ -62,10 +63,7 @@ export class GovernmentController {
   @ApiQuery({ name: 'take', required: false, type: Number, example: 50, description: 'Max 200' })
   @ApiOkResponse({ type: PropertyListResponseDto })
   listProperties(@Query('skip') skip?: string, @Query('take') take?: string) {
-    return this.government.listProperties({
-      skip: skip ? Number(skip) : undefined,
-      take: take ? Number(take) : undefined,
-    });
+    return this.government.listProperties(parsePageQuery(skip, take));
   }
 
   //CSV Import

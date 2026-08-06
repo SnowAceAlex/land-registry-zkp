@@ -29,12 +29,11 @@ import { PUBLIC_SIGNAL_ORDER } from '../../shared/circuitInputs';
 import { PROOF_TIMESTAMP_TOLERANCE_SECONDS } from '../../shared/datetime';
 import { ProofPackage } from '../../shared/types';
 import { generateGroth16Proof, getCircuitPaths, toSolidityCalldata } from '../../shared/zkpHelper';
+import { BLOCKCHAIN_DIR } from '../../scripts/lib/paths';
 import { buildSampleInput } from '../../scripts/setup/sampleWitness';
 
 type CircuitType = ProofPackage['circuitType'];
 const CIRCUITS: CircuitType[] = ['ownership', 'mortgage', 'transfer'];
-
-const BLOCKCHAIN_DIR = path.resolve(__dirname, '../..');
 
 const VERIFY_FN = {
   ownership: 'verifyOwnership',

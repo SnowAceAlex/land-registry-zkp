@@ -10,6 +10,7 @@ import { Property } from '@prisma/client';
 import { randomBytes } from 'crypto';
 
 import { ChainService } from '../chain/chain.service';
+import { PaginationParams, pageArgs, serializeProperty } from '../common/pagination';
 import { IssuanceService } from '../issuance/issuance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RootService } from './root.service';
@@ -181,14 +182,10 @@ export class GovernmentService {
     };
   }
 
-  async listProperties(
-    params: { skip?: number; take?: number } = {},
-  ): Promise<PropertyListResponseDto> {
-    const take = Math.min(params.take ?? 50, 200);
+  async listProperties(params: PaginationParams = {}): Promise<PropertyListResponseDto> {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.property.findMany({
-        skip: params.skip ?? 0,
-        take,
+        ...pageArgs(params),
         orderBy: { id: 'asc' },
         select: {
           propertyId: true,
@@ -209,11 +206,7 @@ export class GovernmentService {
 
     return {
       total,
-      items: items.map((item) => ({
-        ...item,
-        area: Number(item.area),
-        status: item.issuedAt ? 'ISSUED' : 'IMPORTED',
-      })),
+      items: items.map(serializeProperty),
     };
   }
 

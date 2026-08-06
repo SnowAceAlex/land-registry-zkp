@@ -1,13 +1,25 @@
 import { Property } from '@prisma/client';
-import { LURRecord, MerkleProofData, TREE_DEPTH } from '@land-registry/blockchain/shared';
+import {
+  IssuerBlock,
+  LURRecord,
+  MerkleProofData,
+  OwnerSecretFile,
+  Receipt,
+  TREE_DEPTH,
+} from '@land-registry/blockchain/shared';
 
-import { IssuerBlock } from './issuer.service';
-import { serializeLURRecord } from '../records/record.mapper';
+import { serializeLURRecord, toReceiptDescriptiveFields } from '../records/record.mapper';
 
 /**
  * receipt.builder.ts
  * ─────────────────────────────────────────────────────────────────────────────
  * Builds `receipt.json`, the shareable half of an issued bundle (D31, §3.1).
+ *
+ * The SHAPE of a receipt lives in `@land-registry/blockchain/shared` because
+ * this file is only its writer — `scripts/verifyReceipt.ts`, the transfer smoke
+ * script and the Phase 9 browser portal all read the same bytes back. What
+ * stays here is the part that genuinely belongs to the backend: turning a Prisma
+ * row plus a published root into that shape.
  *
  * The field names deliberately follow [SmartCert] §3.3's receipt — including
  * `IssuerCertificateChain`'s capital I — so the thesis can show the lineage
@@ -19,48 +31,6 @@ import { serializeLURRecord } from '../records/record.mapper';
  * (D14/D31). `ownerCommitment` inside `record` is the public commitment and is
  * correct to include.
  */
-
-export interface ReceiptMerkleProof {
-  siblings: string[];
-  pathIndices: number[];
-}
-
-export interface Receipt {
-  issuedOn: string;
-  transactionHash: string;
-  contractAddress: string;
-  rootVersion: number;
-  merkleRoot: string;
-  propertyId: string;
-  leaf: string;
-  merkleProof: ReceiptMerkleProof;
-  record: ReceiptRecord;
-  issuer: IssuerBlock;
-}
-
-export interface ReceiptRecord {
-  // 6 on-chain leaf fields, D4 order
-  propertyId: string;
-  ownerCommitment: string;
-  useType: number;
-  validityPeriod: string;
-  encumbranceStatus: number;
-  tenureType: number;
-  // Off-chain-only metadata (D3/D19) — for display and the PDF
-  landUseCode: string;
-  /** Đối tượng sử dụng đất (CNV/CDS/TKT/TCC/TSN); null = cá nhân */
-  landUserType: string | null;
-  certificateSerial: string;
-  bookEntryNumber: string;
-  /** Số tờ bản đồ — a mandatory field on a real GCN */
-  mapSheetNumber: string | null;
-  /** Nguồn gốc sử dụng đất — a mandatory field on a real GCN */
-  landOrigin: string | null;
-  address: string;
-  area: number;
-  issuingAuthority: string;
-  issueDate: string;
-}
 
 export interface BuildReceiptInput {
   property: Property;
@@ -101,30 +71,15 @@ export function buildReceipt(input: BuildReceiptInput): Receipt {
       siblings: merkleProof.siblings.map((s) => s.toString()),
       pathIndices: [...merkleProof.pathIndices],
     },
+    // Both halves come from the mappers, never from ad-hoc field lists: the
+    // descriptive half is the same function that feeds the leaf commitment, so
+    // the receipt cannot describe a record the leaf does not attest.
     record: {
       ...serializeLURRecord(record),
-      landUseCode: property.landUseCode,
-      landUserType: property.landUserType,
-      certificateSerial: property.certificateSerial,
-      bookEntryNumber: property.bookEntryNumber,
-      mapSheetNumber: property.mapSheetNumber,
-      landOrigin: property.landOrigin,
-      address: property.address,
-      area: Number(property.area),
-      issuingAuthority: property.issuingAuthority,
-      issueDate: property.issueDate.toISOString().slice(0, 10),
+      ...toReceiptDescriptiveFields(property),
     },
     issuer: input.issuer,
   };
-}
-
-/**
- * secret.json — the half that must never be shared and never leaves the
- * owner's possession (D14/D31).
- */
-export interface OwnerSecretFile {
-  propertyId: string;
-  ownerSecret: string;
 }
 
 export function buildSecretFile(propertyId: bigint, ownerSecret: bigint): OwnerSecretFile {

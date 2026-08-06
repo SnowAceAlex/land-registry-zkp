@@ -1,7 +1,9 @@
 import * as crypto from 'crypto';
 import { ethers } from 'ethers';
 
-import { IssuerService, readOrganizationName } from './issuer.service';
+import { readOrganizationName } from '@land-registry/blockchain/shared';
+
+import { IssuerService } from './issuer.service';
 import { ChainService } from '../chain/chain.service';
 
 const ORG_NAME = 'So Tai nguyen va Moi truong TP.HCM';

@@ -1,7 +1,11 @@
-import { MerkleProofData, TREE_DEPTH, UseType } from '@land-registry/blockchain/shared';
+import {
+  IssuerBlock,
+  MerkleProofData,
+  TREE_DEPTH,
+  UseType,
+} from '@land-registry/blockchain/shared';
 
 import { buildReceipt, buildSecretFile } from './receipt.builder';
-import { IssuerBlock } from './issuer.service';
 import { toLURRecord } from '../records/record.mapper';
 import { makeProperty } from '../../test/factories';
 

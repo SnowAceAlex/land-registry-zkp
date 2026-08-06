@@ -24,9 +24,9 @@ import {
   toSolidityCalldata,
   verifyGroth16Proof,
 } from '../shared/zkpHelper';
+import { BLOCKCHAIN_DIR } from '../scripts/lib/paths';
 import { buildSampleInput } from '../scripts/setup/sampleWitness';
 
-const BLOCKCHAIN_DIR = path.resolve(__dirname, '..');
 type CircuitType = ProofPackage['circuitType'];
 const CIRCUITS: CircuitType[] = ['ownership', 'mortgage', 'transfer'];
 

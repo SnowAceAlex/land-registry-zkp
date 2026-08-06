@@ -22,44 +22,37 @@
  * secret.json — the secret never leaves the owner, so only they can do this.
  */
 
+import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 
 import { buildTransferInput } from '../shared/circuitInputs';
 import { nowUnixTimestamp } from '../shared/datetime';
 import { poseidonHash } from '../shared/merkleTree';
-import { hashOffchainMetadata } from '../shared/offchainMetadata';
+import { OwnerSecretFile, Receipt, receiptToLURRecord } from '../shared/receipt';
+import { LURRecord } from '../shared/types';
 import { generateGroth16Proof, getCircuitPaths } from '../shared/zkpHelper';
-import { EncumbranceStatus, LURRecord, TenureType, UseType } from '../shared/types';
+import { abort, postJson } from './lib/http';
+import { BLOCKCHAIN_DIR } from './lib/paths';
 
-const BLOCKCHAIN_DIR = path.resolve(__dirname, '..');
-const API_BASE = process.env.API_BASE ?? 'http://localhost:3001/api';
-
-async function post(
-  endpoint: string,
-  body: unknown,
-  apiKey?: string,
-): Promise<{ status: number; body: any }> {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(apiKey ? { 'x-gov-api-key': apiKey } : {}),
-    },
-    body: JSON.stringify(body),
-  });
-  const text = await response.text();
-  try {
-    return { status: response.status, body: JSON.parse(text) };
-  } catch {
-    return { status: response.status, body: text };
-  }
+/** What POST /transfers/preview returns (D28 step 2). */
+interface TransferPreview {
+  oldMerkleRoot: string;
+  newMerkleRoot: string;
+  oldSiblings: string[];
+  oldPathIndices: number[];
+  newSiblings: string[];
+  newPathIndices: number[];
 }
 
-function abort(step: string, result: { status: number; body: unknown }): never {
-  console.error(`\n${step} failed (HTTP ${result.status}):`);
-  console.error(JSON.stringify(result.body, null, 2));
-  process.exit(1);
+interface TransferRequest {
+  id: number;
+  status: string;
+}
+
+interface TransferApproval {
+  version: number;
+  txHash: string;
 }
 
 async function main(): Promise<void> {
@@ -73,16 +66,20 @@ async function main(): Promise<void> {
     throw new Error('GOV_API_KEY must be set — step 4 is the officer approval and is guarded');
   }
 
-  const receipt = JSON.parse(fs.readFileSync(path.join(bundleDir, 'receipt.json'), 'utf8'));
-  const secret = JSON.parse(fs.readFileSync(path.join(bundleDir, 'secret.json'), 'utf8'));
-  const propertyId: string = receipt.propertyId;
+  const receipt: Receipt = JSON.parse(
+    fs.readFileSync(path.join(bundleDir, 'receipt.json'), 'utf8'),
+  );
+  const secret: OwnerSecretFile = JSON.parse(
+    fs.readFileSync(path.join(bundleDir, 'secret.json'), 'utf8'),
+  );
+  const propertyId = receipt.propertyId;
 
   // The buyer picks their own secret and shares only the commitment — the
   // registry never learns it, which is the whole point of the commitment.
   const newOwnerSecret =
     process.env.NEW_OWNER_SECRET !== undefined
       ? BigInt(process.env.NEW_OWNER_SECRET)
-      : BigInt('0x' + require('crypto').randomBytes(31).toString('hex'));
+      : BigInt('0x' + randomBytes(31).toString('hex'));
   const newOwnerCommitment = await poseidonHash([newOwnerSecret]);
 
   console.log(`\nproperty ${propertyId}`);
@@ -92,7 +89,7 @@ async function main(): Promise<void> {
   console.log(`     ${newOwnerSecret}\n`);
 
   // ── Step 2: the registry projects the tree ─────────────────────────────────
-  const preview = await post('/transfers/preview', {
+  const preview = await postJson<TransferPreview>('/transfers/preview', {
     propertyId,
     newOwnerCommitment: newOwnerCommitment.toString(),
   });
@@ -101,28 +98,9 @@ async function main(): Promise<void> {
   console.log(`          new root ${preview.body.newMerkleRoot.slice(0, 20)}…`);
 
   // ── Step 3: both parties generate one proof together ───────────────────────
-  const oldRecord: LURRecord = {
-    propertyId: BigInt(receipt.record.propertyId),
-    ownerCommitment: BigInt(receipt.record.ownerCommitment),
-    useType: receipt.record.useType as UseType,
-    validityPeriod: BigInt(receipt.record.validityPeriod),
-    encumbranceStatus: receipt.record.encumbranceStatus as EncumbranceStatus,
-    tenureType: receipt.record.tenureType as TenureType,
-    // Recomputed from the receipt's own descriptive fields — if they were
-    // edited, this digest changes and the leaf no longer matches the tree.
-    offchainHash: hashOffchainMetadata({
-      landUseCode: receipt.record.landUseCode,
-      landUserType: receipt.record.landUserType ?? null,
-      certificateSerial: receipt.record.certificateSerial,
-      bookEntryNumber: receipt.record.bookEntryNumber,
-      mapSheetNumber: receipt.record.mapSheetNumber ?? null,
-      landOrigin: receipt.record.landOrigin ?? null,
-      address: receipt.record.address,
-      area: Number(receipt.record.area).toFixed(2),
-      issuingAuthority: receipt.record.issuingAuthority,
-      issueDate: receipt.record.issueDate,
-    }),
-  };
+  // Rebuilt from the receipt's own fields — if any were edited, the offchainHash
+  // changes and the leaf no longer matches the tree.
+  const oldRecord: LURRecord = receiptToLURRecord(receipt.record);
 
   const input = buildTransferInput({
     oldRecord,
@@ -160,27 +138,28 @@ async function main(): Promise<void> {
   const proof = await generateGroth16Proof(input, wasmPath, zkeyPath, 'transfer');
   console.log(`proof     generated in ${Date.now() - startedAt} ms`);
 
-  const submit = await post('/transfers', {
+  const submission = {
     propertyId,
     newOwnerCommitment: newOwnerCommitment.toString(),
     proof: proof.proof,
     publicSignals: proof.publicSignals,
-  });
+  };
+
+  const submit = await postJson<TransferRequest>('/transfers', submission);
   if (submit.status >= 400) abort('submit', submit);
   console.log(`submit    queued as request #${submit.body.id} (status ${submit.body.status})`);
 
   // ── Step 4: the human decision ─────────────────────────────────────────────
-  const approve = await post(`/transfers/${submit.body.id}/approve`, {}, apiKey);
+  const approve = await postJson<TransferApproval>(
+    `/transfers/${submit.body.id}/approve`,
+    {},
+    apiKey,
+  );
   if (approve.status >= 400) abort('approve', approve);
   console.log(`approve   root version ${approve.body.version}, tx ${approve.body.txHash}`);
 
   // ── The proof is now spent: its oldRoot has stopped being latest ───────────
-  const replay = await post('/transfers', {
-    propertyId,
-    newOwnerCommitment: newOwnerCommitment.toString(),
-    proof: proof.proof,
-    publicSignals: proof.publicSignals,
-  });
+  const replay = await postJson<{ message?: string }>('/transfers', submission);
   const replayRejected = replay.status === 422;
   console.log(
     `replay    HTTP ${replay.status} — ${replayRejected ? 'correctly rejected' : 'UNEXPECTEDLY ACCEPTED'}` +

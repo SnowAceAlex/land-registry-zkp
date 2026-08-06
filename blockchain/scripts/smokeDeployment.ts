@@ -23,39 +23,17 @@
  *     "the" demo instance, run read-only first and only publish deliberately.
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
 import { ethers, network } from 'hardhat';
 
 import { PUBLIC_SIGNAL_ORDER } from '../shared/circuitInputs';
 import { fromUnixTimestamp } from '../shared/datetime';
+import { loadDeployment } from '../shared/deployments';
 import { generateGroth16Proof, getCircuitPaths, toSolidityCalldata } from '../shared/zkpHelper';
+import { BLOCKCHAIN_DIR } from './lib/paths';
 import { buildSampleInput } from './setup/sampleWitness';
 
-const BLOCKCHAIN_DIR = path.resolve(__dirname, '..');
-
-interface DeploymentRecord {
-  network: string;
-  chainId: number;
-  deployedAt: string;
-  deployer: string;
-  authority: { address: string; orgName: string; instituteHash: string };
-  contracts: Record<string, string>;
-}
-
-function loadDeployment(): DeploymentRecord {
-  const recordPath = path.join(BLOCKCHAIN_DIR, 'deployments', `${network.name}.json`);
-  if (!fs.existsSync(recordPath)) {
-    throw new Error(
-      `No deployment record at deployments/${network.name}.json — ` +
-        `deploy to this network first (see DEPLOYMENT.md).`,
-    );
-  }
-  return JSON.parse(fs.readFileSync(recordPath, 'utf8'));
-}
-
 async function main() {
-  const deployment = loadDeployment();
+  const deployment = loadDeployment(BLOCKCHAIN_DIR, network.name);
   const [signer] = await ethers.getSigners();
 
   console.log(`\nnetwork:    ${network.name} (chainId ${deployment.chainId})`);

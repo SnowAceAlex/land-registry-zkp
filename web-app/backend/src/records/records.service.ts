@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, NotImplementedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaginationParams, pageArgs, serializeProperty } from '../common/pagination';
 
 /**
  * RecordsService
@@ -16,18 +17,13 @@ import { PrismaService } from '../prisma/prisma.service';
 export class RecordsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(params: { skip?: number; take?: number } = {}) {
-    const take = Math.min(params.take ?? 50, 200);
+  async findAll(params: PaginationParams = {}) {
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.property.findMany({
-        skip: params.skip ?? 0,
-        take,
-        orderBy: { id: 'asc' },
-      }),
+      this.prisma.property.findMany({ ...pageArgs(params), orderBy: { id: 'asc' } }),
       this.prisma.property.count(),
     ]);
 
-    return { total, items: items.map(serialize) };
+    return { total, items: items.map(serializeProperty) };
   }
 
   async findById(propertyId: string) {
@@ -35,7 +31,7 @@ export class RecordsService {
     if (!property) {
       throw new NotFoundException(`Unknown propertyId ${propertyId}`);
     }
-    return serialize(property);
+    return serializeProperty(property);
   }
 
   async create(_dto: Record<string, unknown>): Promise<never> {
@@ -57,14 +53,4 @@ export class RecordsService {
       'Records are never deleted — the registry only ever deactivates state (D29).',
     );
   }
-}
-
-/** Prisma Decimal and the string-encoded bigints need JSON-safe forms. */
-function serialize(property: Awaited<ReturnType<PrismaService['property']['findUnique']>>) {
-  if (!property) return property;
-  return {
-    ...property,
-    area: Number(property.area),
-    status: property.issuedAt ? 'ISSUED' : 'IMPORTED',
-  };
 }

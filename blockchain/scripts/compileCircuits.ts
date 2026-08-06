@@ -23,7 +23,8 @@ import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const BLOCKCHAIN_DIR = path.resolve(__dirname, '..');
+import { BLOCKCHAIN_DIR } from './lib/paths';
+
 const BUILD_DIR = path.join(BLOCKCHAIN_DIR, 'circuits', 'build');
 
 /** Top-level circuits, cheapest first — a failure in ownership fails the rest too. */

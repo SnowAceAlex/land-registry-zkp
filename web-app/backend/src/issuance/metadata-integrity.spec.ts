@@ -1,5 +1,12 @@
-import { hashRecord, hashOffchainMetadata } from '@land-registry/blockchain/shared';
+import {
+  TREE_DEPTH,
+  hashOffchainMetadata,
+  hashRecord,
+  receiptOffchainMetadata,
+  receiptToLURRecord,
+} from '@land-registry/blockchain/shared';
 
+import { buildReceipt } from './receipt.builder';
 import { toLURRecord, toOffchainMetadata } from '../records/record.mapper';
 import { makeProperty } from '../../test/factories';
 
@@ -70,5 +77,56 @@ describe('off-chain metadata is bound to the leaf (R2-01)', () => {
       toOffchainMetadata(makeProperty({ propertyId: '1001', mapSheetNumber: '' })),
     );
     expect(absent).not.toBe(empty);
+  });
+
+  /**
+   * `buildReceipt` must write the row's values faithfully.
+   *
+   * The backend hashes a DB row; every reader of the issued bundle
+   * (scripts/verifyReceipt.ts, the transfer smoke script, the Phase 9 browser
+   * portal) hashes the `record` block those fields were written into. Both sides
+   * now run the same field mapping, so they cannot disagree about WHICH fields
+   * or HOW to normalise them — that class of drift is gone by construction, not
+   * by this test.
+   *
+   * What is still only a convention, and what this test pins, is that the values
+   * `buildReceipt` puts in `record` are the row's own. Types do not cover that:
+   * an override added after the spread type-checks perfectly and produces a
+   * receipt whose recomputed leaf is not in the tree — which reaches the owner
+   * as "your proof is invalid" rather than as a bug report.
+   */
+  it('hashes the same bytes from a DB row and from the receipt built out of it', async () => {
+    const property = makeProperty({ propertyId: '1001' });
+
+    const receipt = buildReceipt({
+      property,
+      record: toLURRecord(property),
+      merkleProof: {
+        leaf: 1n,
+        siblings: Array.from({ length: TREE_DEPTH }, () => 0n),
+        pathIndices: Array.from({ length: TREE_DEPTH }, () => 0),
+        root: 2n,
+      },
+      rootVersion: 1,
+      merkleRoot: 2n,
+      transactionHash: '0xabc',
+      contractAddress: '0xdef',
+      issuer: {
+        ethereumAccount: '0x0000000000000000000000000000000000000001',
+        ethereumAccountSignature: '',
+        IssuerCertificateChain: '',
+      },
+      issuedOn: '2026-08-06T00:00:00+07:00',
+    });
+
+    expect(hashOffchainMetadata(receiptOffchainMetadata(receipt.record))).toBe(
+      hashOffchainMetadata(toOffchainMetadata(property)),
+    );
+
+    // …and therefore the leaf a verifier recomputes from the receipt is the leaf
+    // the registry put in the tree.
+    expect(await hashRecord(receiptToLURRecord(receipt.record))).toBe(
+      await hashRecord(toLURRecord(property)),
+    );
   });
 });

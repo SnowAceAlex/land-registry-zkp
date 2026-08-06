@@ -1,8 +1,12 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ethers } from 'ethers';
+import {
+  IssuerBlock,
+  readOrganizationName,
+  signIssuerAddress,
+} from '@land-registry/blockchain/shared';
 
 import { ChainService } from '../chain/chain.service';
 import { backendDir } from '../common/paths';
@@ -13,27 +17,14 @@ import { backendDir } from '../common/paths';
  * Produces the `issuer` block of receipt.json (§3.1) — the chain of evidence
  * that lets a verifier decide whether to trust a published root at all (D30).
  *
- * The problem it solves: AccessControl proves "this address may publish roots",
- * not "this address belongs to the land authority". Anyone can deploy their own
- * registry and grant themselves the role. So the issuer signs its own Ethereum
- * address with the private key of an X.509 certificate, and the certificate's
- * organization name is anchored on-chain. A verifier that checks all three
- * links (cert → CA, keccak256(O) → authorityInstitute, signature → cert key)
- * cannot be fooled by a look-alike deployment.
- *
- * SIGNATURE FORMAT (D34) — the Phase 9 browser verifier must mirror this
- * exactly: RSASSA-PKCS1-v1_5 over SHA-256, message = the UTF-8 bytes of the
- * EIP-55 checksummed address string (not the raw 20 bytes), output base64.
- * WebCrypto verifies it with algorithm { name: 'RSASSA-PKCS1-v1_5' } and
- * hash SHA-256.
+ * This service owns the ISSUING half: loading the certificate, signing, and
+ * failing loudly at startup if the on-chain anchor disagrees. The verifying half
+ * and the D34 signature format itself live in
+ * `@land-registry/blockchain/shared` (`issuerIdentity.ts`), because the script
+ * and the Phase 9 browser portal verify the same signature and must derive the
+ * same bytes — a rule stated only in prose is a rule that eventually differs
+ * between its implementations.
  */
-
-export interface IssuerBlock {
-  ethereumAccount: string;
-  ethereumAccountSignature: string;
-  /** PEM. Field name keeps [SmartCert]'s capital I — inherited, not a typo. */
-  IssuerCertificateChain: string;
-}
 
 @Injectable()
 export class IssuerService implements OnModuleInit {
@@ -77,15 +68,11 @@ export class IssuerService implements OnModuleInit {
 
   /**
    * Sign an Ethereum address with the certificate's private key.
-   * @param address checksummed by the caller-independent EIP-55 rule so the
-   *   verifier signs/verifies over the exact same bytes regardless of the
-   *   casing the address arrived in.
+   * @param address checksummed here by the EIP-55 rule so signer and verifier
+   *   cover the exact same bytes regardless of the casing it arrived in.
    */
   signEthereumAccount(address: string): string {
-    const checksummed = ethers.getAddress(address);
-    return crypto
-      .sign('sha256', Buffer.from(checksummed, 'utf8'), this.privateKeyPem)
-      .toString('base64');
+    return signIssuerAddress(this.privateKeyPem, ethers.getAddress(address));
   }
 
   /** The `issuer` block embedded in every receipt.json. */
@@ -122,20 +109,4 @@ export class IssuerService implements OnModuleInit {
       this.logger.warn(`could not verify identity anchor: ${(error as Error).message}`);
     }
   }
-}
-
-/**
- * Read the Subject "O" out of a PEM certificate.
- * `X509Certificate.subject` is a newline-separated RDN list ("C=VN\nO=...").
- */
-export function readOrganizationName(certificatePem: string): string {
-  const subject = new crypto.X509Certificate(certificatePem).subject;
-  const line = subject.split('\n').find((rdn) => rdn.startsWith('O='));
-  if (!line) {
-    throw new Error(
-      'Issuer certificate has no Subject "O" (organization) field — D30 anchors ' +
-        'the organization name, so a certificate without one cannot be used',
-    );
-  }
-  return line.slice('O='.length).trim();
 }

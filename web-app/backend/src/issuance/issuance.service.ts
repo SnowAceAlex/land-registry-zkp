@@ -7,13 +7,14 @@ import utc from 'dayjs/plugin/utc';
 import {
   LURRecord,
   MerkleProofData,
+  Receipt,
   VN_TIMEZONE,
   poseidonHash,
 } from '@land-registry/blockchain/shared';
 
 import { IssuerService } from './issuer.service';
 import { PdfService } from './pdf.service';
-import { Receipt, buildReceipt, buildSecretFile } from './receipt.builder';
+import { buildReceipt, buildSecretFile } from './receipt.builder';
 import { ZipService } from './zip.service';
 import { toLURRecord } from '../records/record.mapper';
 

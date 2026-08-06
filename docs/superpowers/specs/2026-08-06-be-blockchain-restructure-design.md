@@ -82,6 +82,17 @@ hashOffchainMetadata(toOffchainMetadata(property))
 
 Thêm vào `metadata-integrity.spec.ts`.
 
+**Ghi chú sau khi triển khai.** Sau khi gộp, `toOffchainMetadata` cũng gọi qua
+`receiptOffchainMetadata`, nên nguy cơ "bên ghi và bên đọc bất đồng về danh sách trường
+hay cách chuẩn hoá" đã bị loại bỏ **bằng kiến trúc** — kiểm chứng bằng cách đục
+`.toFixed(2)` → `.toFixed(1)`: test vẫn xanh, vì cả hai vế dịch chuyển cùng nhau, và đó
+là hành vi đúng.
+
+Thứ test này thật sự canh là bất biến ở **mức giá trị**: `buildReceipt` ghi đúng giá trị
+của row vào `record`. Kiểu dữ liệu không phủ được điều đó — thêm một override sau phần
+spread vẫn type-check sạch. Kiểm chứng bằng cách chèn `area: Number(property.area) * 2`
+vào `buildReceipt`: test đỏ đúng như mong đợi.
+
 ## Không làm
 
 - **Layered architecture** (domain/application/infrastructure) — over-engineering cho

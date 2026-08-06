@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { RecordsService } from './records.service';
+import { parsePageQuery } from '../common/pagination';
 
 /**
  * RecordsController
@@ -23,10 +24,7 @@ export class RecordsController {
   @ApiQuery({ name: 'skip', required: false, type: Number, example: 0 })
   @ApiQuery({ name: 'take', required: false, type: Number, example: 50, description: 'Max 200' })
   findAll(@Query('skip') skip?: string, @Query('take') take?: string) {
-    return this.recordsService.findAll({
-      skip: skip ? Number(skip) : undefined,
-      take: take ? Number(take) : undefined,
-    });
+    return this.recordsService.findAll(parsePageQuery(skip, take));
   }
 
   @Get(':propertyId')

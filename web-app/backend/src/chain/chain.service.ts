@@ -1,6 +1,4 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import * as fs from 'fs';
-import * as path from 'path';
 import { ethers } from 'ethers';
 import {
   LandRegistryVerifier,
@@ -8,7 +6,15 @@ import {
   RootRegistry,
   RootRegistry__factory,
 } from '@land-registry/blockchain/typechain-types';
-import { Groth16Proof, PublicSignals, toSolidityCalldata } from '@land-registry/blockchain/shared';
+import {
+  ChainNetwork,
+  DeploymentRecord,
+  Groth16Proof,
+  PublicSignals,
+  loadDeployment,
+  resolveRpcUrl,
+  toSolidityCalldata,
+} from '@land-registry/blockchain/shared';
 
 import { blockchainDir } from '../common/paths';
 
@@ -24,15 +30,10 @@ import { blockchainDir } from '../common/paths';
  * was actually made rather than to addresses copied into env by hand.
  */
 
-export type ChainNetwork = 'localhost' | 'sepolia' | 'hardhat';
-
-interface DeploymentRecord {
-  network: string;
-  chainId: number;
-  deployer: string;
-  authority: { address: string; orgName: string; instituteHash: string };
-  contracts: Record<string, string>;
-}
+// ChainNetwork and DeploymentRecord now come from the shared package, next to
+// the loader — three copies of that record had already drifted apart. Still
+// re-exported here so callers importing them from ChainService keep working.
+export type { ChainNetwork, DeploymentRecord };
 
 /** A LandRegistryVerifier rejection, decoded from its typed revert (D33). */
 export class ProofRejectedError extends Error {
@@ -69,9 +70,9 @@ export class ChainService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     const network = (process.env.CHAIN_NETWORK ?? 'localhost') as ChainNetwork;
-    this.deployment = loadDeployment(network);
+    this.deployment = loadDeployment(blockchainDir(), network);
 
-    const rpcUrl = process.env.RPC_URL ?? defaultRpcUrl(network);
+    const rpcUrl = resolveRpcUrl(network);
     const privateKey = process.env.AUTHORITY_PRIVATE_KEY ?? process.env.PRIVATE_KEY;
     if (!privateKey) {
       throw new Error(
@@ -251,27 +252,4 @@ export class ChainService implements OnModuleInit {
 /** bigint root → 32-byte hex, the form RootRegistry stores. */
 export function toBytes32(root: bigint): string {
   return ethers.zeroPadValue(ethers.toBeHex(root), 32);
-}
-
-function defaultRpcUrl(network: ChainNetwork): string {
-  if (network === 'sepolia') {
-    const url = process.env.SEPOLIA_RPC_URL;
-    if (!url) {
-      throw new Error('CHAIN_NETWORK=sepolia requires SEPOLIA_RPC_URL (or RPC_URL) to be set');
-    }
-    return url;
-  }
-  return 'http://127.0.0.1:8545';
-}
-
-function loadDeployment(network: ChainNetwork): DeploymentRecord {
-  const recordPath = path.join(blockchainDir(), 'deployments', `${network}.json`);
-
-  if (!fs.existsSync(recordPath)) {
-    throw new Error(
-      `No deployment record at ${recordPath}. Deploy first ` +
-        `(pnpm --filter blockchain run deploy:${network}) — see DEPLOYMENT.md.`,
-    );
-  }
-  return JSON.parse(fs.readFileSync(recordPath, 'utf8'));
 }
