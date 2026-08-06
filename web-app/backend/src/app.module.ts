@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from './prisma/prisma.module';
-import { RecordsModule } from './records/records.module';
-import { ProofModule } from './proof/proof.module';
 import { ChainModule } from './chain/chain.module';
+import { GovernmentModule } from './government/government.module';
+import { IssuanceModule } from './issuance/issuance.module';
+import { PrismaModule } from './prisma/prisma.module';
+import { ProofModule } from './proof/proof.module';
+import { RecordsModule } from './records/records.module';
+import { TreeModule } from './tree/tree.module';
 
 /**
  * Root application module.
@@ -14,9 +17,12 @@ import { ChainModule } from './chain/chain.module';
 @Module({
   imports: [
     PrismaModule,
+    TreeModule,
+    ChainModule,
+    IssuanceModule,
+    GovernmentModule,
     RecordsModule,
     ProofModule,
-    ChainModule,
   ],
 })
 export class AppModule {}

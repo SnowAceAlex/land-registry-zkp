@@ -1,0 +1,25 @@
+# Generated / vendored — never format these
+node_modules/
+dist/
+build/
+coverage/
+pnpm-lock.yaml
+
+# Hardhat + circom build output
+blockchain/artifacts/
+blockchain/cache/
+blockchain/typechain-types/
+blockchain/circuits/build/
+blockchain/fixtures/
+blockchain/ptau/
+
+# Auto-synced from circuits/build/ by verifiers:sync — regenerated, never edited
+blockchain/contracts/verifiers/
+
+# Prisma owns this file's formatting (prisma format)
+web-app/backend/prisma/schema.prisma
+web-app/backend/prisma/migrations/
+web-app/backend/openapi.json
+
+# Frontend keeps its own toolchain (Next.js flat config)
+web-app/frontend/

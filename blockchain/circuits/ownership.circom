@@ -40,6 +40,10 @@ template Ownership(levels) {
     signal input validityPeriod;
     signal input encumbranceStatus;
     signal input tenureType;
+    // Commitment to the descriptive certificate fields (address, area,
+    // landUseCode, …). Private: it never appears in publicSignals, so the D21
+    // layout and the on-chain verifier indices are unchanged.
+    signal input offchainHash;
     signal input ownerSecret;
     signal input siblings[levels];
     signal input pathIndices[levels];
@@ -58,6 +62,7 @@ template Ownership(levels) {
     leafHasher.validityPeriod <== validityPeriod;
     leafHasher.encumbranceStatus <== encumbranceStatus;
     leafHasher.tenureType <== tenureType;
+    leafHasher.offchainHash <== offchainHash;
 
     // 3. That leaf must sit in the tree whose root the state authority published.
     component merkle = MerkleProof(levels);

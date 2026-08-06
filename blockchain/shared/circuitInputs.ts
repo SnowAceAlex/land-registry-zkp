@@ -57,13 +57,16 @@ function assertProofDepth(proof: MerkleProofData, label: string): void {
   }
 }
 
-/** The four record fields shared by every circuit's private witness. */
+/** The record fields shared by every circuit's private witness. */
 function recordFields(record: LURRecord) {
   return {
     useType: record.useType.toString(),
     validityPeriod: record.validityPeriod.toString(),
     encumbranceStatus: record.encumbranceStatus.toString(),
     tenureType: record.tenureType.toString(),
+    // Private: commits the leaf to the descriptive fields without exposing them
+    // (see shared/offchainMetadata.ts). Not a public signal, so D21 is unchanged.
+    offchainHash: record.offchainHash.toString(),
   };
 }
 
@@ -159,6 +162,9 @@ export function buildTransferInput(params: TransferInputParams): ProofInput {
     'validityPeriod',
     'encumbranceStatus',
     'tenureType',
+    // Both leaves are hashed from one set of record signals, so a transfer that
+    // also rewrote the address or area is unprovable by construction.
+    'offchainHash',
   ];
   for (const field of unchanged) {
     if (oldRecord[field] !== newRecord[field]) {

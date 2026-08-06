@@ -56,6 +56,8 @@ async function makeSubjectRecord(now: bigint): Promise<LURRecord> {
     validityPeriod: now + 10n * SECONDS_PER_YEAR,
     encumbranceStatus: EncumbranceStatus.FREE,
     tenureType: TenureType.FIXED_TERM,
+    // Pinned: the sample witness exercises the predicates, not the digest.
+    offchainHash: 555_666_777_888_999n,
   };
 }
 

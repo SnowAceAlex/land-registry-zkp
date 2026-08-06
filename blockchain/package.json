@@ -4,7 +4,8 @@
   "description": "Cryptographic layer: circom circuits, Hardhat contracts, shared Merkle tree + ZKP logic",
   "main": "./shared/index.ts",
   "exports": {
-    "./shared": "./shared/index.ts"
+    "./shared": "./shared/index.ts",
+    "./typechain-types": "./typechain-types/index.ts"
   },
   "engines": {
     "node": ">=20"
@@ -23,7 +24,9 @@
     "circuits:compile": "ts-node scripts/compileCircuits.ts",
     "circuits:setup": "ts-node scripts/setup/setupAll.ts",
     "verifiers:sync": "ts-node scripts/setup/syncVerifiers.ts",
-    "circuits:smoke": "ts-node scripts/setup/smokeOwnership.ts"
+    "circuits:smoke": "ts-node scripts/setup/smokeOwnership.ts",
+    "receipt:verify": "ts-node scripts/verifyReceipt.ts",
+    "transfer:smoke": "ts-node scripts/transferSmoke.ts"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.2",

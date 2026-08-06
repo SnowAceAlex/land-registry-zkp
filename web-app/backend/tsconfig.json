@@ -11,6 +11,7 @@
     "target": "ES2021",
     "sourceMap": true,
     "outDir": "./dist",
+    "rootDir": "../../",
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
@@ -19,11 +20,21 @@
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
-    "types": ["node"],
+    "types": [
+      "node",
+      "jest",
+      "multer"
+    ],
     "paths": {
-      "@land-registry/blockchain/shared": ["../../blockchain/shared/index.ts"],
-      "@land-registry/blockchain": ["../../blockchain/shared/index.ts"]
+      "@land-registry/blockchain/shared": [
+        "../../blockchain/shared/index.ts"
+      ],
+      "@land-registry/blockchain/typechain-types": [
+        "../../blockchain/typechain-types/index.ts"
+      ],
+      "@land-registry/blockchain": [
+        "../../blockchain/shared/index.ts"
+      ]
     }
   }
 }
-

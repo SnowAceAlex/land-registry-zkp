@@ -31,6 +31,13 @@ export const SUBJECT_SECRET = 123_456_789_012_345_678_901n;
 /** A different secret, for "wrong owner" and "new owner" cases. */
 export const OTHER_SECRET = 987_654_321_098_765_432_109n;
 
+/**
+ * Fixed commitment to the descriptive certificate fields. Circuit tests are
+ * about the legal predicates, not the metadata digest, so they pin one value —
+ * a varying digest would change every leaf without testing anything new.
+ */
+export const DEFAULT_OFFCHAIN_HASH = 555_666_777_888_999n;
+
 export interface MakeRecordOptions {
   secret?: bigint;
   propertyId?: bigint;
@@ -38,6 +45,7 @@ export interface MakeRecordOptions {
   validityPeriod?: bigint;
   encumbranceStatus?: EncumbranceStatus;
   tenureType?: TenureType;
+  offchainHash?: bigint;
 }
 
 /**
@@ -65,6 +73,7 @@ export async function makeRecord(
       validityPeriod,
       encumbranceStatus: options.encumbranceStatus ?? EncumbranceStatus.FREE,
       tenureType,
+      offchainHash: options.offchainHash ?? DEFAULT_OFFCHAIN_HASH,
     },
   };
 }

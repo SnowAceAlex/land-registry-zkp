@@ -58,7 +58,8 @@ export async function poseidonHash(inputs: bigint[]): Promise<bigint> {
 
 /**
  * Compute the Poseidon leaf hash for a LUR record.
- * leaf = Poseidon([propertyId, ownerCommitment, useType, validityPeriod, encumbranceStatus, tenureType])
+ * leaf = Poseidon([propertyId, ownerCommitment, useType, validityPeriod,
+ *                  encumbranceStatus, tenureType, offchainHash])
  * This exact field order must match the circom circuits (D4) — never reorder.
  */
 export async function hashRecord(record: LURRecord): Promise<bigint> {
@@ -69,6 +70,7 @@ export async function hashRecord(record: LURRecord): Promise<bigint> {
     record.validityPeriod,
     BigInt(record.encumbranceStatus),
     BigInt(record.tenureType),
+    record.offchainHash,
   ]);
 }
 

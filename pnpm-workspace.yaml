@@ -6,6 +6,9 @@ allowBuilds:
   '@nestjs/core': true
   '@prisma/client': true
   '@prisma/engines': true
+  # Telemetry postinstall pulled in by @nestjs/swagger — nothing depends on it
+  # running, so it stays off.
+  '@scarf/scarf': false
   blake-hash: true
   bufferutil: true
   keccak: true

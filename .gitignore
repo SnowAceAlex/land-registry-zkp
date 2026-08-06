@@ -26,6 +26,14 @@ blockchain/ptau/*.ptau
 coverage/
 coverage.json
 
+# Generated OpenAPI spec — regenerate with `pnpm --filter backend run openapi:export`
+# (changes on every DTO edit, so keeping it in git would be pure churn)
+web-app/backend/openapi.json
+
+# Issuer X.509 identity (Phase 5, D30) — issuer.key.pem is private key material.
+# Regenerate with `pnpm --filter backend run cert:generate`.
+web-app/backend/certs/
+
 # Mock data fixtures (Phase 0) — regenerated via `pnpm --filter blockchain run mock:generate`;
 # mockSecrets.json holds ownerSecret private key material, never commit it.
 blockchain/fixtures/
@@ -90,3 +98,7 @@ THESIS_IMPLEMENTATION_GUIDE.md
 Pre_Thesis_Final_Report_BuiCongVinh_ITCSIU22165.md
 PHASE_2_NOTES.md
 PAPER_ALIGNMENT_NOTES.md
+DEFECTS-audit-response.md
+DEFECTS-land-registry-audit.md
+PHASE_4_NOTES.md
+PHASE_5_MANUAL_TEST.md

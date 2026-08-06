@@ -8,10 +8,21 @@
     "dev:frontend": "pnpm --filter frontend run dev",
     "compile": "pnpm --filter blockchain run hardhat compile",
     "test:blockchain": "pnpm --filter blockchain run test",
+    "test:backend": "pnpm --filter backend run test",
+    "lint": "eslint blockchain web-app/backend",
+    "lint:fix": "eslint blockchain web-app/backend --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down"
   },
   "devDependencies": {
-    "typescript": "^5.4.5"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.9.0",
+    "prettier": "^3.9.6",
+    "typescript": "^5.4.5",
+    "typescript-eslint": "^8.66.0"
   }
 }

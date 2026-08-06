@@ -90,6 +90,18 @@ export interface LURRecord {
 
   /** Land tenure classification — see TenureType enum */
   tenureType: TenureType;
+
+  /**
+   * Commitment to the descriptive certificate fields (address, area,
+   * landUseCode, …) — see shared/offchainMetadata.ts.
+   *
+   * Those fields are printed on the certificate but never stored on-chain.
+   * Without this input the leaf did not cover them, so they could be edited
+   * inside an issued receipt while the Merkle proof still verified. Hashing a
+   * single digest in closes that hole and costs nothing on-chain: the leaf, and
+   * therefore the root, is still one number.
+   */
+  offchainHash: bigint;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

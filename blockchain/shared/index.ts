@@ -10,6 +10,9 @@
 // Types & Enums
 export * from './types';
 
+// Off-chain metadata commitment (7th leaf input)
+export * from './offchainMetadata';
+
 // Merkle Tree utilities (Poseidon-based)
 export * from './merkleTree';
 
