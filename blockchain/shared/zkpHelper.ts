@@ -15,7 +15,7 @@
  *
  *   The one-time trusted-setup APIs (snarkjs.r1cs.* / snarkjs.zKey.*) are a
  *   different concern — key generation, not proving — and are called directly
- *   in scripts/setup/trustedSetup.ts; they are intentionally NOT routed here.
+ *   in scripts/circuits/trustedSetup.ts; they are intentionally NOT routed here.
  *
  * Groth16 workflow:
  *   1. Compile circuit: circom ownership.circom --r1cs --wasm --sym
@@ -182,7 +182,7 @@ export function toSolidityCalldata(proof: Groth16Proof): SolidityProofArgs {
 
 /**
  * Resolve the build-artifact paths for a circuit, matching the layout produced
- * by scripts/compileCircuits.ts + scripts/setup/*.ts:
+ * by scripts/circuits/compile.ts + scripts/circuits/*.ts:
  *   circuits/build/<circuitName>/<circuitName>_js/<circuitName>.wasm
  *   circuits/build/<circuitName>/<circuitName>.zkey
  *   circuits/build/<circuitName>/verification_key.json

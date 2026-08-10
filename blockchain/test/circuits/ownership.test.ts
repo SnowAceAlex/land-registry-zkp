@@ -86,7 +86,7 @@ describe('circuits/ownership.circom (Phase 2)', () => {
     await circuit.checkConstraints(witness);
   });
 
-  it('accepts regardless of encumbrance — that is the mortgage circuit\'s job', async () => {
+  it("accepts regardless of encumbrance — that is the mortgage circuit's job", async () => {
     const subject = await makeSubject(now, {
       encumbranceStatus: EncumbranceStatus.MORTGAGED,
     });

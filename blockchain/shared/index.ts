@@ -10,6 +10,18 @@
 // Types & Enums
 export * from './types';
 
+// Off-chain metadata commitment (7th leaf input)
+export * from './offchainMetadata';
+
+// receipt.json wire format + the single receipt → LURRecord reconstruction
+export * from './receipt';
+
+// D30 issuer identity chain: the D34 signature rule, cert org name, verify
+export * from './issuerIdentity';
+
+// deployments/<network>.json record + RPC endpoint resolution
+export * from './deployments';
+
 // Merkle Tree utilities (Poseidon-based)
 export * from './merkleTree';
 

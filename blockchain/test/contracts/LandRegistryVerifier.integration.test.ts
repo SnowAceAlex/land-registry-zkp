@@ -8,7 +8,7 @@
  * Needs the gitignored trusted-setup artifacts (wasm/zkey) AND the synced
  * verifier contracts (contracts/verifiers/*.sol — produced by circuits:setup,
  * compiled by Hardhat before tests run). On a checkout without them this suite
- * self-skips, same pattern as test/zkpHelper.test.ts.
+ * self-skips, same pattern as test/shared/zkpHelper.test.ts.
  *
  * D21 cross-check: the reject-path assertions read the root/timestamp positions
  * from PUBLIC_SIGNAL_ORDER (TS source of truth) and require the contract's
@@ -29,12 +29,11 @@ import { PUBLIC_SIGNAL_ORDER } from '../../shared/circuitInputs';
 import { PROOF_TIMESTAMP_TOLERANCE_SECONDS } from '../../shared/datetime';
 import { ProofPackage } from '../../shared/types';
 import { generateGroth16Proof, getCircuitPaths, toSolidityCalldata } from '../../shared/zkpHelper';
-import { buildSampleInput } from '../../scripts/setup/sampleWitness';
+import { BLOCKCHAIN_DIR } from '../../scripts/lib/paths';
+import { buildSampleInput } from '../../scripts/circuits/sampleWitness';
 
 type CircuitType = ProofPackage['circuitType'];
 const CIRCUITS: CircuitType[] = ['ownership', 'mortgage', 'transfer'];
-
-const BLOCKCHAIN_DIR = path.resolve(__dirname, '../..');
 
 const VERIFY_FN = {
   ownership: 'verifyOwnership',
@@ -163,7 +162,9 @@ describe('contracts/LandRegistryVerifier — real proofs (integration, Phase 4)'
         // Any mutated public signal breaks the pairing check before the root
         // or timestamp checks are even reached.
         const tampered = [...pkg.publicSignals];
-        tampered[rootIndex === 0 ? 1 : 0] = (BigInt(tampered[rootIndex === 0 ? 1 : 0]) + 1n).toString();
+        tampered[rootIndex === 0 ? 1 : 0] = (
+          BigInt(tampered[rootIndex === 0 ? 1 : 0]) + 1n
+        ).toString();
         await expect(dispatcher[fn](a, b, c, tampered)).to.be.revertedWithCustomError(
           dispatcher,
           'InvalidProof',

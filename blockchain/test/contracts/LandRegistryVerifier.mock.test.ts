@@ -148,9 +148,7 @@ describe('contracts/LandRegistryVerifier — mock verifiers (Phase 4)', () => {
           ).to.equal(true);
         }
         for (const beyond of [now - tolerance - 1n, now + tolerance + 1n]) {
-          await expect(
-            verifier[fn](...DUMMY_PROOF, signalsFor(circuit, PUBLISHED_ROOT, beyond)),
-          )
+          await expect(verifier[fn](...DUMMY_PROOF, signalsFor(circuit, PUBLISHED_ROOT, beyond)))
             .to.be.revertedWithCustomError(verifier, 'StaleTimestamp')
             .withArgs(beyond, now);
         }

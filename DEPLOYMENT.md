@@ -10,11 +10,11 @@ Shell mặc định trong tài liệu này là **PowerShell** — các lệnh đ
 
 ⚠️ Chạy `pnpm --filter blockchain ...` từ ngoài repo (ví dụ terminal vừa mở, đang ở `C:\Users\<bạn>`) sẽ báo **`No projects matched the filters`** — pnpm đi ngược lên tìm workspace và vớ phải workspace khác trên máy. Không phải lỗi cấu hình, chỉ là đứng sai chỗ.
 
-| Giai đoạn | Mạng | Mục đích | Mất gì |
-|---|---|---|---|
-| 1 | Hardhat node local | Xem hệ thống chạy, test tay, debug thoải mái | Không mất gì, reset tuỳ ý |
-| 2 | Sepolia (lần thử) | Kiểm tra deploy thật, verify source, đo gas thật | ETH testnet (miễn phí từ faucet) |
-| 3 | Sepolia (chính thức) | Bản demo dùng cho thesis/bảo vệ | ETH testnet + **địa chỉ này phải giữ ổn định** |
+| Giai đoạn | Mạng                 | Mục đích                                         | Mất gì                                         |
+| --------- | -------------------- | ------------------------------------------------ | ---------------------------------------------- |
+| 1         | Hardhat node local   | Xem hệ thống chạy, test tay, debug thoải mái     | Không mất gì, reset tuỳ ý                      |
+| 2         | Sepolia (lần thử)    | Kiểm tra deploy thật, verify source, đo gas thật | ETH testnet (miễn phí từ faucet)               |
+| 3         | Sepolia (chính thức) | Bản demo dùng cho thesis/bảo vệ                  | ETH testnet + **địa chỉ này phải giữ ổn định** |
 
 Bộ contract deploy gồm **5 cái** (kiến trúc D12):
 
@@ -124,7 +124,7 @@ deployment record → deployments\localhost.json
 ### 1.3 Kiểm tra deployment (read-only, không tốn gas)
 
 ```bash
-pnpm --filter blockchain run smoke:localhost
+pnpm --filter blockchain run chain:smoke:localhost
 ```
 
 Script đọc `deployments/localhost.json` rồi kiểm: contract có code thật không, `rootVersion`/`latestRoot`, cơ quan có `STATE_AUTHORITY_ROLE` chưa, `authorityInstitute` có khớp `keccak256(orgName)` không (D30), và dispatcher có trỏ đúng 3 verifier không.
@@ -132,10 +132,10 @@ Script đọc `deployments/localhost.json` rồi kiểm: contract có code thậ
 ### 1.4 Chạy vòng đầy-đủ: publish root + tạo proof thật + verify on-chain
 
 ```bash
-$env:SMOKE_PUBLISH='1'; pnpm --filter blockchain run smoke:localhost
+$env:SMOKE_PUBLISH='1'; pnpm --filter blockchain run chain:smoke:localhost
 ```
 
-(Git Bash: `SMOKE_PUBLISH=1 pnpm --filter blockchain run smoke:localhost`)
+(Git Bash: `SMOKE_PUBLISH=1 pnpm --filter blockchain run chain:smoke:localhost`)
 
 Đây là màn demo đầu-cuối: dựng cây Merkle thật từ mock record → `publishRoot()` → sinh Groth16 proof bằng snarkjs → gọi `verifyOwnership()` on-chain.
 
@@ -161,7 +161,7 @@ Import private key của account #0 mà terminal 1 in ra (`0xac09...ff80`). ⚠�
 
 ### ⚠️ Gotcha local
 
-Tắt/restart node ở terminal 1 là **toàn bộ contract biến mất**, nhưng `deployments/localhost.json` vẫn còn → mọi lệnh sẽ báo *"No contract code at 0x..."*. Cứ deploy lại (bước 1.2) là xong.
+Tắt/restart node ở terminal 1 là **toàn bộ contract biến mất**, nhưng `deployments/localhost.json` vẫn còn → mọi lệnh sẽ báo _"No contract code at 0x..."_. Cứ deploy lại (bước 1.2) là xong.
 
 ---
 
@@ -191,6 +191,7 @@ AUTHORITY_ORG_NAME="So Tai nguyen va Moi truong TP.HCM"
 ### 2.2 Xin ETH testnet
 
 Cần khoảng **0.05 Sepolia ETH** là dư (5 contract, trong đó 3 verifier khá to). Faucet:
+
 - https://sepoliafaucet.com (Alchemy, cần đăng nhập)
 - https://www.infura.io/faucet/sepolia
 - https://faucets.chain.link/sepolia
@@ -208,13 +209,13 @@ Chậm hơn local nhiều (mỗi contract chờ 1 block ~12s). Script ghi `block
 ### 2.4 Kiểm tra
 
 ```bash
-pnpm --filter blockchain run smoke:sepolia
+pnpm --filter blockchain run chain:smoke:sepolia
 ```
 
 Rồi vòng đầy đủ (tốn thêm 1 tx):
 
 ```bash
-$env:SMOKE_PUBLISH='1'; pnpm --filter blockchain run smoke:sepolia
+$env:SMOKE_PUBLISH='1'; pnpm --filter blockchain run chain:smoke:sepolia
 ```
 
 ### 2.5 Verify source code trên Etherscan
@@ -292,13 +293,13 @@ Copy-Item -Recurse blockchain\circuits\build D:\backup\land-registry-circuits-bu
 
 Đo trên Hardhat local, solc 0.8.36 + optimizer 200 runs (`blockchain/circuits/build/gas-metrics.json`):
 
-| Thao tác | Gas |
-|---|---|
-| `publishRoot()` — **lần đầu** (slot `latestRoot` từ 0 → khác 0) | 115.577 |
-| `publishRoot()` — **các lần sau** | 64.277 |
-| `verifyOwnership()` | ~245.900 |
-| `verifyMortgage()` | ~252.600 |
-| `verifyTransfer()` | ~267.100 |
+| Thao tác                                                        | Gas      |
+| --------------------------------------------------------------- | -------- |
+| `publishRoot()` — **lần đầu** (slot `latestRoot` từ 0 → khác 0) | 115.577  |
+| `publishRoot()` — **các lần sau**                               | 64.277   |
+| `verifyOwnership()`                                             | ~245.900 |
+| `verifyMortgage()`                                              | ~252.600 |
+| `verifyTransfer()`                                              | ~267.100 |
 
 📌 Chênh lệch publish lần đầu vs lần sau là do chi phí SSTORE khởi tạo slot (20k gas) — khi lên bảng Chapter 5 nên ghi rõ đang nói con số nào, đừng gộp làm một.
 
@@ -308,23 +309,23 @@ Ba hàm `verify*` là `view` → gọi off-chain (qua RPC) **không tốn gas th
 
 ## 5. Troubleshooting
 
-| Lỗi | Nguyên nhân | Xử lý |
-|---|---|---|
-| `No projects matched the filters in "C:\Users\..."` | Đang đứng ngoài repo; pnpm tìm workspace khác trên máy | `cd <path-to>/land-registry-zkp` rồi chạy lại |
-| `HH108: Cannot connect to the network localhost` | Chưa mở node ở terminal 1 | `cd <path-to>/land-registry-zkp; pnpm --filter blockchain run node` |
-| `No contract code at 0x...` | Node local đã restart sau khi deploy | Deploy lại (bước 1.2) |
-| `Missing contracts/verifiers/Groth16Verifier*.sol` | Chưa chạy trusted setup | Bước 0.2 |
-| `HH12: artifact ... not found` | Đã sync verifier nhưng chưa compile | `pnpm run compile` |
-| `HH117: Empty string \`\` for network or forking URL` | `SEPOLIA_RPC_URL` rỗng khi Hardhat đọc config — hoặc chưa điền, hoặc `.env` không được nạp | Kiểm tra `.env` ở **gốc repo** có `SEPOLIA_RPC_URL=https://...`; `hardhat.config.ts` phải nạp `path.resolve(__dirname, '../.env')` (một cấp, không phải hai) |
-| `insufficient funds for intrinsic transaction cost` | Ví deployer hết Sepolia ETH | Xin faucet (2.2) |
-| `Invalid Chai property: revertedWithCustomError` khi chạy test | pnpm giữ 2 bản copy chai | Đã fix sẵn bằng import tường minh trong `hardhat.config.ts` — đừng gỡ dòng đó |
-| `Solidity 0.8.36 is not fully supported yet` | Hardhat 2.28.6 ra trước solc 0.8.36 nên chưa có metadata cho nó | Vô hại — chỉ ảnh hưởng stack trace khi debug, không ảnh hưởng bytecode. 99 test vẫn xanh, kể cả các test bắt custom error |
-| Etherscan cảnh báo `UnsoundSpillInMutualRecursion` / `LostStorageArrayWriteOnSlotOverflow` | Cảnh báo theo *phiên bản* solc, không phải phân tích code | Đã hết từ khi lên 0.8.36. Kể cả ở 0.8.24 cũng không chạm tới project này: bug 1 cần `viaIR: true` (không bật) + đệ quy tương hỗ (không có), bug 2 cần storage array tràn slot 2^256−1 (contract không có array nào) |
-| `hardhat verify` báo thiếu API key | `ETHERSCAN_API_KEY` rỗng | Điền vào `.env` (2.1) |
-| `nonce too low` / tx kẹt trên Sepolia | Tx trước chưa mine xong | Chờ, hoặc reset account trong MetaMask |
-| Proof verify được off-chain nhưng on-chain revert `InvalidProof` | `.zkey` hiện tại khác `.zkey` lúc deploy verifier | Xem cảnh báo mục 3 — phải deploy lại verifier |
-| Revert `StaleTimestamp` | Proof cũ quá 10 phút, hoặc đồng hồ máy lệch | Sinh proof mới; kiểm tra giờ hệ thống |
-| Revert `RootMismatch` | Root trong proof không còn là `latestRoot` | Refresh Merkle proof rồi sinh proof lại (D29: chỉ `latestRoot` mới verify được) |
+| Lỗi                                                                                        | Nguyên nhân                                                                                | Xử lý                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `No projects matched the filters in "C:\Users\..."`                                        | Đang đứng ngoài repo; pnpm tìm workspace khác trên máy                                     | `cd <path-to>/land-registry-zkp` rồi chạy lại                                                                                                                                                                       |
+| `HH108: Cannot connect to the network localhost`                                           | Chưa mở node ở terminal 1                                                                  | `cd <path-to>/land-registry-zkp; pnpm --filter blockchain run node`                                                                                                                                                 |
+| `No contract code at 0x...`                                                                | Node local đã restart sau khi deploy                                                       | Deploy lại (bước 1.2)                                                                                                                                                                                               |
+| `Missing contracts/verifiers/Groth16Verifier*.sol`                                         | Chưa chạy trusted setup                                                                    | Bước 0.2                                                                                                                                                                                                            |
+| `HH12: artifact ... not found`                                                             | Đã sync verifier nhưng chưa compile                                                        | `pnpm run compile`                                                                                                                                                                                                  |
+| `HH117: Empty string \`\` for network or forking URL`                                      | `SEPOLIA_RPC_URL` rỗng khi Hardhat đọc config — hoặc chưa điền, hoặc `.env` không được nạp | Kiểm tra `.env` ở **gốc repo** có `SEPOLIA_RPC_URL=https://...`; `hardhat.config.ts` phải nạp `path.resolve(__dirname, '../.env')` (một cấp, không phải hai)                                                        |
+| `insufficient funds for intrinsic transaction cost`                                        | Ví deployer hết Sepolia ETH                                                                | Xin faucet (2.2)                                                                                                                                                                                                    |
+| `Invalid Chai property: revertedWithCustomError` khi chạy test                             | pnpm giữ 2 bản copy chai                                                                   | Đã fix sẵn bằng import tường minh trong `hardhat.config.ts` — đừng gỡ dòng đó                                                                                                                                       |
+| `Solidity 0.8.36 is not fully supported yet`                                               | Hardhat 2.28.6 ra trước solc 0.8.36 nên chưa có metadata cho nó                            | Vô hại — chỉ ảnh hưởng stack trace khi debug, không ảnh hưởng bytecode. 99 test vẫn xanh, kể cả các test bắt custom error                                                                                           |
+| Etherscan cảnh báo `UnsoundSpillInMutualRecursion` / `LostStorageArrayWriteOnSlotOverflow` | Cảnh báo theo _phiên bản_ solc, không phải phân tích code                                  | Đã hết từ khi lên 0.8.36. Kể cả ở 0.8.24 cũng không chạm tới project này: bug 1 cần `viaIR: true` (không bật) + đệ quy tương hỗ (không có), bug 2 cần storage array tràn slot 2^256−1 (contract không có array nào) |
+| `hardhat verify` báo thiếu API key                                                         | `ETHERSCAN_API_KEY` rỗng                                                                   | Điền vào `.env` (2.1)                                                                                                                                                                                               |
+| `nonce too low` / tx kẹt trên Sepolia                                                      | Tx trước chưa mine xong                                                                    | Chờ, hoặc reset account trong MetaMask                                                                                                                                                                              |
+| Proof verify được off-chain nhưng on-chain revert `InvalidProof`                           | `.zkey` hiện tại khác `.zkey` lúc deploy verifier                                          | Xem cảnh báo mục 3 — phải deploy lại verifier                                                                                                                                                                       |
+| Revert `StaleTimestamp`                                                                    | Proof cũ quá 10 phút, hoặc đồng hồ máy lệch                                                | Sinh proof mới; kiểm tra giờ hệ thống                                                                                                                                                                               |
+| Revert `RootMismatch`                                                                      | Root trong proof không còn là `latestRoot`                                                 | Refresh Merkle proof rồi sinh proof lại (D29: chỉ `latestRoot` mới verify được)                                                                                                                                     |
 
 ---
 
@@ -348,14 +349,14 @@ cd <path-to>/land-registry-zkp; pnpm --filter blockchain run node
 # Local — terminal 2
 cd <path-to>/land-registry-zkp
 pnpm --filter blockchain run deploy:localhost
-pnpm --filter blockchain run smoke:localhost      # read-only
-$env:SMOKE_PUBLISH='1'; pnpm --filter blockchain run smoke:localhost   # vòng đầy đủ
+pnpm --filter blockchain run chain:smoke:localhost      # read-only
+$env:SMOKE_PUBLISH='1'; pnpm --filter blockchain run chain:smoke:localhost   # vòng đầy đủ
 $env:SMOKE_PUBLISH=''                             # tắt lại khi xong
 ```
 
 ```bash
 # Sepolia
 pnpm --filter blockchain run deploy:sepolia
-pnpm --filter blockchain run smoke:sepolia
+pnpm --filter blockchain run chain:smoke:sepolia
 cd blockchain; npx hardhat verify --network sepolia <address> <args...>
 ```

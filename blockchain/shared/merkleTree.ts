@@ -58,7 +58,8 @@ export async function poseidonHash(inputs: bigint[]): Promise<bigint> {
 
 /**
  * Compute the Poseidon leaf hash for a LUR record.
- * leaf = Poseidon([propertyId, ownerCommitment, useType, validityPeriod, encumbranceStatus, tenureType])
+ * leaf = Poseidon([propertyId, ownerCommitment, useType, validityPeriod,
+ *                  encumbranceStatus, tenureType, offchainHash])
  * This exact field order must match the circom circuits (D4) — never reorder.
  */
 export async function hashRecord(record: LURRecord): Promise<bigint> {
@@ -69,6 +70,7 @@ export async function hashRecord(record: LURRecord): Promise<bigint> {
     record.validityPeriod,
     BigInt(record.encumbranceStatus),
     BigInt(record.tenureType),
+    record.offchainHash,
   ]);
 }
 
@@ -202,7 +204,8 @@ export async function generateMerkleProof(
 
     const siblingIndex = isRightChild ? currentIndex - 1 : currentIndex + 1;
     const levelNodes = tree.layers[level];
-    const sibling = siblingIndex < levelNodes.length ? levelNodes[siblingIndex] : tree.zeroHashes[level];
+    const sibling =
+      siblingIndex < levelNodes.length ? levelNodes[siblingIndex] : tree.zeroHashes[level];
     siblings.push(sibling);
 
     currentIndex = Math.floor(currentIndex / 2);

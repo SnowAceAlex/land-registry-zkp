@@ -77,6 +77,10 @@ template Transfer(levels) {
     signal input validityPeriod;
     signal input encumbranceStatus;
     signal input tenureType;
+    // Commitment to the descriptive certificate fields (address, area,
+    // landUseCode, …). Private: it never appears in publicSignals, so the D21
+    // layout and the on-chain verifier indices are unchanged.
+    signal input offchainHash;
 
     signal input oldOwnerSecret;
     signal input newOwnerSecret;
@@ -105,6 +109,7 @@ template Transfer(levels) {
     oldLeafHasher.validityPeriod <== validityPeriod;
     oldLeafHasher.encumbranceStatus <== encumbranceStatus;
     oldLeafHasher.tenureType <== tenureType;
+    oldLeafHasher.offchainHash <== offchainHash;
 
     // 4. ...which must be in the currently published tree.
     component oldMerkle = MerkleProof(levels);
@@ -123,6 +128,7 @@ template Transfer(levels) {
     newLeafHasher.validityPeriod <== validityPeriod;
     newLeafHasher.encumbranceStatus <== encumbranceStatus;
     newLeafHasher.tenureType <== tenureType;
+    newLeafHasher.offchainHash <== offchainHash;
 
     // 6. ...which must be in the tree the authority is about to publish.
     component newMerkle = MerkleProof(levels);

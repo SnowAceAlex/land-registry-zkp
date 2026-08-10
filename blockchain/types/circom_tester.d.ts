@@ -27,10 +27,7 @@ declare module 'circom_tester/wasm/tester' {
   }
 
   export interface WasmTester {
-    calculateWitness(
-      input: Record<string, unknown>,
-      sanityCheck?: boolean,
-    ): Promise<Witness>;
+    calculateWitness(input: Record<string, unknown>, sanityCheck?: boolean): Promise<Witness>;
     /** Throws if any R1CS constraint is unsatisfied by the witness. */
     checkConstraints(witness: Witness): Promise<void>;
     /** Throws if a named output signal doesn't equal the expected value. */

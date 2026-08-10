@@ -13,17 +13,15 @@ import { Pool } from 'pg';
  *
  * The connection URL is read from DATABASE_URL env var at construction time.
  * The datasource URL itself is no longer in schema.prisma — it lives in
- * prisma/prisma.config.ts (used by the Prisma CLI for migrations/generate).
+ * prisma.config.ts at the package root, which the Prisma CLI reads for
+ * migrations and generate.
  *
  * This service is exported by PrismaModule (@Global), so it can be injected
  * into any feature service (RecordsService, ChainService, ProofService, etc.)
  * without importing PrismaModule in each feature module.
  */
 @Injectable()
-export class PrismaService
-  extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy
-{
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor() {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {

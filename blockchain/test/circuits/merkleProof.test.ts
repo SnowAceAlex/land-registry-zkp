@@ -16,7 +16,7 @@ import * as path from 'path';
 import wasm_tester, { WasmTester } from 'circom_tester/wasm/tester';
 import { MerkleProofData } from '../../shared/types';
 import { buildTree, generateMerkleProof, TREE_DEPTH } from '../../shared/merkleTree';
-import { generateMockRecords } from '../../scripts/generateMockData';
+import { generateMockRecords } from '../../scripts/tools/generateMockData';
 
 const CIRCUIT_PATH = path.resolve(__dirname, '../../circuits/common/merkleProof.circom');
 // circomlib resolves under blockchain/node_modules, NOT the workspace root.

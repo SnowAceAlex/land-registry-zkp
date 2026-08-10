@@ -36,10 +36,10 @@ export enum UseType {
  * Encumbrance / mortgage status of a property.
  */
 export enum EncumbranceStatus {
-  FREE = 0,           // No encumbrance
-  MORTGAGED = 1,      // Under mortgage
-  LITIGATED = 2,      // Subject to legal dispute
-  RESTRICTED = 3,     // Restricted transfer (e.g., planning zone)
+  FREE = 0, // No encumbrance
+  MORTGAGED = 1, // Under mortgage
+  LITIGATED = 2, // Subject to legal dispute
+  RESTRICTED = 3, // Restricted transfer (e.g., planning zone)
 }
 
 /**
@@ -49,9 +49,9 @@ export enum EncumbranceStatus {
  * backend at record-issue time based on the detailed land use code.
  */
 export enum TenureType {
-  PERPETUAL = 0,          // ONT, ODT, community agricultural land — no time-check
-  FIXED_TERM = 1,         // annual/perennial crop land, production forest, aquaculture/salt — 50 years
-  PROJECT_LEASEHOLD = 2,  // TMD, SKC — up to 50/70 years depending on project
+  PERPETUAL = 0, // ONT, ODT, community agricultural land — no time-check
+  FIXED_TERM = 1, // annual/perennial crop land, production forest, aquaculture/salt — 50 years
+  PROJECT_LEASEHOLD = 2, // TMD, SKC — up to 50/70 years depending on project
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -90,6 +90,18 @@ export interface LURRecord {
 
   /** Land tenure classification — see TenureType enum */
   tenureType: TenureType;
+
+  /**
+   * Commitment to the descriptive certificate fields (address, area,
+   * landUseCode, …) — see shared/offchainMetadata.ts.
+   *
+   * Those fields are printed on the certificate but never stored on-chain.
+   * Without this input the leaf did not cover them, so they could be edited
+   * inside an issued receipt while the Merkle proof still verified. Hashing a
+   * single digest in closes that hole and costs nothing on-chain: the leaf, and
+   * therefore the root, is still one number.
+   */
+  offchainHash: bigint;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

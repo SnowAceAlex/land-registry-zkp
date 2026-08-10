@@ -1,5 +1,8 @@
-// This is your Prisma schema file.
-// Learn more about it at: https://pris.ly/d/prisma-schema
+// Prisma schema — synced with CODING_ROADMAP.md D19 (leaf schema) + D3 (off-chain
+// metadata) + Phase 5 additions (MerkleRoot, IssuedBundle, TransferRequest).
+//
+// Connection URL lives in prisma.config.ts (Prisma 7 pattern), NOT here.
+// Default: postgresql://postgres:postgres@localhost:5433/land_registry?schema=public
 
 generator client {
   provider = "prisma-client-js"
@@ -7,67 +10,209 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // Connection URL is now configured in prisma/prisma.config.ts (Prisma 7+)
-  // Default: postgresql://postgres:postgres@localhost:5433/land_registry?schema=public
+}
+
+// Enums are stored by NAME (readable in DB). The name↔numeric mapping used for
+// circuit inputs lives in src/records/record.mapper.ts, backed by the enums in
+// @land-registry/blockchain/shared — never map numbers by hand elsewhere.
+
+enum UseType {
+  RESIDENTIAL
+  AGRICULTURAL
+  COMMERCIAL
+  INDUSTRIAL
+  FORESTRY
+}
+
+enum EncumbranceStatus {
+  FREE
+  MORTGAGED
+  LITIGATED
+  RESTRICTED
+}
+
+enum TenureType {
+  PERPETUAL
+  FIXED_TERM
+  PROJECT_LEASEHOLD
+}
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// Đối tượng sử dụng đất — mục B Phụ lục II TT 08/2024. Off-chain only (D3),
+/// but it decides which tenures are lawful for a given land code (Điều 171).
+enum LandUserType {
+  /// Cá nhân trong nước
+  CNV
+  /// Cộng đồng dân cư
+  CDS
+  /// Tổ chức kinh tế
+  TKT
+  /// Cơ quan nhà nước, cơ quan Đảng, đơn vị vũ trang nhân dân
+  TCN
+  /// Tổ chức sự nghiệp công lập
+  TSN
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Property Model — Land Use Rights (LUR) Record
+// Property — one Land Use Rights (LUR) record
 // ─────────────────────────────────────────────────────────────────────────────
+// The 6 on-chain leaf fields (D4 order: propertyId, ownerCommitment, useType,
+// validityPeriod, encumbranceStatus, tenureType) + off-chain-only metadata
+// (D3/D19) that never enters the leaf hash.
 
 model Property {
-  /// Internal auto-increment primary key
-  id                Int      @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  /// Public unique property identifier (cadastral code or numeric ID)
-  /// Stored as String to handle large numbers; convert to BigInt for circuit inputs
-  propertyId        String   @unique
+  /// Decimal string of a bigint — unique public identifier, part of the leaf
+  propertyId String @unique
 
-  /// Poseidon commitment to the owner's identity: Poseidon([ownerSecret])
-  /// Stored as String (hex) — the owner's actual identity is NEVER stored
-  ownerCommitment   String
+  /// Poseidon([ownerSecret]) as decimal string. NULL = imported but not yet
+  /// issued (D14: the secret — and therefore the commitment — is generated at
+  /// issue time, never before, never stored).
+  ownerCommitment String?
 
-  /// Land use type: RESIDENTIAL | AGRICULTURAL | COMMERCIAL | INDUSTRIAL | FORESTRY
-  useType           String
-
-  /// LUR validity period — stored as Unix timestamp string (end date of the LUR)
+  useType           UseType
+  /// Unix seconds (decimal string); "0" sentinel when tenureType = PERPETUAL (D5)
   validityPeriod    String
+  encumbranceStatus EncumbranceStatus
+  /// Supplied by the import and validated against landUseCode + landUserType
+  /// (revised D2 — the term follows how the State granted the land, not the
+  /// land category alone; see Điều 171 Luật Đất đai 2024).
+  tenureType        TenureType
 
-  /// Encumbrance status: FREE | MORTGAGED | LITIGATED | RESTRICTED
-  encumbranceStatus String
+  // Off-chain-only metadata (D3/D19) — displayed in UI/PDF, never hashed
+  landUseCode       String
+  /// Đối tượng sử dụng đất; null = cá nhân (the ordinary case)
+  landUserType      LandUserType?
+  /// Đất cộng đồng dùng để bảo tồn bản sắc dân tộc (Điều 178 khoản 4) — the
+  /// condition that makes community land perpetual; community use alone is not
+  culturalPreservation Boolean   @default(false)
+  certificateSerial String
+  bookEntryNumber   String
+  /// Số tờ bản đồ — mandatory on a real GCN (mẫu TT 10/2024)
+  mapSheetNumber    String?
+  /// Nguồn gốc sử dụng đất — mandatory on a real GCN (Nhà nước giao/cho thuê/công nhận)
+  landOrigin        String?
+  address           String
+  area              Decimal       @db.Decimal(12, 2)
+  issuingAuthority  String
+  issueDate         DateTime      @db.Date
 
-  /// Assessed value in VND — stored as String to preserve precision of large integers
-  assessedValue     String
+  // Cache refreshed after every root publish (non-sensitive — safe to store)
+  /// Poseidon leaf hash, decimal string
+  leaf        String?
+  /// { siblings: string[20], pathIndices: number[20] }
+  merkleProof Json?
+  /// Root version the cached merkleProof corresponds to (staleness flag, §3.1)
+  rootVersion Int?
+  /// When the owner bundle was issued; NULL = not yet issued
+  issuedAt    DateTime?
 
-  // TODO: Add additional fields as needed:
-  //   - location: String?         (geographic coordinates or address)
-  //   - area: String?             (land area in m²)
-  //   - leafHash: String?         (cache the Poseidon leaf hash after tree build)
-  //   - merkleIndex: Int?         (position in the Merkle tree)
-
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("properties")
 }
 
-// TODO: Add more models as needed:
+// ─────────────────────────────────────────────────────────────────────────────
+// AdministrativeUnit — commune-level catalog (phường / xã / đặc khu)
+// ─────────────────────────────────────────────────────────────────────────────
+// Reference data, not application logic: the two-tier structure in force since
+// 01/7/2025 (NĐ 151/2025) means an address resolves to exactly one of these.
+// Kept in the database rather than in code so the catalog can be re-seeded from
+// an official export without a redeploy.
 //
-// model MerkleRoot {
-//   id          Int      @id @default(autoincrement())
-//   root        String   @unique           // hex string of the Merkle root
-//   version     Int                        // monotonically increasing version number
-//   txHash      String?                   // on-chain transaction hash of publishRoot()
-//   publishedAt DateTime @default(now())
-//   @@map("merkle_roots")
-// }
-//
-// model ProofRequest {
-//   id              Int      @id @default(autoincrement())
-//   propertyId      String
-//   requestedBy     String                 // wallet address of the verifier
-//   circuitType     String                 // 'ownership' | 'mortgage' | 'transfer'
-//   status          String   @default("PENDING")
-//   createdAt       DateTime @default(now())
-//   @@map("proof_requests")
-// }
+// Seed it with: pnpm --filter backend run seed:admin-units <file>
+// While the table is EMPTY the importer cannot verify that a ward exists, and
+// says so instead of silently accepting anything.
+
+enum AdministrativeUnitType {
+  PHUONG
+  XA
+  DAC_KHU
+}
+
+model AdministrativeUnit {
+  id        Int                    @id @default(autoincrement())
+  /// Name without the "Phường"/"Xã" prefix, e.g. "Sài Gòn"
+  name      String
+  type      AdministrativeUnitType
+  /// Tỉnh / thành phố trực thuộc trung ương
+  province  String
+  /// Official code from the source export, when the file carries one
+  code      String?
+  createdAt DateTime               @default(now())
+
+  @@unique([name, province])
+  @@index([province])
+  @@map("administrative_units")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MerkleRoot — mirror of on-chain rootHistory (D29)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model MerkleRoot {
+  id          Int      @id @default(autoincrement())
+  /// On-chain rootVersion (starts at 1)
+  version     Int      @unique
+  /// Decimal string. NOT unique — the contract allows re-publishing an old
+  /// root as a new version.
+  root        String
+  /// publishRoot() transaction hash
+  txHash      String
+  publishedAt DateTime @default(now())
+
+  @@map("merkle_roots")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IssuedBundle — one-time-download bundle awaiting claim
+// ─────────────────────────────────────────────────────────────────────────────
+
+model IssuedBundle {
+  id         Int      @id @default(autoincrement())
+  /// One pending bundle per property
+  propertyId String   @unique
+  /// 32 random bytes, hex — the URL capability; treat as a secret
+  claimToken String   @unique
+  /// Complete bundle-<propertyId>.zip (receipt.json + secret.json + certificate.pdf)
+  bundleZip  Bytes
+  createdAt  DateTime @default(now())
+  /// TTL — expired rows are deleted on access (default: 7 days after issue)
+  expiresAt  DateTime
+
+  @@map("issued_bundles")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TransferRequest — D28 pending-approval queue
+// ─────────────────────────────────────────────────────────────────────────────
+
+model TransferRequest {
+  id                 Int            @id @default(autoincrement())
+  propertyId         String
+  /// Poseidon([newOwnerSecret]) as decimal string
+  newOwnerCommitment String
+  /// publicSignals[0] — root the proof was generated against
+  oldRoot            String
+  /// publicSignals[1] — projected root to publish on approval
+  newRoot            String
+  /// Groth16Proof JSON as emitted by snarkjs
+  proof              Json
+  /// string[7] in PUBLIC_SIGNAL_ORDER.transfer (D21)
+  publicSignals      Json
+  status             TransferStatus @default(PENDING)
+  rejectReason       String?
+  /// publishRoot() tx hash once approved
+  txHash             String?
+  createdAt          DateTime       @default(now())
+  decidedAt          DateTime?
+
+  @@map("transfer_requests")
+}
