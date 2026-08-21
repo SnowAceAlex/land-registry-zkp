@@ -26,6 +26,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ethers, network } from 'hardhat';
+import { BLOCKCHAIN_DIR } from '../lib/paths';
 
 /** Default mock organization for the PoC — X.509 Subject "O" (D30). */
 const DEFAULT_ORG_NAME = 'So Tai nguyen va Moi truong TP.HCM';
@@ -63,7 +64,7 @@ async function main() {
 
   // The generated verifiers only exist after trusted setup + sync + compile.
   for (const name of VERIFIER_CONTRACTS) {
-    const solPath = path.join(__dirname, '..', 'contracts', 'verifiers', `${name}.sol`);
+    const solPath = path.join(BLOCKCHAIN_DIR, 'contracts', 'verifiers', `${name}.sol`);
     if (!fs.existsSync(solPath)) {
       throw new Error(
         `Missing contracts/verifiers/${name}.sol — run ` +
@@ -110,7 +111,7 @@ async function main() {
   // contracts above already cost gas, and losing their addresses to a failure
   // in the step below would strand them. smoke:<network> reports an
   // unregistered authority clearly, so a half-finished record is recoverable.
-  const deploymentsDir = path.join(__dirname, '..', 'deployments');
+  const deploymentsDir = path.join(BLOCKCHAIN_DIR, 'deployments');
   fs.mkdirSync(deploymentsDir, { recursive: true });
   const outPath = path.join(deploymentsDir, `${network.name}.json`);
   fs.writeFileSync(outPath, JSON.stringify(deployment, null, 2));
