@@ -49,6 +49,14 @@ const config: HardhatUserConfig = {
   etherscan: {
     apiKey: ETHERSCAN_API_KEY,
   },
+  // Second, independent source-verification service (decentralized, IPFS-backed,
+  // needs no API key). Off on purpose: Etherscan above already gives the public
+  // verified-source page the thesis cites, and leaving this unset makes
+  // `hardhat verify` print a setup notice on every run. Flip to true to also
+  // publish there — it is additive, not a replacement.
+  sourcify: {
+    enabled: false,
+  },
   paths: {
     sources: './contracts',
     tests: './test',
