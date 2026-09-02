@@ -33,13 +33,34 @@ export async function postJson<T = unknown>(
   body: unknown,
   apiKey?: string,
 ): Promise<ApiResponse<T>> {
+  return request<T>(endpoint, { method: 'POST', body: JSON.stringify(body) }, apiKey);
+}
+
+/**
+ * GET and parse the response.
+ *
+ * `apiKey` is optional here for a reason worth stating: the proof endpoints are
+ * deliberately unguarded (D39) — the caller is a land owner or a buyer, not an
+ * officer — so the owner-side scripts pass nothing.
+ */
+export async function getJson<T = unknown>(
+  endpoint: string,
+  apiKey?: string,
+): Promise<ApiResponse<T>> {
+  return request<T>(endpoint, { method: 'GET' }, apiKey);
+}
+
+async function request<T>(
+  endpoint: string,
+  init: RequestInit,
+  apiKey?: string,
+): Promise<ApiResponse<T>> {
   const response = await fetch(`${apiBase()}${endpoint}`, {
-    method: 'POST',
+    ...init,
     headers: {
       'Content-Type': 'application/json',
       ...(apiKey ? { 'x-gov-api-key': apiKey } : {}),
     },
-    body: JSON.stringify(body),
   });
 
   const text = await response.text();

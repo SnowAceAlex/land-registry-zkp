@@ -1,18 +1,21 @@
 import { Module } from '@nestjs/common';
+
+import { ChainModule } from '../chain/chain.module';
 import { ProofController } from './proof.controller';
 import { ProofService } from './proof.service';
-import { RecordsModule } from '../records/records.module';
+import { TreeModule } from '../tree/tree.module';
 
 /**
- * ProofModule
- * Handles Merkle proof generation requests from land owners.
- * Depends on RecordsModule to fetch property records.
+ * ProofModule — Merkle-proof refresh and off-chain verification for owners and
+ * verifiers (Phase 6).
  *
- * TODO: Import ChainModule (or inject ChainService) if on-chain root verification
- *       is needed before issuing proofs.
+ * TreeModule because a stale cache is rebuilt through the one service allowed
+ * to decide leaf order (D24), ChainModule because both endpoints are answers
+ * about the CURRENT root and neither means anything without it. PrismaModule is
+ * @Global, so PrismaService needs no import here.
  */
 @Module({
-  imports: [RecordsModule],
+  imports: [TreeModule, ChainModule],
   controllers: [ProofController],
   providers: [ProofService],
 })

@@ -18,14 +18,22 @@
  * resulting proof + public signals are shareable.
  */
 
-import { LURRecord, MerkleProofData, ProofInput } from './types';
+import { LURRecord, MerkleProofData, ProofInput, ProofPackage } from './types';
 import { TREE_DEPTH } from './merkleTree';
+
+/** The three circuits. Declared in types.ts; named here for the lookups below. */
+export type CircuitType = ProofPackage['circuitType'];
 
 /**
  * Public signal order per circuit — pinned here because Phase 4's
  * LandRegistryVerifier.sol indexes into the publicSignals array positionally.
  * These must match the `component main {public [...]}` declaration order in
  * each .circom file, which circuit tests assert against (D21).
+ *
+ * `satisfies` rather than a plain annotation: it keeps the literal tuple types
+ * (so the arrays stay readonly and precisely typed) while still failing to
+ * compile if a circuit exists in {@link CircuitType} but has no entry here —
+ * a missing entry would otherwise surface as `undefined` at a lookup site.
  */
 export const PUBLIC_SIGNAL_ORDER = {
   ownership: ['merkleRoot', 'propertyId', 'ownerCommitment', 'currentTimestamp'],
@@ -45,7 +53,99 @@ export const PUBLIC_SIGNAL_ORDER = {
     'currentTimestamp',
     'minRequiredRemainingTerm',
   ],
-} as const;
+} as const satisfies Record<CircuitType, readonly string[]>;
+
+/**
+ * Position of a named public signal within a circuit's `publicSignals` array.
+ *
+ * Every consumer that reaches into `publicSignals` — the backend verify
+ * endpoint, the transfer flow, the Phase 9 portal — needs an index, and an
+ * index written as a literal is D21 copied to another file. Looking it up by
+ * name means renaming a signal in a .circom file breaks compilation here (the
+ * only TS file that spells signal names) instead of silently reading the wrong
+ * element somewhere else.
+ *
+ * @throws if the circuit has no signal by that name.
+ */
+export function publicSignalIndex(circuitType: CircuitType, signalName: string): number {
+  const order = PUBLIC_SIGNAL_ORDER[circuitType] as readonly string[];
+  const index = order.indexOf(signalName);
+  if (index === -1) {
+    throw new Error(
+      `publicSignalIndex: circuit '${circuitType}' has no public signal '${signalName}' ` +
+        `(it has: ${order.join(', ')})`,
+    );
+  }
+  return index;
+}
+
+/**
+ * The name of the signal carrying the root a verifier must compare against the
+ * current on-chain root. `transfer` is the odd one out: its first root is the
+ * OLD root — the new one is not published yet at verification time, which is
+ * the whole point of the two-step flow (D28 / §3).
+ */
+export function rootSignalName(circuitType: CircuitType): string {
+  return circuitType === 'transfer' ? 'oldMerkleRoot' : 'merkleRoot';
+}
+
+/**
+ * Infer which circuit produced a proof from how many public signals it carries.
+ *
+ * The three counts (4 / 5 / 7) are distinct, so a bare proof package is
+ * self-describing — which is what lets the verifier portal (Phase 9) accept a
+ * pasted proof without being told its type. Derived from PUBLIC_SIGNAL_ORDER
+ * rather than written as literals: adding a public signal to a circuit must not
+ * leave a stale number here that quietly mis-identifies proofs.
+ *
+ * @throws if no circuit has that many public signals.
+ */
+export function circuitTypeForSignalCount(count: number): CircuitType {
+  const matches = (Object.keys(PUBLIC_SIGNAL_ORDER) as CircuitType[]).filter(
+    (circuit) => PUBLIC_SIGNAL_ORDER[circuit].length === count,
+  );
+
+  if (matches.length === 1) {
+    return matches[0];
+  }
+  if (matches.length > 1) {
+    // Not reachable today (4/5/7 are distinct) but a new circuit could collide,
+    // and guessing would be worse than saying so.
+    throw new Error(
+      `circuitTypeForSignalCount: ${count} public signals is ambiguous between ` +
+        `${matches.join(' and ')} — the circuit type must be stated explicitly`,
+    );
+  }
+
+  const known = (Object.keys(PUBLIC_SIGNAL_ORDER) as CircuitType[])
+    .map((circuit) => `${circuit}=${PUBLIC_SIGNAL_ORDER[circuit].length}`)
+    .join(', ');
+  throw new Error(`circuitTypeForSignalCount: no circuit takes ${count} public signals (${known})`);
+}
+
+/**
+ * Label a `publicSignals` array with the signal names of its circuit (D21).
+ *
+ * This is what a verifier is allowed to learn and no more: the public signals
+ * ARE the selective disclosure, so naming them is how a UI shows "this proof
+ * discloses the root, the property id, the commitment and a timestamp" without
+ * inventing a per-circuit field list of its own.
+ *
+ * @throws if the array length does not match the circuit's signal count.
+ */
+export function describePublicSignals(
+  circuitType: CircuitType,
+  publicSignals: readonly string[],
+): Record<string, string> {
+  const order = PUBLIC_SIGNAL_ORDER[circuitType] as readonly string[];
+  if (publicSignals.length !== order.length) {
+    throw new Error(
+      `describePublicSignals: circuit '${circuitType}' has ${order.length} public signals, ` +
+        `got ${publicSignals.length}`,
+    );
+  }
+  return Object.fromEntries(order.map((name, index) => [name, publicSignals[index]]));
+}
 
 /** Reject a proof that isn't the fixed depth the circuits are compiled for. */
 function assertProofDepth(proof: MerkleProofData, label: string): void {

@@ -26,7 +26,8 @@
     "verifiers:sync": "ts-node scripts/circuits/syncVerifiers.ts",
     "mock:generate": "ts-node scripts/tools/generateMockData.ts",
     "receipt:verify": "ts-node scripts/tools/verifyReceipt.ts",
-    "transfer:smoke": "ts-node scripts/tools/transferSmoke.ts"
+    "transfer:smoke": "ts-node scripts/tools/transferSmoke.ts",
+    "owner:smoke": "ts-node scripts/tools/ownerSmoke.ts"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.2",

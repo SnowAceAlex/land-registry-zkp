@@ -41,15 +41,13 @@
 import * as path from 'path';
 import * as snarkjs from 'snarkjs';
 
-import { PUBLIC_SIGNAL_ORDER } from './circuitInputs';
+import { CircuitType, PUBLIC_SIGNAL_ORDER } from './circuitInputs';
 import {
   PROOF_TIMESTAMP_TOLERANCE_SECONDS,
   assertTimestampFresh,
   nowUnixTimestamp,
 } from './datetime';
 import { Groth16Proof, ProofInput, ProofPackage, PublicSignals } from './types';
-
-type CircuitType = ProofPackage['circuitType'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Proof Generation
