@@ -1,21 +1,40 @@
-import { Controller, Get, Post, Param, Body } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiServiceUnavailableResponse,
+  ApiTags,
+  ApiUnprocessableEntityResponse,
+} from '@nestjs/swagger';
+
 import { ProofService } from './proof.service';
+import { VerifyProofDto } from './dto/proof.dto';
+import { MerkleProofResponseDto, VerifyProofResponseDto } from './dto/proof.response.dto';
 
 /**
- * ProofController
+ * ProofController — `/api/proof/*`
  * ─────────────────────────────────────────────────────────────────────────────
- * REST endpoints for Merkle proof issuance and verification.
- * Base path: /api/proof
+ * The two endpoints the owner and verifier portals live on (Phase 8/9).
  *
- * Planned endpoints:
- *   GET  /api/proof/:propertyId     — generate a Merkle proof for a property
- *   POST /api/proof/verify           — verify a submitted proof off-chain
+ * ⚠️ NEITHER ROUTE IS GUARDED, on purpose (D39). Three reasons, worth stating
+ * because the absence of a guard normally means someone forgot one:
  *
- * TODO:
- *  1. Add authentication guard (only the property owner can request their proof)
- *  2. Add rate limiting to prevent abuse
- *  3. Add response DTO with the MerkleProofData fields + circuit input format
+ *  1. The caller is a land owner, a buyer or a bank — not an officer. Reusing
+ *     `GOV_API_KEY` here would be the wrong identity, and the browser portals
+ *     of Phase 8/9 cannot hold the authority's key anyway.
+ *  2. Authenticating "the owner" is circular in this design. The only thing
+ *     that proves ownership is an ownership.circom proof, and producing one
+ *     requires the very Merkle proof being requested.
+ *  3. Nothing here is secret. Leaves and siblings are Poseidon hashes, the leaf
+ *     position follows from the pinned propertyId order (D24), and
+ *     `GET /api/records/:propertyId` already returns the owner commitment. The
+ *     private witness — `ownerSecret` and the record fields — never reaches
+ *     this server at all.
+ *
+ * Recorded in Limitations alongside D14 (the authority itself is mocked).
  */
 @ApiTags('Proof')
 @Controller('proof')
@@ -24,28 +43,46 @@ export class ProofController {
 
   @Get(':propertyId')
   @ApiOperation({
-    summary: 'Not implemented yet — Phase 6',
+    summary: 'Current Merkle proof for a property (refresh a stale bundle)',
     description:
-      'Will re-issue the current Merkle proof for a property so owners can refresh a stale ' +
-      'one. Until then the cached proof is refreshed on every root publish and travels in the ' +
-      'issued bundle.',
-    deprecated: true,
+      'Every published root invalidates the Merkle proof inside EVERY issued bundle, not just ' +
+      'the record that changed — so a single transfer leaves all other owners holding a proof ' +
+      'that no longer verifies. This re-issues the current one. No ownerSecret is involved: ' +
+      'the response is public data, and the private witness stays in the owner browser. ' +
+      'Compare `rootVersion` with the value in your receipt.json to detect staleness (§3.1).',
   })
-  generateProof(@Param('propertyId') propertyId: string) {
-    // TODO: add auth guard — verify caller owns this property
-    return this.proofService.generateProof(propertyId);
+  @ApiParam({ name: 'propertyId', example: '1', description: 'Decimal-string id' })
+  @ApiOkResponse({ type: MerkleProofResponseDto })
+  @ApiNotFoundResponse({ description: 'No property with that propertyId' })
+  @ApiBadRequestResponse({ description: 'Property imported but not issued yet — it has no leaf' })
+  @ApiServiceUnavailableResponse({ description: 'Cached proof does not verify; republish needed' })
+  getMerkleProof(@Param('propertyId') propertyId: string) {
+    return this.proofService.getMerkleProof(propertyId);
   }
 
   @Post('verify')
+  // POST because a proof is far too large for a query string, but nothing is
+  // created — this is a question, and Nest's default 201 would say otherwise.
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Not implemented yet — Phase 6',
+    summary: 'Verify a Groth16 proof off-chain (and optionally on-chain)',
     description:
-      'Off-chain verification on behalf of a client. Must call assertTimestampFresh (D26): ' +
-      'groth16.verify() returns true for a replayed proof dated years ago.',
-    deprecated: true,
+      'Applies the same three rules LandRegistryVerifier applies on chain, and rejects with the ' +
+      'same names (D33): the proof must be cryptographically valid (InvalidProof), its ' +
+      '`currentTimestamp` must be within ±10 minutes of now (StaleTimestamp — D26: a proof ' +
+      'dated back to when an expired title was still valid verifies perfectly), and its root ' +
+      'must be the current on-chain root (RootMismatch). The circuit type is inferred from the ' +
+      'number of public signals when not given.',
   })
-  verifyProof(@Body() body: unknown) {
-    // TODO: define VerifyProofDto
-    return this.proofService.verifyProof(body);
+  @ApiOkResponse({ type: VerifyProofResponseDto })
+  @ApiBadRequestResponse({ description: 'Malformed body, or circuitType contradicts the signals' })
+  @ApiUnprocessableEntityResponse({
+    description: 'Proof rejected — body carries `reason`, `message` and optional `details`',
+  })
+  @ApiServiceUnavailableResponse({
+    description: 'Trusted-setup artifacts missing on the server (run circuits:setup)',
+  })
+  verify(@Body() dto: VerifyProofDto) {
+    return this.proofService.verify(dto);
   }
 }

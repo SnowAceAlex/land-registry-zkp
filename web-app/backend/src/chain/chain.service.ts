@@ -8,8 +8,10 @@ import {
 } from '@land-registry/blockchain/typechain-types';
 import {
   ChainNetwork,
+  CircuitType,
   DeploymentRecord,
   Groth16Proof,
+  PUBLIC_SIGNAL_ORDER,
   PublicSignals,
   loadDeployment,
   resolveRpcUrl,
@@ -146,27 +148,72 @@ export class ChainService implements OnModuleInit {
     return { txHash: receipt!.hash, version, root };
   }
 
-  async verifyTransferOnChain(proof: Groth16Proof, publicSignals: PublicSignals): Promise<true> {
-    const { a, b, c } = toSolidityCalldata(proof);
-    const signals = publicSignals.map((s) => BigInt(s));
-    if (signals.length !== 7) {
+  /**
+   * Verify a proof through LandRegistryVerifier, which also re-checks the root
+   * against `latestRoot` and the timestamp against `block.timestamp` (D9/D26).
+   *
+   * `staticCall` because the verifier functions are `view`: this is a question
+   * asked of the chain, not a state change, and it costs no gas. The contract
+   * signals rejection by reverting with a typed error (D33) rather than
+   * returning false, so a thrown {@link ProofRejectedError} — not a `false`
+   * return — is the "invalid" answer.
+   */
+  async verifyOnChain(
+    circuitType: CircuitType,
+    proof: Groth16Proof,
+    publicSignals: PublicSignals,
+  ): Promise<true> {
+    const expected = PUBLIC_SIGNAL_ORDER[circuitType].length;
+    if (publicSignals.length !== expected) {
       throw new ProofRejectedError(
         'Unknown',
-        `transfer proof must carry 7 public signals, got ${signals.length}`,
+        `a ${circuitType} proof carries ${expected} public signals (D21), ` +
+          `got ${publicSignals.length}`,
       );
     }
 
+    const { a, b, c } = toSolidityCalldata(proof);
+    const signals = publicSignals.map((s) => BigInt(s));
+
+    // The three overloads differ only in the fixed-length pubSignals tuple
+    // (uint[4]/[5]/[7]); the length is already checked above, so the casts
+    // restate what PUBLIC_SIGNAL_ORDER has established rather than assume it.
+    const args = [
+      a as [string, string],
+      b as [[string, string], [string, string]],
+      c as [string, string],
+    ] as const;
+
     try {
-      await this.verifier.verifyTransfer.staticCall(
-        a as [string, string],
-        b as [[string, string], [string, string]],
-        c as [string, string],
-        signals as unknown as [bigint, bigint, bigint, bigint, bigint, bigint, bigint],
-      );
+      switch (circuitType) {
+        case 'ownership':
+          await this.verifier.verifyOwnership.staticCall(
+            ...args,
+            signals as unknown as [bigint, bigint, bigint, bigint],
+          );
+          break;
+        case 'mortgage':
+          await this.verifier.verifyMortgage.staticCall(
+            ...args,
+            signals as unknown as [bigint, bigint, bigint, bigint, bigint],
+          );
+          break;
+        case 'transfer':
+          await this.verifier.verifyTransfer.staticCall(
+            ...args,
+            signals as unknown as [bigint, bigint, bigint, bigint, bigint, bigint, bigint],
+          );
+          break;
+      }
       return true;
     } catch (error) {
       throw this.decodeVerifierError(error);
     }
+  }
+
+  /** {@link verifyOnChain} for the transfer flow (D28 step 4). */
+  async verifyTransferOnChain(proof: Groth16Proof, publicSignals: PublicSignals): Promise<true> {
+    return this.verifyOnChain('transfer', proof, publicSignals);
   }
 
   private decodeRegistryError(error: unknown): RootPublishError {
