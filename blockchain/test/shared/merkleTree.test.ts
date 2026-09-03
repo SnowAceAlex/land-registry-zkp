@@ -2,12 +2,22 @@ import { expect } from 'chai';
 
 import { generateMockRecords } from '../../scripts/tools/generateMockData';
 import {
+  MAX_PROPERTY_ID,
   TREE_DEPTH,
   buildTree,
   generateMerkleProof,
   getMerkleRoot,
   verifyMerkleProof,
 } from '../../shared/merkleTree';
+
+/** Read pathIndices (LSB-first, as the circuit does) back into a leaf index. */
+function indexFromPathIndices(pathIndices: number[]): bigint {
+  let acc = 0n;
+  for (let i = pathIndices.length - 1; i >= 0; i--) {
+    acc = acc * 2n + BigInt(pathIndices[i]);
+  }
+  return acc;
+}
 
 describe('merkleTree (Phase 1)', () => {
   it('builds a tree and produces a non-zero root', async () => {
@@ -107,5 +117,39 @@ describe('merkleTree (Phase 1)', () => {
     malformed.pathIndices[0] = 2; // not 0 or 1
 
     expect(await verifyMerkleProof(malformed, tree.root)).to.equal(false);
+  });
+
+  it('places each leaf at index = propertyId (D41)', async () => {
+    const { records } = await generateMockRecords(12);
+    const tree = await buildTree(records);
+
+    for (const record of records) {
+      const proof = await generateMerkleProof(tree, record);
+      expect(indexFromPathIndices(proof.pathIndices)).to.equal(record.propertyId);
+    }
+  });
+
+  it('produces the same root regardless of input order (D41 supersedes D24)', async () => {
+    const { records } = await generateMockRecords(10);
+    const reversed = [...records].reverse();
+
+    const inOrder = await buildTree(records);
+    const shuffled = await buildTree(reversed);
+
+    expect(shuffled.root).to.equal(inOrder.root);
+  });
+
+  it('rejects a propertyId outside the addressable range (D41)', async () => {
+    const { records } = await generateMockRecords(2);
+    records[1] = { ...records[1], propertyId: MAX_PROPERTY_ID + 1n };
+
+    let threw = false;
+    try {
+      await buildTree(records);
+    } catch (e) {
+      threw = true;
+      expect((e as Error).message).to.match(/outside the addressable range/);
+    }
+    expect(threw).to.equal(true);
   });
 });

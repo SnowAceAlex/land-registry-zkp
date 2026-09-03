@@ -4,12 +4,12 @@ import { toLURRecord } from '../records/record.mapper';
 import { makeProperty } from '../../test/factories';
 
 /**
- * Regression tests for the D24 leaf-ordering rule. These are the cheapest
- * possible guard against the most expensive possible mistake: a change to leaf
- * order invalidates every Merkle proof already handed to a land owner, and
- * nothing else in the system would fail loudly when it happens.
+ * `sortByPropertyId` no longer decides the tree (D41 keys leaf position to
+ * propertyId), but it still decides the order of every property list the API
+ * returns, so its numeric-vs-lexicographic behaviour is still worth pinning.
+ * The final test is the regression guard for D41 itself.
  */
-describe('leaf ordering (D24)', () => {
+describe('leaf ordering (D41 supersedes D24)', () => {
   it('sorts propertyIds numerically, not lexicographically', () => {
     const rows = [
       makeProperty({ propertyId: '2' }),
@@ -48,7 +48,7 @@ describe('leaf ordering (D24)', () => {
     expect(first.root).toBe(second.root);
   });
 
-  it('produces a DIFFERENT root when the order changes — this is why the order is pinned', async () => {
+  it('produces the SAME root whatever the input order (D41 — position follows propertyId)', async () => {
     const rows = [
       makeProperty({ propertyId: '1' }),
       makeProperty({ propertyId: '2' }),
@@ -56,11 +56,12 @@ describe('leaf ordering (D24)', () => {
     ];
 
     const numericOrder = await buildTree(sortByPropertyId(rows).map(toLURRecord));
-    // What a Postgres `ORDER BY "propertyId"` on a String column would give:
+    // What a Postgres `ORDER BY "propertyId"` on a String column would give.
+    // Under D24 this produced a different tree; under D41 it cannot.
     const lexicographicOrder = await buildTree(
       [...rows].sort((a, b) => a.propertyId.localeCompare(b.propertyId)).map(toLURRecord),
     );
 
-    expect(lexicographicOrder.root).not.toBe(numericOrder.root);
+    expect(lexicographicOrder.root).toBe(numericOrder.root);
   });
 });

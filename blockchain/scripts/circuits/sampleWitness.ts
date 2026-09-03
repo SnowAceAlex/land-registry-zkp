@@ -66,7 +66,11 @@ async function makeSubjectRecord(now: bigint): Promise<LURRecord> {
   };
 }
 
-/** Place `record` in the middle of `fillerCount` random filler records. */
+/**
+ * Place `record` in a tree alongside `fillerCount` random filler records. Its
+ * slot follows its propertyId (D41), not its array position; the fillers only
+ * keep the Merkle path from being entirely zero-hashes.
+ */
 async function placeInTree(
   record: LURRecord,
   fillerCount = 6,
@@ -131,8 +135,9 @@ export async function buildSampleInput(
     };
   }
 
-  // transfer: swap ownerCommitment, rebuild the tree preserving order —
-  // exactly the operation Phase 5's publish step performs.
+  // transfer: swap ownerCommitment, rebuild the tree with the one record's
+  // owner swapped — order is irrelevant under D41 — exactly the operation
+  // Phase 5's publish step performs.
   const newRecord: LURRecord = { ...record, ownerCommitment: await poseidonHash([BUYER_SECRET]) };
   const newRecords = allRecords.map((r) => (r.propertyId === record.propertyId ? newRecord : r));
   const newTree = await buildTree(newRecords);

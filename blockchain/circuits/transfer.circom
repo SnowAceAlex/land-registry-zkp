@@ -44,11 +44,12 @@ pragma circom 2.0.0;
  * ── Scope limitations to carry into the thesis (Scope 1.5) ───────────────────
  * (a) Requiring both secrets in one witness assumes buyer and seller sign in a
  *     single session. A production system needs multi-party proof composition.
- * (b) D24: the two Merkle paths are independent, so the circuit proves the new
- *     leaf is in the new tree but NOT that the old leaf was removed from it. A
- *     malicious authority could publish a tree containing both. Constraining the
- *     two paths to be identical would close this, at the cost of forcing an
- *     in-place update; kept independent here per the locked §2.4 design.
+ * (b) CLOSED by D41. Both Merkle paths are now pinned to `expectedIndex ==
+ *     propertyId`, so oldPathIndices === newPathIndices is a consequence, the
+ *     new tree's slot for this property holds the NEW leaf, and the old leaf
+ *     has no reachable path to the published root. Previously the two paths
+ *     were independent and a malicious authority could publish a tree carrying
+ *     both, leaving the seller able to keep proving ownership.
  */
 
 include "circomlib/circuits/poseidon.circom";
@@ -118,6 +119,8 @@ template Transfer(levels) {
         oldMerkle.siblings[i] <== oldSiblings[i];
         oldMerkle.pathIndices[i] <== oldPathIndices[i];
     }
+
+    oldMerkle.expectedIndex <== propertyId;
     oldMerkle.root === oldMerkleRoot;
 
     // 5. Post-transfer leaf — same fields, new owner.
@@ -137,6 +140,7 @@ template Transfer(levels) {
         newMerkle.siblings[i] <== newSiblings[i];
         newMerkle.pathIndices[i] <== newPathIndices[i];
     }
+    newMerkle.expectedIndex <== propertyId;
     newMerkle.root === newMerkleRoot;
 
     // 7. Compliance: land under mortgage, litigation or restriction cannot be

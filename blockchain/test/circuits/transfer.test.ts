@@ -17,12 +17,19 @@ import { EncumbranceStatus, LURRecord, MerkleProofData, TenureType } from '../..
 import {
   buildTree,
   generateMerkleProof,
+  hashRecord,
   poseidonHash,
   LURMerkleTree,
 } from '../../shared/merkleTree';
 import { buildTransferInput, PUBLIC_SIGNAL_ORDER } from '../../shared/circuitInputs';
 import { nowUnixTimestamp } from '../../shared/datetime';
-import { makeSubject, MakeRecordOptions, OTHER_SECRET, SECONDS_PER_YEAR } from '../helpers/records';
+import {
+  makeSubject,
+  MakeRecordOptions,
+  OTHER_SECRET,
+  pathAt,
+  SECONDS_PER_YEAR,
+} from '../helpers/records';
 
 const CIRCUIT_PATH = path.resolve(__dirname, '../../circuits/transfer.circom');
 const INCLUDE_PATH = path.resolve(__dirname, '../../node_modules');
@@ -51,8 +58,8 @@ async function makeTransferFixture(
     ownerCommitment: await poseidonHash([newSecret]),
   };
 
-  // Rebuild the whole registry with the one record swapped, preserving order —
-  // exactly the operation Phase 5's publish step performs.
+  // Rebuild the whole registry with the one record's owner swapped — order is
+  // irrelevant under D41 — exactly the operation Phase 5's publish step performs.
   const newRecords = subject.allRecords.map((r) =>
     r.propertyId === subject.record.propertyId ? newRecord : r,
   );
@@ -266,5 +273,41 @@ describe('circuits/transfer.circom (Phase 2)', () => {
       message = (error as Error).message;
     }
     expect(message).to.match(/only change ownerCommitment/);
+  });
+
+  it('rejects a transfer whose new leaf sits at a different slot (D41)', async () => {
+    const fixture = await makeTransferFixture(now);
+    const newLeaf = await hashRecord(fixture.newRecord);
+
+    // A self-consistent path placing the new leaf one slot over, together with
+    // the root that path implies — so newMerkle.root === newMerkleRoot still
+    // holds and the ONLY unsatisfied constraint is the D41 index binding.
+    // Shifting pathIndices alone would break the root check too, and the test
+    // would then pass for the wrong reason.
+    const misplaced = await pathAt(newLeaf, Number(fixture.newRecord.propertyId) + 1);
+
+    const input = buildTransferInput({
+      oldRecord: fixture.oldRecord,
+      newRecord: fixture.newRecord,
+      oldOwnerSecret: fixture.oldSecret,
+      newOwnerSecret: fixture.newSecret,
+      oldProof: fixture.oldProof,
+      newProof: {
+        leaf: newLeaf,
+        siblings: misplaced.siblings,
+        pathIndices: misplaced.pathIndices,
+        root: misplaced.root,
+      },
+      currentTimestamp: now,
+      minRequiredRemainingTerm: 0n,
+    });
+
+    let threw = false;
+    try {
+      await circuit.calculateWitness(input);
+    } catch {
+      threw = true;
+    }
+    expect(threw, 'both transfer paths must sit at index === propertyId').to.equal(true);
   });
 });

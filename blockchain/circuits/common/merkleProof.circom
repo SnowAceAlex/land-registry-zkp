@@ -15,6 +15,10 @@ pragma circom 2.0.0;
  *   - leaf                 leaf hash (see common/leafHasher.circom)
  *   - pathIndices[levels]  0 = current node is the LEFT child, 1 = RIGHT child
  *   - siblings[levels]     sibling hash at each level, bottom-up
+ *   - expectedIndex        the leaf index this path must correspond to. The
+ *                          caller MUST pass the record's propertyId (D41) —
+ *                          the template constrains the path bits to encode it,
+ *                          so a leaf can only be proven at its own slot.
  * Output:
  *   - root                 computed Merkle root
  *
@@ -35,6 +39,9 @@ template MerkleProof(levels) {
     signal input leaf;
     signal input pathIndices[levels];
     signal input siblings[levels];
+    // D41: the leaf index this path must correspond to. Callers pass the
+    // record's propertyId, which pins one property to exactly one slot.
+    signal input expectedIndex;
     signal output root;
 
     // levelHash[i] = the node on the path at height i; levelHash[0] is the leaf.
@@ -44,12 +51,19 @@ template MerkleProof(levels) {
     component switchers[levels];
     component hashers[levels];
 
+    // pathIndices read LSB-first is the binary expansion of the leaf index.
+    var indexAcc = 0;
+    var pow = 1;
+
     for (var i = 0; i < levels; i++) {
         // circomlib's Switcher is documented "assume sel is binary" — it does
         // NOT constrain sel itself. Without this, a prover could pass
         // pathIndices[i] = 5 and steer (outL, outR) to an arbitrary linear
         // combination, forging a path to any root. Force it to a bit.
         pathIndices[i] * (pathIndices[i] - 1) === 0;
+
+        indexAcc += pathIndices[i] * pow;
+        pow = pow * 2;
 
         // sel = 0 -> (outL, outR) = (L, R) = (current, sibling)   [current is left]
         // sel = 1 -> (outL, outR) = (R, L) = (sibling, current)   [current is right]
@@ -64,6 +78,13 @@ template MerkleProof(levels) {
 
         levelHash[i + 1] <== hashers[i].out;
     }
+
+    // D41 — the load-bearing line. Without it a leaf can be proven at ANY slot,
+    // so a tree carrying both a transferred-away leaf and its replacement lets
+    // the previous owner keep proving ownership. With it, a property occupies
+    // exactly one slot and at most one owner is provable per published root.
+    // The bits are already constrained above, so this is one linear constraint.
+    indexAcc === expectedIndex;
 
     root <== levelHash[levels];
 }

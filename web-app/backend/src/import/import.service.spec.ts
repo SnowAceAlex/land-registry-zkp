@@ -173,6 +173,17 @@ describe('ImportService', () => {
     expect(result.errors[0].message).toMatch(/duplicate propertyId/);
   });
 
+  it('rejects a propertyId beyond the addressable range of the tree (D41)', async () => {
+    const { service } = makeService();
+
+    const result = await service.importCsv(
+      [HEADER, row({ propertyId: '1' }), row({ propertyId: '1048576' })].join('\n'), // 2^20
+    );
+
+    expect(result.imported).toBe(1);
+    expect(result.errors[0].message).toMatch(/exceeds the addressable range/);
+  });
+
   it('defaults encumbranceStatus to FREE and rejects unknown values', async () => {
     const { service, created } = makeService();
 

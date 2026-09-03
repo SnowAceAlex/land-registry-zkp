@@ -14,17 +14,8 @@ import { toLURRecord } from '../records/record.mapper';
  * TreeService
  * ─────────────────────────────────────────────────────────────────────────────
  * Loads issued properties from Postgres and hands them to the shared Merkle
- * layer. It owns exactly one thing the shared package cannot know about: the
- * LEAF ORDER.
- *
- * ⚠️ D24 — `buildTree()` assigns leaf indices by array position, so the order
- * this service produces IS the tree. Change it and every Merkle proof ever
- * issued stops verifying. The order is pinned to ascending numeric propertyId.
- *
- * ⚠️ It must be sorted here, in JS, as BigInt — NOT with Postgres `ORDER BY`.
- * `propertyId` is a String column, so Postgres sorts it lexicographically
- * ("10" < "2"), which silently produces a different tree than the numeric
- * order. See tree.service.spec.ts for the regression test.
+ * layer.
+
  *
  * No hashing lives here. buildTree/generateMerkleProof come from
  * @land-registry/blockchain/shared — the repo-wide rule is that Merkle and
@@ -32,10 +23,10 @@ import { toLURRecord } from '../records/record.mapper';
  */
 @Injectable()
 export class TreeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
-   * Every issued property, in the canonical leaf order (D24).
+   * Every issued property, in the canonical list order (D41: no longer the leaf order).
    * Properties without an ownerCommitment are not yet issued and have no leaf.
    */
   async loadIssuedProperties(): Promise<Property[]> {
@@ -88,8 +79,8 @@ export class TreeService {
     }
 
     // Only ownerCommitment may differ (transfer.circom derives both leaves from
-    // one set of record-field signals — see D24/§2.4), so the projection swaps
-    // that single field and leaves the leaf order untouched.
+    // one set of record-field signals — see D41/§2.4), so the projection swaps
+    // that single field and leaves every leaf in its propertyId slot.
     const properties = current.map((property) => {
       const replacement = replacements.get(property.propertyId);
       return replacement === undefined ? property : { ...property, ownerCommitment: replacement };
@@ -105,8 +96,8 @@ export class TreeService {
 }
 
 /**
- * Canonical leaf order (D24): ascending numeric propertyId.
- * Exported so the regression test can exercise it directly.
+ * Canonical list order (D41 — no longer the leaf order): ascending numeric
+ * propertyId. Exported so the regression test can exercise it directly.
  */
 export function sortByPropertyId<T extends { propertyId: string }>(rows: T[]): T[] {
   return [...rows].sort((a, b) => {

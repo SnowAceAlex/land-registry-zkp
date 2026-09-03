@@ -15,7 +15,14 @@ import wasm_tester, { WasmTester, Witness } from 'circom_tester/wasm/tester';
 import { EncumbranceStatus, TenureType } from '../../shared/types';
 import { buildOwnershipInput, PUBLIC_SIGNAL_ORDER } from '../../shared/circuitInputs';
 import { nowUnixTimestamp } from '../../shared/datetime';
-import { makeSubject, SECONDS_PER_YEAR, OTHER_SECRET } from '../helpers/records';
+import {
+  makeRecord,
+  makeSubject,
+  pathAt,
+  SECONDS_PER_YEAR,
+  OTHER_SECRET,
+} from '../helpers/records';
+import { hashRecord } from '../../shared/merkleTree';
 
 const CIRCUIT_PATH = path.resolve(__dirname, '../../circuits/ownership.circom');
 const INCLUDE_PATH = path.resolve(__dirname, '../../node_modules');
@@ -168,5 +175,54 @@ describe('circuits/ownership.circom (Phase 2)', () => {
     siblings[0] = (BigInt(siblings[0]) + 1n).toString();
 
     await expectRejected(input, 'a forged Merkle path must not reach the published root');
+  });
+
+  it('accepts a leaf sitting at its own propertyId slot (D41 control)', async () => {
+    const { record, secret } = await makeRecord(now);
+    const leaf = await hashRecord(record);
+    const placed = await pathAt(leaf, Number(record.propertyId));
+
+    const input = buildOwnershipInput({
+      record,
+      ownerSecret: secret,
+      proof: {
+        leaf,
+        siblings: placed.siblings,
+        pathIndices: placed.pathIndices,
+        root: placed.root,
+      },
+      currentTimestamp: now,
+    });
+
+    const witness = await circuit.calculateWitness(input);
+    await circuit.checkConstraints(witness);
+  });
+
+  it('rejects a leaf sitting at any other slot — this is the stale-leaf guard (D41)', async () => {
+    const { record, secret } = await makeRecord(now);
+    const leaf = await hashRecord(record);
+    // Same record, same valid path arithmetic, one slot over. Before D41 this
+    // verified, which is what let a transferred-away leaf stay provable.
+    const misplaced = await pathAt(leaf, Number(record.propertyId) + 1);
+
+    const input = buildOwnershipInput({
+      record,
+      ownerSecret: secret,
+      proof: {
+        leaf,
+        siblings: misplaced.siblings,
+        pathIndices: misplaced.pathIndices,
+        root: misplaced.root,
+      },
+      currentTimestamp: now,
+    });
+
+    let threw = false;
+    try {
+      await circuit.calculateWitness(input);
+    } catch {
+      threw = true;
+    }
+    expect(threw, 'a leaf must only be provable at index === propertyId').to.equal(true);
   });
 });

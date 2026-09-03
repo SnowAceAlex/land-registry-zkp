@@ -23,11 +23,12 @@ const CIRCUIT_PATH = path.resolve(__dirname, '../../circuits/common/merkleProof.
 const INCLUDE_PATH = path.resolve(__dirname, '../../node_modules');
 
 /** MerkleProofData -> circom input object (circom wants decimal strings). */
-function toCircuitInput(proof: MerkleProofData) {
+function toCircuitInput(proof: MerkleProofData, expectedIndex: bigint) {
   return {
     leaf: proof.leaf.toString(),
     pathIndices: proof.pathIndices.map((i) => i.toString()),
     siblings: proof.siblings.map((s) => s.toString()),
+    expectedIndex: expectedIndex.toString(),
   };
 }
 
@@ -50,7 +51,7 @@ describe('circuits/common/merkleProof.circom (Phase 2)', () => {
     const tree = await buildTree(records);
     const proof = await generateMerkleProof(tree, records[3]);
 
-    const witness = await circuit.calculateWitness(toCircuitInput(proof));
+    const witness = await circuit.calculateWitness(toCircuitInput(proof, records[3].propertyId));
     await circuit.checkConstraints(witness);
     await circuit.assertOut(witness, { root: tree.root });
   });
@@ -61,7 +62,7 @@ describe('circuits/common/merkleProof.circom (Phase 2)', () => {
 
     for (const record of records) {
       const proof = await generateMerkleProof(tree, record);
-      const witness = await circuit.calculateWitness(toCircuitInput(proof));
+      const witness = await circuit.calculateWitness(toCircuitInput(proof, record.propertyId));
       await circuit.assertOut(witness, { root: tree.root });
     }
   });
@@ -72,7 +73,7 @@ describe('circuits/common/merkleProof.circom (Phase 2)', () => {
     const proof = await generateMerkleProof(tree, records[0]);
 
     expect(proof.siblings).to.have.lengthOf(TREE_DEPTH);
-    const witness = await circuit.calculateWitness(toCircuitInput(proof));
+    const witness = await circuit.calculateWitness(toCircuitInput(proof, records[0].propertyId));
     await circuit.assertOut(witness, { root: tree.root });
   });
 
@@ -81,7 +82,7 @@ describe('circuits/common/merkleProof.circom (Phase 2)', () => {
     const tree = await buildTree(records);
     const proof = await generateMerkleProof(tree, records[2]);
 
-    const tampered = toCircuitInput(proof);
+    const tampered = toCircuitInput(proof, records[2].propertyId);
     tampered.siblings[0] = (proof.siblings[0] + 1n).toString();
 
     const witness = await circuit.calculateWitness(tampered);
@@ -96,7 +97,7 @@ describe('circuits/common/merkleProof.circom (Phase 2)', () => {
     const tree = await buildTree(records);
     const proof = await generateMerkleProof(tree, records[0]);
 
-    const malformed = toCircuitInput(proof);
+    const malformed = toCircuitInput(proof, records[0].propertyId);
     malformed.pathIndices[0] = '2';
 
     let threw = false;
@@ -106,5 +107,24 @@ describe('circuits/common/merkleProof.circom (Phase 2)', () => {
       threw = true;
     }
     expect(threw, 'pathIndices[i] must be constrained to a bit').to.equal(true);
+  });
+
+  it('rejects a path whose indices do not encode expectedIndex (D41)', async () => {
+    const { records } = await generateMockRecords(8);
+    const tree = await buildTree(records);
+    const proof = await generateMerkleProof(tree, records[3]);
+
+    // A genuine path for this record, presented as if it belonged to the
+    // neighbouring propertyId. This is the shape of the stale-leaf attack:
+    // a real leaf sitting at a slot that is not its own.
+    const mislabelled = toCircuitInput(proof, records[3].propertyId + 1n);
+
+    let threw = false;
+    try {
+      await circuit.calculateWitness(mislabelled);
+    } catch {
+      threw = true;
+    }
+    expect(threw, 'pathIndices must be constrained to encode expectedIndex').to.equal(true);
   });
 });
