@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import * as Papa from 'papaparse';
-import { TenureType, toUnixTimestamp } from '@land-registry/blockchain/shared';
+import { MAX_PROPERTY_ID, TenureType, toUnixTimestamp } from '@land-registry/blockchain/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ImportRow } from './csv-row';
@@ -43,7 +43,7 @@ export class ImportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly administrativeUnits: AdministrativeUnitsService,
-  ) {}
+  ) { }
 
   async importCsv(csv: string): Promise<ImportResult> {
     const parsed = Papa.parse<ImportRow>(csv, {
@@ -117,6 +117,15 @@ export class ImportService {
     if (!/^\d+$/.test(propertyId)) {
       throw new Error(`propertyId must be a decimal integer string, got '${propertyId}'`);
     }
+    // D41: a leaf's position in the Merkle tree IS its propertyId, so an id
+    // beyond the tree's address space cannot be committed at all. Reject at
+    // import rather than at publish time, where it would fail a whole batch.
+    if (BigInt(propertyId) > MAX_PROPERTY_ID) {
+      throw new Error(
+        `propertyId ${propertyId} exceeds the addressable range of the registry tree ` +
+        `(max ${MAX_PROPERTY_ID})`,
+      );
+    }
 
     const landUseCode = requireField(row, 'landUseCode').toUpperCase();
     const { useType } = classifyLandUseCode(landUseCode);
@@ -140,7 +149,7 @@ export class ImportService {
     if (!CERTIFICATE_SERIAL_PATTERN.test(certificateSerial)) {
       throw new Error(
         `certificateSerial must be 2 letters followed by 6 digits (e.g. 'CT 100001'), ` +
-          `got '${certificateSerial}'`,
+        `got '${certificateSerial}'`,
       );
     }
 
@@ -206,7 +215,7 @@ export class ImportService {
       if (hasExpiry) {
         throw new Error(
           `landUseCode '${row.landUseCode}' is being registered as perpetual tenure, which has ` +
-            `no expiry date, but expiryDate='${row.expiryDate}' was given`,
+          `no expiry date, but expiryDate='${row.expiryDate}' was given`,
         );
       }
       return '0';
@@ -251,9 +260,9 @@ export class ImportService {
       if (Math.abs(years - INDIVIDUAL_AGRICULTURAL_TERM_YEARS) > toleranceYears) {
         throw new Error(
           `term is ${years.toFixed(1)} years, but allocation/recognition to an individual is ` +
-            `${INDIVIDUAL_AGRICULTURAL_TERM_YEARS} years (Điều 172 khoản 1 điểm a Luật Đất đai 2024). ` +
-            `Set expiryDate to ${INDIVIDUAL_AGRICULTURAL_TERM_YEARS} years after issueDate, or set ` +
-            `landUserType if the land is leased or held by an organisation`,
+          `${INDIVIDUAL_AGRICULTURAL_TERM_YEARS} years (Điều 172 khoản 1 điểm a Luật Đất đai 2024). ` +
+          `Set expiryDate to ${INDIVIDUAL_AGRICULTURAL_TERM_YEARS} years after issueDate, or set ` +
+          `landUserType if the land is leased or held by an organisation`,
         );
       }
       return;
@@ -265,11 +274,11 @@ export class ImportService {
       if (years > cap + toleranceYears) {
         throw new Error(
           `term is ${years.toFixed(1)} years, which exceeds the ${cap}-year cap for a project ` +
-            `lease (Điều 172 khoản 1 điểm c)` +
-            (isLongTerm
-              ? ''
-              : `. Set isLongTermInvestmentProject=true if the investment project runs over ` +
-                `${PROJECT_TERM_YEARS} years under Luật Đầu tư`),
+          `lease (Điều 172 khoản 1 điểm c)` +
+          (isLongTerm
+            ? ''
+            : `. Set isLongTermInvestmentProject=true if the investment project runs over ` +
+            `${PROJECT_TERM_YEARS} years under Luật Đầu tư`),
         );
       }
     }

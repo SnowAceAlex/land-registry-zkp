@@ -17,6 +17,7 @@ import {
   generateMerkleProof,
   poseidonHash,
   LURMerkleTree,
+  TREE_DEPTH,
 } from '../../shared/merkleTree';
 import { MerkleProofData } from '../../shared/types';
 import { generateMockRecords } from '../../scripts/tools/generateMockData';
@@ -89,8 +90,11 @@ export interface SubjectFixture {
 
 /**
  * Place `record` in a tree alongside `fillerCount` random records and return the
- * record's inclusion proof. The subject sits in the middle so its Merkle path
- * exercises both left- and right-child steps.
+ * record's inclusion proof. Under D41 the subject's slot is its propertyId
+ * (SUBJECT_PROPERTY_ID = 9001) regardless of where it sits in the array; the
+ * binary expansion 0b10001100101001 already mixes left- and right-child steps,
+ * so the path is non-degenerate. The fillers only ensure some siblings are real
+ * node hashes rather than the zero-hash chain all the way up.
  */
 export async function placeInTree(
   record: LURRecord,
@@ -115,4 +119,33 @@ export async function makeSubject(
 ): Promise<SubjectFixture> {
   const { record, secret } = await makeRecord(now, options);
   return placeInTree(record, secret, fillerCount);
+}
+
+/**
+ * Build a self-consistent Merkle path placing `leaf` at `index`, and return the
+ * root that path implies. The siblings are arbitrary constants — the path is
+ * valid *internally*, which is exactly the freedom D41 removes. This models a
+ * tree a malicious authority could publish, not one buildTree() would produce,
+ * so a test using it must fail for the D41 reason and not because the root
+ * mismatched.
+ */
+export async function pathAt(
+  leaf: bigint,
+  index: number,
+): Promise<{ siblings: bigint[]; pathIndices: number[]; root: bigint }> {
+  const siblings: bigint[] = [];
+  const pathIndices: number[] = [];
+  let node = leaf;
+  let cursor = index;
+
+  for (let height = 0; height < TREE_DEPTH; height++) {
+    const sibling = BigInt(height + 1);
+    const isRightChild = (cursor & 1) === 1;
+    pathIndices.push(isRightChild ? 1 : 0);
+    siblings.push(sibling);
+    node = await poseidonHash(isRightChild ? [sibling, node] : [node, sibling]);
+    cursor >>= 1;
+  }
+
+  return { siblings, pathIndices, root: node };
 }

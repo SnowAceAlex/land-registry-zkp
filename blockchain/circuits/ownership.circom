@@ -71,6 +71,8 @@ template Ownership(levels) {
         merkle.siblings[i] <== siblings[i];
         merkle.pathIndices[i] <== pathIndices[i];
     }
+    
+    merkle.expectedIndex <== propertyId;
     merkle.root === merkleRoot;
 
     // 4. Not expired. minRequiredRemainingTerm = 1 makes the shared threshold
