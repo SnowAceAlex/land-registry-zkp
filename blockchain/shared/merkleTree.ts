@@ -18,12 +18,24 @@
  *   missing siblings — the standard Tornado-Cash/Semaphore technique. This
  *   is O(N) instead of O(2^20) and produces identical roots/proofs to what a
  *   literal 2^20-leaf tree (padded with the same empty-leaf sentinel) would.
+ *
+ *   Leaf position is keyed by `propertyId` (D41): a record's slot IS its
+ *   propertyId, not its position in the input array. That makes the build
+ *   order-independent and, more importantly, pins one property to exactly one
+ *   slot so a superseded leaf has no reachable path to the published root.
  */
 
 import { buildPoseidon, Poseidon } from 'circomlibjs';
 import { LURRecord, MerkleProofData } from './types';
 
 export const TREE_DEPTH = 20;
+
+/**
+ * Largest addressable propertyId (D41). A leaf's position IS its propertyId, so
+ * the tree can hold ids 0..2^TREE_DEPTH-1. Depth 20 already capped the registry
+ * at ~1.05M leaves (D20), so this adds no capacity limit that did not exist.
+ */
+export const MAX_PROPERTY_ID = (1n << BigInt(TREE_DEPTH)) - 1n;
 
 /** Sentinel value for an empty leaf (level 0 of the zero-hash chain). */
 const EMPTY_LEAF = 0n;
@@ -96,55 +108,83 @@ async function getZeroHashes(): Promise<bigint[]> {
 // Merkle Tree Construction
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** A fixed-depth-20 sparse Merkle tree built from real LUR record leaves. */
+/**
+ * A fixed-depth-20 sparse Merkle tree, keyed by propertyId (D41).
+ *
+ * Only occupied nodes are stored. `levels[h]` maps a node index at height h to
+ * its hash; a missing entry means "empty subtree", answered by zeroHashes[h].
+ * levels[0] holds the leaves, levels[TREE_DEPTH] holds at most the root.
+ */
 export interface LURMerkleTree {
   readonly depth: number;
-  /** Real leaf hashes only, in the order the records were provided. */
-  readonly leaves: bigint[];
-  /** layers[0] = leaves; layers[i] = level-i node hashes (real nodes only, no padding stored). */
-  readonly layers: bigint[][];
+  /** levels[h]: node index at height h -> hash. Occupied nodes only. */
+  readonly levels: Map<number, bigint>[];
   readonly zeroHashes: bigint[];
   readonly root: bigint;
-  /** propertyId (stringified) -> index into `leaves` for O(1) proof lookup. */
+  /** propertyId (stringified) -> leaf index. Always Number(propertyId) (D41). */
   readonly indexByPropertyId: Map<string, number>;
 }
 
 /**
- * Build a fixed-depth-20 sparse Merkle tree from an array of LUR records.
- * @param records Array of all LUR records in the registry
- * @returns       A LURMerkleTree instance
+ * Build the registry tree. A record's leaf goes at index = its propertyId, so
+ * the input order does not affect the result (this is what supersedes D24).
+ *
+ * ⚠️ D41 — why the position is a function of the record and not of the caller:
+ * if the builder could choose positions, it could place two leaves for the same
+ * propertyId (an old owner and a new one) in one tree, and both would produce
+ * valid ownership proofs against the published root. Binding the position to
+ * propertyId, and forcing the circuit to prove that binding, makes a stale leaf
+ * unreachable: one slot holds one value.
  */
 export async function buildTree(records: LURRecord[]): Promise<LURMerkleTree> {
   const zeroHashes = await getZeroHashes();
-  const leaves = await Promise.all(records.map(hashRecord));
 
+  const levels: Map<number, bigint>[] = [new Map<number, bigint>()];
   const indexByPropertyId = new Map<string, number>();
-  records.forEach((record, i) => {
+
+  for (const record of records) {
+    if (record.propertyId < 0n || record.propertyId > MAX_PROPERTY_ID) {
+      throw new Error(
+        `buildTree: propertyId ${record.propertyId} is outside the addressable range ` +
+          `0..${MAX_PROPERTY_ID} of a depth-${TREE_DEPTH} tree (D41)`,
+      );
+    }
+
     const key = record.propertyId.toString();
     // propertyId is documented as unique — fail fast instead of silently
-    // overwriting the index (which would yield a proof for the wrong leaf).
+    // overwriting the slot (which would drop one owner's leaf without a trace).
     if (indexByPropertyId.has(key)) {
       throw new Error(`buildTree: duplicate propertyId ${record.propertyId}`);
     }
-    indexByPropertyId.set(key, i);
-  });
 
-  const layers: bigint[][] = [leaves];
-  let currentLevel = leaves;
-  for (let level = 0; level < TREE_DEPTH; level++) {
-    const nextLevel: bigint[] = [];
-    for (let i = 0; i < currentLevel.length; i += 2) {
-      const left = currentLevel[i];
-      const right = i + 1 < currentLevel.length ? currentLevel[i + 1] : zeroHashes[level];
-      nextLevel.push(await poseidonHash([left, right]));
-    }
-    layers.push(nextLevel);
-    currentLevel = nextLevel;
+    const index = Number(record.propertyId);
+    indexByPropertyId.set(key, index);
+    levels[0].set(index, await hashRecord(record));
   }
 
-  const root = currentLevel.length > 0 ? currentLevel[0] : zeroHashes[TREE_DEPTH];
+  for (let height = 0; height < TREE_DEPTH; height++) {
+    const current = levels[height];
+    const parents = new Map<number, bigint>();
 
-  return { depth: TREE_DEPTH, leaves, layers, zeroHashes, root, indexByPropertyId };
+    // Two siblings share one parent, so collect parent indices first rather
+    // than hashing the same parent twice.
+    const parentIndices = new Set<number>();
+    for (const index of current.keys()) {
+      parentIndices.add(index >> 1);
+    }
+
+    for (const parentIndex of parentIndices) {
+      const left = current.get(parentIndex * 2) ?? zeroHashes[height];
+      const right = current.get(parentIndex * 2 + 1) ?? zeroHashes[height];
+      parents.set(parentIndex, await poseidonHash([left, right]));
+    }
+
+    levels.push(parents);
+  }
+
+  const root = levels[TREE_DEPTH].get(0) ?? zeroHashes[TREE_DEPTH];
+
+  return { depth: TREE_DEPTH, levels, zeroHashes, root, indexByPropertyId };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -167,13 +207,9 @@ export async function getMerkleRoot(tree: LURMerkleTree): Promise<bigint> {
 /**
  * Generate a Merkle inclusion proof for a specific record.
  *
- * The returned MerkleProofData is used as private input to the circom
- * circuit (siblings + pathIndices, always length 20 regardless of the
- * real record count — see the D20 note at the top of this file).
- *
- * @param tree    The LURMerkleTree instance
- * @param record  The specific LUR record to generate a proof for
- * @returns       A MerkleProofData object with leaf, siblings, pathIndices, root
+ * `pathIndices` is the binary expansion of the leaf index, LSB first — and by
+ * D41 the leaf index is the propertyId, so the circuit can (and does) check
+ * that these bits reconstruct the public propertyId signal.
  */
 export async function generateMerkleProof(
   tree: LURMerkleTree,
@@ -184,31 +220,29 @@ export async function generateMerkleProof(
     throw new Error(`generateMerkleProof: propertyId ${record.propertyId} not found in tree`);
   }
 
-  // Recompute the leaf from the provided record and ensure it matches the tree.
-  // Guards against a caller passing a record whose fields drifted from what the
-  // tree was built with — otherwise they'd get a proof for a stale leaf that
-  // silently fails to match the circuit-computed leaf downstream.
+  // Recompute the leaf and ensure it matches the tree. Guards against a caller
+  // passing a record whose fields drifted from what the tree was built with —
+  // otherwise they'd get a proof for a stale leaf that silently fails to match
+  // the circuit-computed leaf downstream.
   const leaf = await hashRecord(record);
-  if (leaf !== tree.leaves[index]) {
+  if (leaf !== tree.levels[0].get(index)) {
     throw new Error(
       `generateMerkleProof: record hash does not match tree leaf for propertyId ${record.propertyId}`,
     );
   }
+
   const siblings: bigint[] = [];
   const pathIndices: number[] = [];
 
   let currentIndex = index;
-  for (let level = 0; level < tree.depth; level++) {
-    const isRightChild = currentIndex % 2 === 1;
+  for (let height = 0; height < TREE_DEPTH; height++) {
+    const isRightChild = (currentIndex & 1) === 1;
     pathIndices.push(isRightChild ? 1 : 0);
 
-    const siblingIndex = isRightChild ? currentIndex - 1 : currentIndex + 1;
-    const levelNodes = tree.layers[level];
-    const sibling =
-      siblingIndex < levelNodes.length ? levelNodes[siblingIndex] : tree.zeroHashes[level];
-    siblings.push(sibling);
+    const siblingIndex = currentIndex ^ 1;
+    siblings.push(tree.levels[height].get(siblingIndex) ?? tree.zeroHashes[height]);
 
-    currentIndex = Math.floor(currentIndex / 2);
+    currentIndex >>= 1;
   }
 
   return { leaf, siblings, pathIndices, root: tree.root };
