@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiBadRequestResponse,
   ApiNotFoundResponse,
@@ -56,6 +57,10 @@ export class ProofController {
   @ApiNotFoundResponse({ description: 'No property with that propertyId' })
   @ApiBadRequestResponse({ description: 'Property imported but not issued yet — it has no leaf' })
   @ApiServiceUnavailableResponse({ description: 'Cached proof does not verify; republish needed' })
+  // Tighter than the 60/minute global default (AppModule): on a cache miss
+  // (D40) this rebuilds the entire Merkle tree, the most expensive operation
+  // any public route can trigger, so it gets its own smaller bucket.
+  @Throttle({ default: { limit: 12, ttl: 60_000 } })
   getMerkleProof(@Param('propertyId') propertyId: string) {
     return this.proofService.getMerkleProof(propertyId);
   }

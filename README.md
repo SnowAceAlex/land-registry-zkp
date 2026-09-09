@@ -14,7 +14,7 @@ land-registry-zkp/
 ├── blockchain/          # Cryptographic layer: circom circuits, Hardhat contracts, shared ZKP logic
 ├── web-app/
 │   ├── backend/         # NestJS API: LUR record management, Merkle proof endpoints, chain interaction
-│   └── frontend/        # Next.js (App Router): government / owner / verifier portals
+│   └── frontend/        # Next.js (App Router): government + resident portals (D49)
 └── docker-compose.yml   # PostgreSQL 16 (host port 5433)
 ```
 
@@ -41,11 +41,14 @@ Phases 0–4 of the roadmap are implemented and tested. The cryptographic and on
 | 2     | Circuits — `ownership`, `mortgage`, `transfer` (+3 shared templates)     | ✅ Done        |
 | 3     | Trusted setup — Groth16 zkey/vkey/verifier export, prove + verify E2E    | ✅ Done        |
 | 4     | Smart contracts — `RootRegistry`, `LandRegistryVerifier`, deploy scripts | ✅ Done        |
-| 5–6   | Backend — government portal API, owner/proof API                         | ⬜ Not started |
-| 7–9   | Frontend — government / owner / verifier portals                         | ⬜ Not started |
+| 5     | Backend — government portal API (import, issue, publish)                 | ✅ Done        |
+| 6     | Backend — owner/proof API (refresh Merkle proof, verify off/on-chain)    | ✅ Done        |
+| 7     | Realign chain + backend to the UC-1…UC-6 flow (D42–D48)                  | ⬜ Not started |
+| 8     | Frontend — Government portal (UC-1…UC-4)                                 | ⬜ Not started |
+| 9     | Frontend — Resident portal (UC-5, UC-6, history lookup)                  | ⬜ Not started |
 | 10–11 | E2E integration, evaluation metrics, thesis writing                      | ⬜ Not started |
 
-**Test suite**: 101 passing (`pnpm run test:blockchain`). On a checkout without trusted-setup artifacts the proof-dependent tests self-skip → 85 passing + 16 pending, never failing.
+**Test suite**: 118 passing (`pnpm run test:blockchain`) + 105 passing (`pnpm run test:backend`). On a checkout without trusted-setup artifacts the proof-dependent blockchain tests self-skip → 102 passing + 16 pending, never failing.
 
 ---
 
@@ -178,8 +181,8 @@ See [`.env.example`](./.env.example) for the full list.
 | `AUTHORITY_ADDRESS`                    | Account granted `STATE_AUTHORITY_ROLE` — blank = deployer | Any deploy     |
 | `AUTHORITY_ORG_NAME`                   | X.509 Subject `O` anchored on-chain (D30)                 | Any deploy     |
 | `DATABASE_URL`                         | PostgreSQL connection (port 5433 via Docker)              | Phase 5+       |
-| `NEXT_PUBLIC_CONTRACT_ADDRESS`         | Deployed `RootRegistry` address                           | Phase 7+       |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | From cloud.walletconnect.com                              | Phase 7+       |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS`         | Deployed `RootRegistry` address                           | Phase 8+       |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | From cloud.walletconnect.com                              | Phase 8+       |
 
 ---
 

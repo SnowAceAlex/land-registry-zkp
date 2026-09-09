@@ -220,9 +220,28 @@ describe('ProofService.getMerkleProof — cache-first, self-healing (D40)', () =
   });
 
   it('400s a property that is imported but not issued — it has no leaf', async () => {
-    const notIssued = makeProperty({ propertyId: '1', ownerCommitment: null, issuedAt: null });
+    const notIssued = makeProperty({
+      propertyId: '1',
+      ownerCommitment: null,
+      issuedAt: null,
+      status: 'IMPORTED',
+    });
     const { service } = makeService(notIssued, 1n);
     await expect(service.getMerkleProof('1')).rejects.toThrow(BadRequestException);
+  });
+
+  it('410s a revoked property — not 404, and never returns a stale cached proof', async () => {
+    const revoked = makeProperty({
+      propertyId: '1001',
+      status: 'REVOKED',
+      ownerCommitment: 'c1',
+      leaf: 'stale-leaf',
+      merkleProof: { siblings: [], pathIndices: [] },
+      rootVersion: CHAIN_VERSION,
+    });
+    const { service } = makeService(revoked, 1n);
+
+    await expect(service.getMerkleProof('1001')).rejects.toMatchObject({ status: 410 });
   });
 });
 

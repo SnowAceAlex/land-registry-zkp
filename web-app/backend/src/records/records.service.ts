@@ -1,6 +1,18 @@
 import { Injectable, NotFoundException, NotImplementedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { PaginationParams, pageArgs, serializeProperty } from '../common/pagination';
+import { PaginationParams, pageArgs, serializePropertyPublic } from '../common/pagination';
+
+/** The only columns the unauthenticated `/api/records*` routes may ever read.
+ *  Keeping the `select` this narrow means a future schema column cannot leak
+ *  here even if `serializePropertyPublic` were ever misused — the row never
+ *  reaches this code with more than these five fields on it. */
+const PUBLIC_PROPERTY_SELECT = {
+  propertyId: true,
+  ownerCommitment: true,
+  status: true,
+  leaf: true,
+  rootVersion: true,
+} as const;
 
 /**
  * RecordsService
@@ -19,19 +31,26 @@ export class RecordsService {
 
   async findAll(params: PaginationParams = {}) {
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.property.findMany({ ...pageArgs(params), orderBy: { id: 'asc' } }),
+      this.prisma.property.findMany({
+        ...pageArgs(params),
+        orderBy: { id: 'asc' },
+        select: PUBLIC_PROPERTY_SELECT,
+      }),
       this.prisma.property.count(),
     ]);
 
-    return { total, items: items.map(serializeProperty) };
+    return { total, items: items.map(serializePropertyPublic) };
   }
 
   async findById(propertyId: string) {
-    const property = await this.prisma.property.findUnique({ where: { propertyId } });
+    const property = await this.prisma.property.findUnique({
+      where: { propertyId },
+      select: PUBLIC_PROPERTY_SELECT,
+    });
     if (!property) {
       throw new NotFoundException(`Unknown propertyId ${propertyId}`);
     }
-    return serializeProperty(property);
+    return serializePropertyPublic(property);
   }
 
   async create(_dto: Record<string, unknown>): Promise<never> {

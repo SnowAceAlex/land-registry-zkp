@@ -49,17 +49,6 @@ export class ProofRejectedError extends Error {
   }
 }
 
-/** A RootRegistry.publishRoot rejection, decoded from its typed revert (D33). */
-export class RootPublishError extends Error {
-  constructor(
-    readonly reason: 'DuplicateRoot' | 'ZeroRoot' | 'Unauthorized' | 'Unknown',
-    message: string,
-  ) {
-    super(message);
-    this.name = 'RootPublishError';
-  }
-}
-
 @Injectable()
 export class ChainService implements OnModuleInit {
   private readonly logger = new Logger(ChainService.name);
@@ -78,8 +67,9 @@ export class ChainService implements OnModuleInit {
     const privateKey = process.env.AUTHORITY_PRIVATE_KEY ?? process.env.PRIVATE_KEY;
     if (!privateKey) {
       throw new Error(
-        'AUTHORITY_PRIVATE_KEY (or PRIVATE_KEY) must be set — it signs publishRoot() and ' +
-          'must be an account registered via registerAuthority()',
+        'AUTHORITY_PRIVATE_KEY (or PRIVATE_KEY) must be set — it is used for read calls ' +
+          'against RootRegistry/LandRegistryVerifier and should be the account registered ' +
+          'via registerAuthority() (on-chain writes are signed in the browser, D43)',
       );
     }
 
@@ -102,7 +92,11 @@ export class ChainService implements OnModuleInit {
     await this.warnIfNotAuthority();
   }
 
-  /** The address the backend signs publishRoot() with, EIP-55 checksummed. */
+  /**
+   * The signer's address, EIP-55 checksummed. Used for read calls only — the
+   * backend no longer sends any transaction; on-chain writes are signed in
+   * the officer's browser wallet (D43).
+   */
   get authorityAddress(): string {
     return ethers.getAddress(this.signer.address);
   }
@@ -132,20 +126,6 @@ export class ChainService implements OnModuleInit {
 
   async getRootVersion(): Promise<number> {
     return Number(await this.registry.rootVersion());
-  }
-
-  async publishRoot(root: bigint): Promise<{ txHash: string; version: number; root: bigint }> {
-    let receipt: ethers.TransactionReceipt | null;
-    try {
-      const tx = await this.registry.publishRoot(toBytes32(root));
-      receipt = await tx.wait();
-    } catch (error) {
-      throw this.decodeRegistryError(error);
-    }
-
-    const version = await this.getRootVersion();
-    this.logger.log(`published root version ${version} in tx ${receipt!.hash}`);
-    return { txHash: receipt!.hash, version, root };
   }
 
   /**
@@ -216,34 +196,6 @@ export class ChainService implements OnModuleInit {
     return this.verifyOnChain('transfer', proof, publicSignals);
   }
 
-  private decodeRegistryError(error: unknown): RootPublishError {
-    const data = (error as { data?: string })?.data;
-    const parsed = data ? this.registry.interface.parseError(data) : null;
-    const message = (error as Error)?.message ?? String(error);
-
-    switch (parsed?.name) {
-      case 'DuplicateRoot':
-        return new RootPublishError(
-          'DuplicateRoot',
-          'This root is already the current one — there is nothing new to publish',
-        );
-      case 'ZeroRoot':
-        return new RootPublishError(
-          'ZeroRoot',
-          'Refusing to publish an empty root — the registry has no issued records',
-        );
-      default:
-        if (message.includes('AccessControlUnauthorizedAccount')) {
-          return new RootPublishError(
-            'Unauthorized',
-            `Signer ${this.signer.address} does not hold STATE_AUTHORITY_ROLE — ` +
-              'register it with registerAuthority() (see DEPLOYMENT.md)',
-          );
-        }
-        return new RootPublishError('Unknown', `publishRoot failed: ${message}`);
-    }
-  }
-
   private decodeVerifierError(error: unknown): ProofRejectedError {
     const data = (error as { data?: string })?.data;
     const parsed = data ? this.verifier.interface.parseError(data) : null;
@@ -284,8 +236,8 @@ export class ChainService implements OnModuleInit {
       if (!(await this.hasAuthorityRole(this.signer.address))) {
         this.logger.error(
           `signer ${this.signer.address} does NOT hold STATE_AUTHORITY_ROLE on ` +
-            `${await this.registry.getAddress()} — publishRoot() will revert. ` +
-            `Run registerAuthority() for this account (see DEPLOYMENT.md).`,
+            `${await this.registry.getAddress()} — any on-chain write signed with this role ` +
+            `will be rejected. Run registerAuthority() for this account (see DEPLOYMENT.md).`,
         );
       }
     } catch (error) {
@@ -294,9 +246,4 @@ export class ChainService implements OnModuleInit {
       );
     }
   }
-}
-
-/** bigint root → 32-byte hex, the form RootRegistry stores. */
-export function toBytes32(root: bigint): string {
-  return ethers.zeroPadValue(ethers.toBeHex(root), 32);
 }

@@ -15,7 +15,7 @@ import {
 import { IssuerService } from './issuer.service';
 import { PdfService } from './pdf.service';
 import { buildReceipt, buildSecretFile } from './receipt.builder';
-import { ZipService } from './zip.service';
+import { ZipEntry, ZipService } from './zip.service';
 import { toLURRecord } from '../records/record.mapper';
 
 dayjs.extend(utc);
@@ -89,12 +89,19 @@ export class IssuanceService {
     return bundles;
   }
 
-  private async buildBundle(
+  /**
+   * The files that make up one owner's bundle, unpacked.
+   *
+   * Split out from buildBundle so the batch archive (D42) can place them under a
+   * per-property folder without unzipping and re-zipping a bundle that was just
+   * built. buildBundle stays the single-plot path, unchanged in behaviour.
+   */
+  async buildBundleFiles(
     source: BundleSource,
     context: PublishedRootContext,
     issuer: ReturnType<IssuerService['buildIssuerBlock']>,
     issuedOn: string,
-  ): Promise<BuiltBundle> {
+  ): Promise<{ propertyId: string; receipt: Receipt; files: ZipEntry[] }> {
     const record: LURRecord = toLURRecord(source.property);
 
     const receipt = buildReceipt({
@@ -114,17 +121,42 @@ export class IssuanceService {
       : undefined;
     const pdf = await this.pdf.renderCertificate(receipt, explorerUrl);
 
-    const zip = await this.zip.create([
-      { name: 'receipt.json', content: JSON.stringify(receipt, null, 2) },
-      {
-        name: 'secret.json',
-        content: JSON.stringify(buildSecretFile(record.propertyId, source.ownerSecret), null, 2),
-      },
-      { name: 'certificate.pdf', content: pdf },
-      { name: 'README.txt', content: OWNER_README },
-    ]);
+    return {
+      propertyId: source.property.propertyId,
+      receipt,
+      files: [
+        { name: 'receipt.json', content: JSON.stringify(receipt, null, 2) },
+        {
+          name: 'secret.json',
+          content: JSON.stringify(buildSecretFile(record.propertyId, source.ownerSecret), null, 2),
+        },
+        { name: 'certificate.pdf', content: pdf },
+        { name: 'README.txt', content: OWNER_README },
+      ],
+    };
+  }
 
-    return { propertyId: source.property.propertyId, zip, receipt };
+  private async buildBundle(
+    source: BundleSource,
+    context: PublishedRootContext,
+    issuer: ReturnType<IssuerService['buildIssuerBlock']>,
+    issuedOn: string,
+  ): Promise<BuiltBundle> {
+    const { propertyId, receipt, files } = await this.buildBundleFiles(
+      source,
+      context,
+      issuer,
+      issuedOn,
+    );
+    return { propertyId, zip: await this.zip.create(files), receipt };
+  }
+
+  /** One issuer block + timestamp for a whole batch, so every bundle agrees. */
+  batchContext() {
+    return {
+      issuer: this.issuer.buildIssuerBlock(),
+      issuedOn: dayjs().tz(VN_TIMEZONE).format('YYYY-MM-DDTHH:mm:ssZ'),
+    };
   }
 }
 

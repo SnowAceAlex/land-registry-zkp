@@ -1,16 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ArrayNotEmpty, IsArray, IsString, Matches } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsNumberString } from 'class-validator';
 
-export class IssueBatchDto {
-  /**
-   * Properties to issue together. One Merkle root publish covers the whole
-   * batch — the point of batching (gas) — and every owner in it gets their own
-   * bundle afterwards.
-   */
-  @ApiProperty({ example: ['1', '2', '3'], description: 'Decimal-string property ids' })
+/** D43 — phase 1 of the two-phase issuance draft flow. */
+export class CreateIssuanceDraftDto {
+  /** Decimal-string propertyIds to issue in this round */
+  @ApiProperty({ type: [String], example: ['1001', '1002'] })
   @IsArray()
   @ArrayNotEmpty()
-  @IsString({ each: true })
-  @Matches(/^\d+$/, { each: true, message: 'propertyId must be a decimal integer string' })
+  @IsNumberString({}, { each: true })
   propertyIds!: string[];
 }

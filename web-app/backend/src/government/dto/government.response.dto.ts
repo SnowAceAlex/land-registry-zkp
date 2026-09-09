@@ -36,7 +36,7 @@ export class RegistryStatusResponseDto {
   @ApiProperty({ example: '0x5FbDB2315678afecb367f032d93F642f64180aa3' })
   contractAddress!: string;
 
-  /** Account that signs publishRoot(); must hold STATE_AUTHORITY_ROLE. */
+  /** The backend's read-only chain account; should hold STATE_AUTHORITY_ROLE (D43). */
   @ApiProperty({ example: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' })
   authority!: string;
 
@@ -49,66 +49,11 @@ export class RegistryStatusResponseDto {
 
   /**
    * False means the database and the chain disagree — usually because the chain
-   * was restarted or redeployed while the database kept its rows. Publishing a
-   * root reconciles them.
+   * was restarted or redeployed while the database kept its rows, or because a
+   * draft batch was confirmed and published the next root.
    */
   @ApiProperty({ example: true })
   inSync!: boolean;
-}
-
-export class PublishRootResponseDto {
-  @ApiProperty({ example: EXAMPLE_ROOT })
-  root!: string;
-
-  @ApiProperty({ example: 2 })
-  version!: number;
-
-  /** Null when nothing needed publishing — no transaction was sent. */
-  @ApiPropertyOptional({ example: EXAMPLE_TX, nullable: true })
-  txHash!: string | null;
-
-  /**
-   * False means the rebuilt root already matched the chain. RootRegistry
-   * rejects re-publishing the current root, so the backend skips the
-   * transaction instead of sending one that would revert.
-   */
-  @ApiProperty({ example: true })
-  published!: boolean;
-
-  @ApiProperty({ example: 'Published root version 2' })
-  message!: string;
-}
-
-export class IssuedBundleManifestEntryDto {
-  @ApiProperty({ example: '1' })
-  propertyId!: string;
-
-  /**
-   * Single-use download path. The bundle is deleted the moment it is fetched,
-   * so this link works exactly once.
-   */
-  @ApiProperty({
-    example: '/api/bundles/claim/a4638d869008df08b02d6744ffec1e4933c29742ee1cd0e50e26ca5cd4eb2b97',
-  })
-  claimUrl!: string;
-
-  @ApiProperty({ example: '2026-08-10T04:16:16.829Z', format: 'date-time' })
-  expiresAt!: Date;
-}
-
-export class IssueBatchResponseDto {
-  @ApiProperty({ example: EXAMPLE_ROOT })
-  root!: string;
-
-  @ApiProperty({ example: 1 })
-  version!: number;
-
-  /** One transaction covers the whole batch — that is the point of batching. */
-  @ApiProperty({ example: EXAMPLE_TX })
-  txHash!: string;
-
-  @ApiProperty({ type: [IssuedBundleManifestEntryDto] })
-  bundles!: IssuedBundleManifestEntryDto[];
 }
 
 export class PropertySummaryDto {
@@ -158,4 +103,51 @@ export class PropertyListResponseDto {
 
   @ApiProperty({ type: [PropertySummaryDto] })
   items!: PropertySummaryDto[];
+}
+
+/**
+ * The complete record an officer sees for ONE property — `PropertySummaryDto`
+ * plus every descriptive certificate field.
+ *
+ * Why this is a separate shape from the list: the list is a browsing view and
+ * is deliberately a summary, but an officer opening a single plot is usually
+ * doing exactly the thing the certificate fields exist for (checking a serial
+ * against a paper record, correcting an address). Splitting them keeps the
+ * list cheap without making the detail view useless.
+ *
+ * None of these fields ever appear on the unauthenticated `/api/records*`
+ * routes — that is the whole point of the two-tier split. They are committed
+ * to on chain through `offchainHash` (D36), but committing is for tamper
+ * detection, not publication.
+ */
+export class PropertyDetailDto extends PropertySummaryDto {
+  /** Số hiệu Giấy chứng nhận */
+  @ApiProperty({ example: 'CT 100001' })
+  certificateSerial!: string;
+
+  /** Số vào sổ cấp GCN */
+  @ApiProperty({ example: 'CS20001' })
+  bookEntryNumber!: string;
+
+  /** Đối tượng sử dụng đất (mục B TT 08/2024); null = cá nhân */
+  @ApiPropertyOptional({ example: null, nullable: true })
+  landUserType!: string | null;
+
+  /** Đất cộng đồng dùng để bảo tồn bản sắc dân tộc (Điều 178 khoản 4) */
+  @ApiProperty({ example: false })
+  culturalPreservation!: boolean;
+
+  /** Số tờ bản đồ */
+  @ApiPropertyOptional({ example: '1', nullable: true })
+  mapSheetNumber!: string | null;
+
+  /** Nguồn gốc sử dụng đất */
+  @ApiPropertyOptional({ example: 'Nhà nước công nhận quyền sử dụng đất', nullable: true })
+  landOrigin!: string | null;
+
+  @ApiProperty({ example: 'Sở Nông nghiệp và Môi trường TP.HCM' })
+  issuingAuthority!: string;
+
+  @ApiProperty({ format: 'date-time' })
+  issueDate!: Date;
 }

@@ -2,9 +2,13 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  Param,
+  ParseIntPipe,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -20,37 +24,50 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Response } from 'express';
+import { SkipThrottle } from '@nestjs/throttler';
 
 import { ApiKeyGuard, GOV_API_KEY_HEADER, GOV_API_KEY_SECURITY } from '../common/api-key.guard';
 import { parsePageQuery } from '../common/pagination';
+import { ChangeSetService } from './changeset.service';
 import { GovernmentService } from './government.service';
 import { ImportService } from '../import/import.service';
 import { ImportResult } from '../import/dto/import.response.dto';
-import { IssueBatchDto } from './dto/issue-batch.dto';
+import { IssuanceBatchService } from '../issuance/issuance-batch.service';
+import { ConfirmDraftDto } from './dto/confirm-draft.dto';
+import { CreateIssuanceDraftDto } from './dto/issue-batch.dto';
+import { CreateRevocationDto } from './dto/revocation.dto';
 import {
-  IssueBatchResponseDto,
   PropertyListResponseDto,
-  PublishRootResponseDto,
+  PropertyDetailDto,
   RegistryStatusResponseDto,
 } from './dto/government.response.dto';
+import { RevocationService } from './revocation.service';
 
 @ApiTags('Government')
 @ApiSecurity(GOV_API_KEY_SECURITY)
 @ApiUnauthorizedResponse({ description: `Missing or invalid ${GOV_API_KEY_HEADER} header` })
+// Exempt from the global rate limit (see AppModule): these routes already sit
+// behind ApiKeyGuard, and a legitimate bulk import or multi-property issuance
+// round trips easily exceeds the public 60/minute default.
+@SkipThrottle()
 @Controller('government')
 @UseGuards(ApiKeyGuard)
 export class GovernmentController {
   constructor(
     private readonly government: GovernmentService,
     private readonly importService: ImportService,
+    private readonly issuanceBatches: IssuanceBatchService,
+    private readonly revocations: RevocationService,
+    private readonly changeSets: ChangeSetService,
   ) {}
 
   @Get('status')
   @ApiOperation({
     summary: 'Registry state on chain vs. in the database',
     description:
-      'Use `inSync` as the health check while testing: false means the chain was restarted ' +
-      'or redeployed while the database kept its rows. Publishing a root reconciles them.',
+      'Use `inSync` as the health check while testing: false means the chain was restarted or ' +
+      'redeployed while the database kept its rows, or a draft batch published a newer root.',
   })
   @ApiOkResponse({ type: RegistryStatusResponseDto })
   status() {
@@ -64,6 +81,19 @@ export class GovernmentController {
   @ApiOkResponse({ type: PropertyListResponseDto })
   listProperties(@Query('skip') skip?: string, @Query('take') take?: string) {
     return this.government.listProperties(parsePageQuery(skip, take));
+  }
+
+  @Get('properties/:propertyId')
+  @ApiOperation({
+    summary: 'Get one property with its full descriptive fields',
+    description:
+      'The guarded counterpart of GET /api/records/:propertyId: that public route returns only ' +
+      'propertyId/ownerCommitment/status/leaf/rootVersion, this one returns the full row for an ' +
+      'authenticated officer.',
+  })
+  @ApiOkResponse({ type: PropertyDetailDto })
+  getProperty(@Param('propertyId') propertyId: string) {
+    return this.government.getProperty(propertyId);
   }
 
   //CSV Import
@@ -95,31 +125,114 @@ export class GovernmentController {
     return this.importService.importCsv(file.buffer.toString('utf8'));
   }
 
-  // Issue a batch
-  @Post('issue-batch')
+  // Issuance draft — two-phase flow (D43), Metamask signs instead of the backend
+  @Get('issuance-batches')
   @ApiOperation({
-    summary: 'Issue a batch of properties (one publishRoot transaction)',
+    summary: 'List issuance rounds, newest first',
     description:
-      'Generates an ownerSecret per property, publishes ONE root covering the whole batch, ' +
-      'refreshes the cached Merkle proof of every issued property, and returns a single-use ' +
-      'download link per owner. The secrets exist only inside those bundles — the response ' +
-      'is the one chance to collect them (D14/D34).',
+      'Summary columns only — never draftSecrets (secret material, D14) or archiveZip ' +
+      '(megabytes of ZIP, D42). Download the archive itself via GET issuance-batches/:id/archive.',
   })
-  @ApiOkResponse({ type: IssueBatchResponseDto })
-  issueBatch(@Body() dto: IssueBatchDto) {
-    return this.government.issueBatch(dto.propertyIds);
+  listIssuanceBatches() {
+    return this.issuanceBatches.list();
   }
 
-  // Publish root
-  @Post('publish-root')
+  @Post('issuance-batches')
   @ApiOperation({
-    summary: 'Rebuild the tree from the database and publish',
+    summary: 'Create an issuance draft (phase 1 of 2)',
     description:
-      'Returns `published: false` without sending a transaction when the rebuilt root already ' +
-      'matches the chain — RootRegistry rejects re-publishing the current root (DuplicateRoot).',
+      'Generates owner secrets, projects the new Merkle root, and stores everything as a ' +
+      'durable draft. No Property row is modified until confirm. Sign the returned newRoot ' +
+      'with Metamask, then call confirm.',
   })
-  @ApiOkResponse({ type: PublishRootResponseDto })
-  publishRoot() {
-    return this.government.publishRoot();
+  async createIssuanceDraft(@Body() dto: CreateIssuanceDraftDto) {
+    return this.issuanceBatches.createDraft(dto.propertyIds);
+  }
+
+  @Post('issuance-batches/:id/confirm')
+  @ApiOperation({
+    summary: 'Confirm an issuance draft (phase 2 of 2)',
+    description:
+      'Re-reads latestRoot from the chain and applies the draft only if it matches. The ' +
+      'request body carries no chain evidence on purpose — the optional txHash is a display ' +
+      'label only, never trusted as proof the publish happened.',
+  })
+  async confirmIssuanceDraft(@Param('id', ParseIntPipe) id: number, @Body() dto: ConfirmDraftDto) {
+    return this.issuanceBatches.confirm(id, dto.txHash);
+  }
+
+  @Delete('issuance-batches/:id')
+  @ApiOperation({ summary: 'Discard an unsigned issuance draft' })
+  async discardIssuanceDraft(@Param('id', ParseIntPipe) id: number) {
+    await this.issuanceBatches.discard(id);
+    return { discarded: id };
+  }
+
+  @Get('issuance-batches/:id/archive')
+  @ApiOperation({
+    summary: 'Download the whole batch as one ZIP, one folder per property',
+    description:
+      'Each folder holds receipt.json, secret.json, certificate.pdf and README.txt; a ' +
+      'manifest.json at the root ties the archive to a root version. Available until the ' +
+      "batch's archiveExpiresAt, after which the secrets are unrecoverable and affected " +
+      'plots must be re-issued.',
+  })
+  async downloadArchive(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    const { zip, filename } = await this.issuanceBatches.archiveFor(id);
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': String(zip.length),
+    });
+    res.end(zip);
+  }
+
+  @Post('revocations')
+  @ApiOperation({ summary: 'Request revocation of an issued certificate' })
+  async requestRevocation(@Body() dto: CreateRevocationDto) {
+    return this.revocations.request(dto);
+  }
+
+  @Get('pending-changes')
+  @ApiOperation({
+    summary: 'Approved transfers and pending revocations waiting for the next change set',
+  })
+  pendingChanges() {
+    return this.changeSets.pending();
+  }
+
+  // Change-set draft — batches approved transfers + pending revocations into
+  // one root, two-phase flow (D44/D46), Metamask signs instead of the backend
+  @Post('changesets')
+  @ApiOperation({
+    summary: 'Create a change-set draft (phase 1 of 2)',
+    description:
+      'Gathers every approved transfer and pending revocation, projects the single root that ' +
+      'applying all of them produces, and stores it as a durable draft. No Property, ' +
+      'TransferRequest or Revocation row is modified until confirm. Sign the returned newRoot ' +
+      '(and, when the round includes any revocations, the revocationCalldata for ' +
+      'publishRootWithRevocations) with Metamask, then call confirm.',
+  })
+  async createChangeSetDraft() {
+    return this.changeSets.createDraft();
+  }
+
+  @Post('changesets/:id/confirm')
+  @ApiOperation({
+    summary: 'Confirm a change-set draft (phase 2 of 2)',
+    description:
+      'Re-reads latestRoot from the chain and applies the draft only if it matches. The ' +
+      'request body carries no chain evidence on purpose — the optional txHash is a display ' +
+      'label only, never trusted as proof the publish happened.',
+  })
+  async confirmChangeSetDraft(@Param('id', ParseIntPipe) id: number, @Body() dto: ConfirmDraftDto) {
+    return this.changeSets.confirm(id, dto.txHash);
+  }
+
+  @Delete('changesets/:id')
+  @ApiOperation({ summary: 'Discard an unsigned change-set draft' })
+  async discardChangeSetDraft(@Param('id', ParseIntPipe) id: number) {
+    await this.changeSets.discard(id);
+    return { discarded: id };
   }
 }

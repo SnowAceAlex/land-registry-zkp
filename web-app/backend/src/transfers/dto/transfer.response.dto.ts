@@ -8,7 +8,6 @@ import { TransferStatus } from '@prisma/client';
  */
 
 const EXAMPLE_ROOT = '5677530015593700534173836181788122415198283309363871298832210090950018556857';
-const EXAMPLE_TX = '0xdf6ab016b71708fc6a0bd43dce0b39642d14dcb70e9693d975b443ce9e947edf';
 
 export class TransferRequestDto {
   @ApiProperty({ example: 1 })
@@ -24,7 +23,7 @@ export class TransferRequestDto {
   @ApiProperty({ example: EXAMPLE_ROOT })
   oldRoot!: string;
 
-  /** publicSignals[1] — published only when an officer approves. */
+  /** publicSignals[1] — the root this transfer's proof commits to; published later by a change set. */
   @ApiProperty()
   newRoot!: string;
 
@@ -34,7 +33,7 @@ export class TransferRequestDto {
   @ApiPropertyOptional({ nullable: true, example: null })
   rejectReason!: string | null;
 
-  /** publishRoot() transaction, set once approved. */
+  /** Tx hash of the change set that published this transfer; null until then. */
   @ApiPropertyOptional({ nullable: true, example: null })
   txHash!: string | null;
 
@@ -52,15 +51,16 @@ export class TransferApprovalResponseDto {
   @ApiProperty({ example: '1' })
   propertyId!: string;
 
-  /** The newly effective root — the transfer is now on chain. */
-  @ApiProperty({ example: EXAMPLE_ROOT })
-  root!: string;
+  @ApiProperty({ enum: TransferStatus, example: TransferStatus.APPROVED })
+  status!: TransferStatus;
 
-  @ApiProperty({ example: 2 })
-  version!: number;
-
-  @ApiProperty({ example: EXAMPLE_TX })
-  txHash!: string;
+  /**
+   * Approval only records the officer's decision (D46) — the root that makes
+   * it effective on chain is published later, when a change set batches this
+   * transfer with others and an officer signs it.
+   */
+  @ApiPropertyOptional({ nullable: true, format: 'date-time' })
+  decidedAt!: Date | null;
 }
 
 /**
@@ -79,7 +79,7 @@ export class TransferPreviewResult {
   @ApiProperty({ description: 'Current root — must still be latest when the proof is submitted' })
   oldMerkleRoot!: string;
 
-  /** Root that WOULD result from this transfer; published only on approval. */
+  /** Root that WOULD result from this transfer; published later by a change set. */
   @ApiProperty()
   newMerkleRoot!: string;
 

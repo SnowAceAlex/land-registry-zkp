@@ -4,15 +4,15 @@
 
 **Goal:** Make it cryptographically impossible for a superseded leaf (a previous owner's record) to have a valid Merkle path to `latestRoot`, by binding a leaf's position in the tree to its `propertyId` and forcing every circuit to prove that binding.
 
-**Architecture:** Today the tree assigns leaf indices by array position (D24), and `MerkleProof(20)` accepts any `pathIndices` the prover supplies. Nothing links a leaf to a position, so a tree containing *two* leaves for one `propertyId` (old owner + new owner) verifies both. D41 makes the index a deterministic function of the record: `index === propertyId`. `common/merkleProof.circom` gains a required `expectedIndex` input and constrains `Σ pathIndices[i]·2^i === expectedIndex`; all three circuits pass `propertyId`. `shared/merkleTree.ts` becomes a genuine sparse-by-key tree (a `Map<index, hash>` per level) instead of a dense-prefix array. One slot holds one value, so after a transfer the old owner has no reachable path — not "hard", but unsatisfiable.
+**Architecture:** Today the tree assigns leaf indices by array position (D24), and `MerkleProof(20)` accepts any `pathIndices` the prover supplies. Nothing links a leaf to a position, so a tree containing _two_ leaves for one `propertyId` (old owner + new owner) verifies both. D41 makes the index a deterministic function of the record: `index === propertyId`. `common/merkleProof.circom` gains a required `expectedIndex` input and constrains `Σ pathIndices[i]·2^i === expectedIndex`; all three circuits pass `propertyId`. `shared/merkleTree.ts` becomes a genuine sparse-by-key tree (a `Map<index, hash>` per level) instead of a dense-prefix array. One slot holds one value, so after a transfer the old owner has no reachable path — not "hard", but unsatisfiable.
 
 **Tech Stack:** Circom 2.2.3 (native Windows binary, `cargo install circom`), circomlib, snarkjs (Groth16), TypeScript, Hardhat + Mocha/Chai (blockchain), NestJS + Jest (backend), Prisma/Postgres.
 
 ## Global Constraints
 
-- **Tree depth stays 20.** Do not change `TREE_DEPTH` in this plan. Raising it to 26 (~67M plots, national scale) is a follow-up decided *after* Task 5 reports the new constraint counts.
+- **Tree depth stays 20.** Do not change `TREE_DEPTH` in this plan. Raising it to 26 (~67M plots, national scale) is a follow-up decided _after_ Task 5 reports the new constraint counts.
 - **`propertyId` must satisfy `0 ≤ propertyId ≤ 2^20 − 1` (1 048 575).** This is forced, not chosen: if the authority could assign positions freely it could assign two positions to one property, which is exactly the hole being closed. Depth 20 already capped the registry at ~1.05M leaves (D20), so capacity is unchanged.
-- **`PUBLIC_SIGNAL_ORDER` must not change.** `expectedIndex` is wired *inside* each circuit from the already-public `propertyId` signal. Consequence: `LandRegistryVerifier.sol` and `RootRegistry.sol` are **not modified by this plan**, and `shared/circuitInputs.ts` keeps its current function signatures.
+- **`PUBLIC_SIGNAL_ORDER` must not change.** `expectedIndex` is wired _inside_ each circuit from the already-public `propertyId` signal. Consequence: `LandRegistryVerifier.sol` and `RootRegistry.sol` are **not modified by this plan**, and `shared/circuitInputs.ts` keeps its current function signatures.
 - **The leaf field order (D4) must not change.** `hashRecord()` and `LeafHasher()` stay byte-for-byte semantically identical.
 - **`shared/merkleTree.ts` remains the only place Merkle/Poseidon logic lives.** Do not add tree logic to backend or frontend.
 - **`shared/index.ts` barrel must stay browser-safe** — no top-level `fs`/`node:*` imports introduced.
@@ -36,7 +36,7 @@ It does **not** prove the old leaf was removed from the new tree, and nothing co
 
 Today this is prevented only at the application layer — `Property.propertyId @unique` in Prisma and the `duplicate propertyId` guard in `buildTree()` — i.e. by trusting the authority to run this software. That is precisely the trust the thesis claims to remove.
 
-After D41 the property `index === propertyId` is enforced *inside the proof*: a leaf for property 123 can only be proven at slot 123, one slot holds one value, so at most one owner is provable at any published root.
+After D41 the property `index === propertyId` is enforced _inside the proof_: a leaf for property 123 can only be proven at slot 123, one slot holds one value, so at most one owner is provable at any published root.
 
 **Not fixed by this plan** (stays a documented limitation): the transfer proof still requires both parties' secrets in a single witness (single-session assumption).
 
@@ -44,24 +44,24 @@ After D41 the property `index === propertyId` is enforced *inside the proof*: a 
 
 ## File Structure
 
-| File | Responsibility after this change |
-|---|---|
-| `blockchain/shared/merkleTree.ts` | **Modified.** Sparse-by-key tree: `levels[h]: Map<number, bigint>` of occupied nodes only; leaf index = `Number(propertyId)`; exports `MAX_PROPERTY_ID`. Drops the `leaves`/`layers` array fields (no external consumer). |
-| `blockchain/circuits/common/merkleProof.circom` | **Modified.** New required `expectedIndex` input; constrains the path bits to encode it. Placing the constraint here (not in each circuit) makes it impossible for a circuit to forget it. |
-| `blockchain/circuits/ownership.circom` | **Modified.** One line: `merkle.expectedIndex <== propertyId;` |
-| `blockchain/circuits/mortgage.circom` | **Modified.** One line: `merkle.expectedIndex <== propertyId;` |
-| `blockchain/circuits/transfer.circom` | **Modified.** Two lines: both `oldMerkle` and `newMerkle` get `expectedIndex <== propertyId`, which makes `oldPathIndices === newPathIndices` an automatic consequence. |
-| `blockchain/test/shared/merkleTree.test.ts` | **Modified.** Adds placement, order-independence and range tests. |
-| `blockchain/test/circuits/merkleProof.test.ts` | **Modified.** `toCircuitInput` takes `expectedIndex`; adds the wrong-index rejection test. |
-| `blockchain/test/circuits/ownership.test.ts` | **Modified.** Adds the headline regression test: a leaf with a self-consistent path at a slot other than its `propertyId` cannot be proven. |
-| `blockchain/test/circuits/transfer.test.ts` | **Modified.** Adds: a transfer whose new path targets a different slot is rejected. |
-| `web-app/backend/src/tree/tree.service.ts` | **Modified.** Doc comment only: D24 superseded by D41; `sortByPropertyId` is retained for deterministic *list* output, no longer load-bearing for the tree. |
-| `web-app/backend/src/tree/tree.service.spec.ts` | **Modified.** The "different order ⇒ different root" test is inverted into "any order ⇒ same root (D41)". |
-| `web-app/backend/src/import/import.service.ts` | **Modified.** Rejects `propertyId > MAX_PROPERTY_ID` at import with an explicit message. |
-| `web-app/backend/src/import/import.service.spec.ts` | **Modified.** Adds the out-of-range rejection case. |
-| `CODING_ROADMAP.md` | **Modified.** Adds D41 to §0; marks D24 superseded; updates §2.1. |
-| `CLAUDE.md` | **Modified.** Updates the `merkleTree.ts`, `circuits/`, and `tree/` descriptions. |
-| `Mẫu đăng ký đề tài LVTN - BuiCongVinh ITCSIU22165.docx` (in `~/Downloads`) | **Modified in Task 7.** Requirement 14 wording: the stale-leaf limitation is closed; only the single-session assumption remains. |
+| File                                                                        | Responsibility after this change                                                                                                                                                                                          |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `blockchain/shared/merkleTree.ts`                                           | **Modified.** Sparse-by-key tree: `levels[h]: Map<number, bigint>` of occupied nodes only; leaf index = `Number(propertyId)`; exports `MAX_PROPERTY_ID`. Drops the `leaves`/`layers` array fields (no external consumer). |
+| `blockchain/circuits/common/merkleProof.circom`                             | **Modified.** New required `expectedIndex` input; constrains the path bits to encode it. Placing the constraint here (not in each circuit) makes it impossible for a circuit to forget it.                                |
+| `blockchain/circuits/ownership.circom`                                      | **Modified.** One line: `merkle.expectedIndex <== propertyId;`                                                                                                                                                            |
+| `blockchain/circuits/mortgage.circom`                                       | **Modified.** One line: `merkle.expectedIndex <== propertyId;`                                                                                                                                                            |
+| `blockchain/circuits/transfer.circom`                                       | **Modified.** Two lines: both `oldMerkle` and `newMerkle` get `expectedIndex <== propertyId`, which makes `oldPathIndices === newPathIndices` an automatic consequence.                                                   |
+| `blockchain/test/shared/merkleTree.test.ts`                                 | **Modified.** Adds placement, order-independence and range tests.                                                                                                                                                         |
+| `blockchain/test/circuits/merkleProof.test.ts`                              | **Modified.** `toCircuitInput` takes `expectedIndex`; adds the wrong-index rejection test.                                                                                                                                |
+| `blockchain/test/circuits/ownership.test.ts`                                | **Modified.** Adds the headline regression test: a leaf with a self-consistent path at a slot other than its `propertyId` cannot be proven.                                                                               |
+| `blockchain/test/circuits/transfer.test.ts`                                 | **Modified.** Adds: a transfer whose new path targets a different slot is rejected.                                                                                                                                       |
+| `web-app/backend/src/tree/tree.service.ts`                                  | **Modified.** Doc comment only: D24 superseded by D41; `sortByPropertyId` is retained for deterministic _list_ output, no longer load-bearing for the tree.                                                               |
+| `web-app/backend/src/tree/tree.service.spec.ts`                             | **Modified.** The "different order ⇒ different root" test is inverted into "any order ⇒ same root (D41)".                                                                                                                 |
+| `web-app/backend/src/import/import.service.ts`                              | **Modified.** Rejects `propertyId > MAX_PROPERTY_ID` at import with an explicit message.                                                                                                                                  |
+| `web-app/backend/src/import/import.service.spec.ts`                         | **Modified.** Adds the out-of-range rejection case.                                                                                                                                                                       |
+| `CODING_ROADMAP.md`                                                         | **Modified.** Adds D41 to §0; marks D24 superseded; updates §2.1.                                                                                                                                                         |
+| `CLAUDE.md`                                                                 | **Modified.** Updates the `merkleTree.ts`, `circuits/`, and `tree/` descriptions.                                                                                                                                         |
+| `Mẫu đăng ký đề tài LVTN - BuiCongVinh ITCSIU22165.docx` (in `~/Downloads`) | **Modified in Task 7.** Requirement 14 wording: the stale-leaf limitation is closed; only the single-session assumption remains.                                                                                          |
 
 **Not touched:** `blockchain/contracts/**` (public signal layout unchanged), `shared/circuitInputs.ts`, `shared/types.ts`, `shared/receipt.ts`, backend `proof/`, `issuance/`, `transfers/`, `chain/`, `government/`.
 
@@ -70,10 +70,12 @@ After D41 the property `index === propertyId` is enforced *inside the proof*: a 
 ### Task 1: Sparse-by-key tree in `shared/merkleTree.ts`
 
 **Files:**
+
 - Modify: `blockchain/shared/merkleTree.ts`
 - Test: `blockchain/test/shared/merkleTree.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing from earlier tasks.
 - Produces:
   - `export const MAX_PROPERTY_ID: bigint` — `(1n << 20n) - 1n`.
@@ -100,39 +102,39 @@ function indexFromPathIndices(pathIndices: number[]): bigint {
 Add these three tests inside the existing `describe('merkleTree (Phase 1)', ...)` block:
 
 ```ts
-  it('places each leaf at index = propertyId (D41)', async () => {
-    const { records } = await generateMockRecords(12);
-    const tree = await buildTree(records);
+it('places each leaf at index = propertyId (D41)', async () => {
+  const { records } = await generateMockRecords(12);
+  const tree = await buildTree(records);
 
-    for (const record of records) {
-      const proof = await generateMerkleProof(tree, record);
-      expect(indexFromPathIndices(proof.pathIndices)).to.equal(record.propertyId);
-    }
-  });
+  for (const record of records) {
+    const proof = await generateMerkleProof(tree, record);
+    expect(indexFromPathIndices(proof.pathIndices)).to.equal(record.propertyId);
+  }
+});
 
-  it('produces the same root regardless of input order (D41 supersedes D24)', async () => {
-    const { records } = await generateMockRecords(10);
-    const reversed = [...records].reverse();
+it('produces the same root regardless of input order (D41 supersedes D24)', async () => {
+  const { records } = await generateMockRecords(10);
+  const reversed = [...records].reverse();
 
-    const inOrder = await buildTree(records);
-    const shuffled = await buildTree(reversed);
+  const inOrder = await buildTree(records);
+  const shuffled = await buildTree(reversed);
 
-    expect(shuffled.root).to.equal(inOrder.root);
-  });
+  expect(shuffled.root).to.equal(inOrder.root);
+});
 
-  it('rejects a propertyId outside the addressable range (D41)', async () => {
-    const { records } = await generateMockRecords(2);
-    records[1] = { ...records[1], propertyId: MAX_PROPERTY_ID + 1n };
+it('rejects a propertyId outside the addressable range (D41)', async () => {
+  const { records } = await generateMockRecords(2);
+  records[1] = { ...records[1], propertyId: MAX_PROPERTY_ID + 1n };
 
-    let threw = false;
-    try {
-      await buildTree(records);
-    } catch (e) {
-      threw = true;
-      expect((e as Error).message).to.match(/outside the addressable range/);
-    }
-    expect(threw).to.equal(true);
-  });
+  let threw = false;
+  try {
+    await buildTree(records);
+  } catch (e) {
+    threw = true;
+    expect((e as Error).message).to.match(/outside the addressable range/);
+  }
+  expect(threw).to.equal(true);
+});
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -313,10 +315,12 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ### Task 2: Bind path indices to `expectedIndex` in `MerkleProof`
 
 **Files:**
+
 - Modify: `blockchain/circuits/common/merkleProof.circom`
 - Test: `blockchain/test/circuits/merkleProof.test.ts`
 
 **Interfaces:**
+
 - Consumes: `buildTree` / `generateMerkleProof` from Task 1.
 - Produces: `MerkleProof(levels)` gains a required input `expectedIndex`. Every instantiation must now wire it — Task 3 does that for the three top-level circuits.
 
@@ -347,24 +351,24 @@ Update every existing call site in that file to pass the record's `propertyId`:
 Then add this new test at the end of the `describe` block:
 
 ```ts
-  it('rejects a path whose indices do not encode expectedIndex (D41)', async () => {
-    const { records } = await generateMockRecords(8);
-    const tree = await buildTree(records);
-    const proof = await generateMerkleProof(tree, records[3]);
+it('rejects a path whose indices do not encode expectedIndex (D41)', async () => {
+  const { records } = await generateMockRecords(8);
+  const tree = await buildTree(records);
+  const proof = await generateMerkleProof(tree, records[3]);
 
-    // A genuine path for this record, presented as if it belonged to the
-    // neighbouring propertyId. This is the shape of the stale-leaf attack:
-    // a real leaf sitting at a slot that is not its own.
-    const mislabelled = toCircuitInput(proof, records[3].propertyId + 1n);
+  // A genuine path for this record, presented as if it belonged to the
+  // neighbouring propertyId. This is the shape of the stale-leaf attack:
+  // a real leaf sitting at a slot that is not its own.
+  const mislabelled = toCircuitInput(proof, records[3].propertyId + 1n);
 
-    let threw = false;
-    try {
-      await circuit.calculateWitness(mislabelled);
-    } catch {
-      threw = true;
-    }
-    expect(threw, 'pathIndices must be constrained to encode expectedIndex').to.equal(true);
-  });
+  let threw = false;
+  try {
+    await circuit.calculateWitness(mislabelled);
+  } catch {
+    threw = true;
+  }
+  expect(threw, 'pathIndices must be constrained to encode expectedIndex').to.equal(true);
+});
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -462,6 +466,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ### Task 3: Wire `propertyId` into the three circuits
 
 **Files:**
+
 - Modify: `blockchain/circuits/ownership.circom`
 - Modify: `blockchain/circuits/mortgage.circom`
 - Modify: `blockchain/circuits/transfer.circom`
@@ -469,6 +474,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Test: `blockchain/test/circuits/transfer.test.ts`
 
 **Interfaces:**
+
 - Consumes: `MerkleProof(levels)` with the `expectedIndex` input from Task 2.
 - Produces: nothing new in TypeScript. `PUBLIC_SIGNAL_ORDER` is unchanged, so `shared/circuitInputs.ts`, the contracts and the backend are untouched.
 
@@ -510,49 +516,49 @@ export async function pathAt(
 Add these two tests to the `describe('circuits/ownership.circom ...')` block in `blockchain/test/circuits/ownership.test.ts`, importing `pathAt` and `makeRecord` from `../helpers/records` and `hashRecord` from `../../shared/merkleTree`:
 
 ```ts
-  it('accepts a leaf sitting at its own propertyId slot (D41 control)', async () => {
-    const { record, secret } = await makeRecord(now);
-    const leaf = await hashRecord(record);
-    const placed = await pathAt(leaf, Number(record.propertyId));
+it('accepts a leaf sitting at its own propertyId slot (D41 control)', async () => {
+  const { record, secret } = await makeRecord(now);
+  const leaf = await hashRecord(record);
+  const placed = await pathAt(leaf, Number(record.propertyId));
 
-    const input = buildOwnershipInput({
-      record,
-      ownerSecret: secret,
-      proof: { leaf, siblings: placed.siblings, pathIndices: placed.pathIndices, root: placed.root },
-      currentTimestamp: now,
-    });
-
-    const witness = await circuit.calculateWitness(input);
-    await circuit.checkConstraints(witness);
+  const input = buildOwnershipInput({
+    record,
+    ownerSecret: secret,
+    proof: { leaf, siblings: placed.siblings, pathIndices: placed.pathIndices, root: placed.root },
+    currentTimestamp: now,
   });
 
-  it('rejects a leaf sitting at any other slot — this is the stale-leaf guard (D41)', async () => {
-    const { record, secret } = await makeRecord(now);
-    const leaf = await hashRecord(record);
-    // Same record, same valid path arithmetic, one slot over. Before D41 this
-    // verified, which is what let a transferred-away leaf stay provable.
-    const misplaced = await pathAt(leaf, Number(record.propertyId) + 1);
+  const witness = await circuit.calculateWitness(input);
+  await circuit.checkConstraints(witness);
+});
 
-    const input = buildOwnershipInput({
-      record,
-      ownerSecret: secret,
-      proof: {
-        leaf,
-        siblings: misplaced.siblings,
-        pathIndices: misplaced.pathIndices,
-        root: misplaced.root,
-      },
-      currentTimestamp: now,
-    });
+it('rejects a leaf sitting at any other slot — this is the stale-leaf guard (D41)', async () => {
+  const { record, secret } = await makeRecord(now);
+  const leaf = await hashRecord(record);
+  // Same record, same valid path arithmetic, one slot over. Before D41 this
+  // verified, which is what let a transferred-away leaf stay provable.
+  const misplaced = await pathAt(leaf, Number(record.propertyId) + 1);
 
-    let threw = false;
-    try {
-      await circuit.calculateWitness(input);
-    } catch {
-      threw = true;
-    }
-    expect(threw, 'a leaf must only be provable at index === propertyId').to.equal(true);
+  const input = buildOwnershipInput({
+    record,
+    ownerSecret: secret,
+    proof: {
+      leaf,
+      siblings: misplaced.siblings,
+      pathIndices: misplaced.pathIndices,
+      root: misplaced.root,
+    },
+    currentTimestamp: now,
   });
+
+  let threw = false;
+  try {
+    await circuit.calculateWitness(input);
+  } catch {
+    threw = true;
+  }
+  expect(threw, 'a leaf must only be provable at index === propertyId').to.equal(true);
+});
 ```
 
 > `buildOwnershipInput` takes `merkleRoot` from `proof.root` (verified in `shared/circuitInputs.ts:190`), which is why passing the `pathAt` root inside the proof object is enough — no separate root argument exists.
@@ -560,41 +566,41 @@ Add these two tests to the `describe('circuits/ownership.circom ...')` block in 
 Add this test to the `describe('circuits/transfer.circom ...')` block in `blockchain/test/circuits/transfer.test.ts`, importing `pathAt` from `../helpers/records` and `hashRecord` from `../../shared/merkleTree`:
 
 ```ts
-  it('rejects a transfer whose new leaf sits at a different slot (D41)', async () => {
-    const fixture = await makeTransferFixture(now);
-    const newLeaf = await hashRecord(fixture.newRecord);
+it('rejects a transfer whose new leaf sits at a different slot (D41)', async () => {
+  const fixture = await makeTransferFixture(now);
+  const newLeaf = await hashRecord(fixture.newRecord);
 
-    // A self-consistent path placing the new leaf one slot over, together with
-    // the root that path implies — so newMerkle.root === newMerkleRoot still
-    // holds and the ONLY unsatisfied constraint is the D41 index binding.
-    // Shifting pathIndices alone would break the root check too, and the test
-    // would then pass for the wrong reason.
-    const misplaced = await pathAt(newLeaf, Number(fixture.newRecord.propertyId) + 1);
+  // A self-consistent path placing the new leaf one slot over, together with
+  // the root that path implies — so newMerkle.root === newMerkleRoot still
+  // holds and the ONLY unsatisfied constraint is the D41 index binding.
+  // Shifting pathIndices alone would break the root check too, and the test
+  // would then pass for the wrong reason.
+  const misplaced = await pathAt(newLeaf, Number(fixture.newRecord.propertyId) + 1);
 
-    const input = buildTransferInput({
-      oldRecord: fixture.oldRecord,
-      newRecord: fixture.newRecord,
-      oldOwnerSecret: fixture.oldSecret,
-      newOwnerSecret: fixture.newSecret,
-      oldProof: fixture.oldProof,
-      newProof: {
-        leaf: newLeaf,
-        siblings: misplaced.siblings,
-        pathIndices: misplaced.pathIndices,
-        root: misplaced.root,
-      },
-      currentTimestamp: now,
-      minRequiredRemainingTerm: 0n,
-    });
-
-    let threw = false;
-    try {
-      await circuit.calculateWitness(input);
-    } catch {
-      threw = true;
-    }
-    expect(threw, 'both transfer paths must sit at index === propertyId').to.equal(true);
+  const input = buildTransferInput({
+    oldRecord: fixture.oldRecord,
+    newRecord: fixture.newRecord,
+    oldOwnerSecret: fixture.oldSecret,
+    newOwnerSecret: fixture.newSecret,
+    oldProof: fixture.oldProof,
+    newProof: {
+      leaf: newLeaf,
+      siblings: misplaced.siblings,
+      pathIndices: misplaced.pathIndices,
+      root: misplaced.root,
+    },
+    currentTimestamp: now,
+    minRequiredRemainingTerm: 0n,
   });
+
+  let threw = false;
+  try {
+    await circuit.calculateWitness(input);
+  } catch {
+    threw = true;
+  }
+  expect(threw, 'both transfer paths must sit at index === propertyId').to.equal(true);
+});
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -642,9 +648,9 @@ Update the header comment of `transfer.circom`: in the "Scope limitations" block
 
 Finally, fix three comments that D41 makes untrue. They are only comments, but a wrong comment about leaf ordering is exactly the kind of thing a later phase trusts:
 
-- `blockchain/test/helpers/records.ts`, in `placeInTree`: *"The subject sits in the middle so its Merkle path exercises both left- and right-child steps"* → the subject's position is now `SUBJECT_PROPERTY_ID` (9001) regardless of array position; its binary expansion `0b10001100101001` already mixes left and right steps. Say that instead.
-- `blockchain/scripts/circuits/sampleWitness.ts`, the `placeInTree` doc line *"Place `record` in the middle of `fillerCount` random filler records"* → position follows `propertyId`; the fillers only make the path non-degenerate.
-- `blockchain/scripts/circuits/sampleWitness.ts`, the transfer branch comment *"rebuild the tree preserving order"* → *"rebuild the tree with the one record's owner swapped — order is irrelevant under D41"*.
+- `blockchain/test/helpers/records.ts`, in `placeInTree`: _"The subject sits in the middle so its Merkle path exercises both left- and right-child steps"_ → the subject's position is now `SUBJECT_PROPERTY_ID` (9001) regardless of array position; its binary expansion `0b10001100101001` already mixes left and right steps. Say that instead.
+- `blockchain/scripts/circuits/sampleWitness.ts`, the `placeInTree` doc line _"Place `record` in the middle of `fillerCount` random filler records"_ → position follows `propertyId`; the fillers only make the path non-degenerate.
+- `blockchain/scripts/circuits/sampleWitness.ts`, the transfer branch comment _"rebuild the tree preserving order"_ → _"rebuild the tree with the one record's owner swapped — order is irrelevant under D41"_.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -672,12 +678,14 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ### Task 4: Backend — range validation, D24 retirement, spec inversion
 
 **Files:**
+
 - Modify: `web-app/backend/src/import/import.service.ts`
 - Modify: `web-app/backend/src/import/import.service.spec.ts`
 - Modify: `web-app/backend/src/tree/tree.service.ts`
 - Modify: `web-app/backend/src/tree/tree.service.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `MAX_PROPERTY_ID` from Task 1, re-exported through `@land-registry/blockchain/shared`.
 - Produces: no new exports. `sortByPropertyId` keeps its current signature and behaviour.
 
@@ -688,37 +696,37 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 Add to `web-app/backend/src/import/import.service.spec.ts`, next to the existing `'catches a propertyId repeated inside the same file'` test (same `makeService()` / `row()` / `importCsv` helpers already defined at the top of that file):
 
 ```ts
-  it('rejects a propertyId beyond the addressable range of the tree (D41)', async () => {
-    const { service } = makeService();
+it('rejects a propertyId beyond the addressable range of the tree (D41)', async () => {
+  const { service } = makeService();
 
-    const result = await service.importCsv(
-      [HEADER, row({ propertyId: '1' }), row({ propertyId: '1048576' })].join('\n'), // 2^20
-    );
+  const result = await service.importCsv(
+    [HEADER, row({ propertyId: '1' }), row({ propertyId: '1048576' })].join('\n'), // 2^20
+  );
 
-    expect(result.imported).toBe(1);
-    expect(result.errors[0].message).toMatch(/exceeds the addressable range/);
-  });
+  expect(result.imported).toBe(1);
+  expect(result.errors[0].message).toMatch(/exceeds the addressable range/);
+});
 ```
 
 Replace the last test in `web-app/backend/src/tree/tree.service.spec.ts` — delete the `'produces a DIFFERENT root when the order changes — this is why the order is pinned'` test entirely and put this in its place:
 
 ```ts
-  it('produces the SAME root whatever the input order (D41 — position follows propertyId)', async () => {
-    const rows = [
-      makeProperty({ propertyId: '1' }),
-      makeProperty({ propertyId: '2' }),
-      makeProperty({ propertyId: '10' }),
-    ];
+it('produces the SAME root whatever the input order (D41 — position follows propertyId)', async () => {
+  const rows = [
+    makeProperty({ propertyId: '1' }),
+    makeProperty({ propertyId: '2' }),
+    makeProperty({ propertyId: '10' }),
+  ];
 
-    const numericOrder = await buildTree(sortByPropertyId(rows).map(toLURRecord));
-    // What a Postgres `ORDER BY "propertyId"` on a String column would give.
-    // Under D24 this produced a different tree; under D41 it cannot.
-    const lexicographicOrder = await buildTree(
-      [...rows].sort((a, b) => a.propertyId.localeCompare(b.propertyId)).map(toLURRecord),
-    );
+  const numericOrder = await buildTree(sortByPropertyId(rows).map(toLURRecord));
+  // What a Postgres `ORDER BY "propertyId"` on a String column would give.
+  // Under D24 this produced a different tree; under D41 it cannot.
+  const lexicographicOrder = await buildTree(
+    [...rows].sort((a, b) => a.propertyId.localeCompare(b.propertyId)).map(toLURRecord),
+  );
 
-    expect(lexicographicOrder.root).toBe(numericOrder.root);
-  });
+  expect(lexicographicOrder.root).toBe(numericOrder.root);
+});
 ```
 
 Also change that file's `describe` title and header comment from `leaf ordering (D24)` to:
@@ -746,19 +754,19 @@ Expected: FAIL — the tree spec fails on `expect(lexicographicOrder.root).toBe(
 In `web-app/backend/src/import/import.service.ts`, add `MAX_PROPERTY_ID` to the existing import from `@land-registry/blockchain/shared`, then extend the propertyId validation:
 
 ```ts
-    const propertyId = requireField(row, 'propertyId');
-    if (!/^\d+$/.test(propertyId)) {
-      throw new Error(`propertyId must be a decimal integer string, got '${propertyId}'`);
-    }
-    // D41: a leaf's position in the Merkle tree IS its propertyId, so an id
-    // beyond the tree's address space cannot be committed at all. Reject at
-    // import rather than at publish time, where it would fail a whole batch.
-    if (BigInt(propertyId) > MAX_PROPERTY_ID) {
-      throw new Error(
-        `propertyId ${propertyId} exceeds the addressable range of the registry tree ` +
-          `(max ${MAX_PROPERTY_ID}) — D41`,
-      );
-    }
+const propertyId = requireField(row, 'propertyId');
+if (!/^\d+$/.test(propertyId)) {
+  throw new Error(`propertyId must be a decimal integer string, got '${propertyId}'`);
+}
+// D41: a leaf's position in the Merkle tree IS its propertyId, so an id
+// beyond the tree's address space cannot be committed at all. Reject at
+// import rather than at publish time, where it would fail a whole batch.
+if (BigInt(propertyId) > MAX_PROPERTY_ID) {
+  throw new Error(
+    `propertyId ${propertyId} exceeds the addressable range of the registry tree ` +
+      `(max ${MAX_PROPERTY_ID}) — D41`,
+  );
+}
 ```
 
 In `web-app/backend/src/tree/tree.service.ts`, replace the two ⚠️ paragraphs of the class doc comment with:
@@ -814,10 +822,12 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ### Task 5: Trusted setup, redeploy, and measurement
 
 **Files:**
+
 - Regenerated (gitignored): `blockchain/circuits/build/**`, `blockchain/contracts/verifiers/*.sol`
 - Modify: `blockchain/circuits/build/setup-metrics.json`, `gas-metrics.json` (outputs, gitignored — record their values in the commit message of Task 6)
 
 **Interfaces:**
+
 - Consumes: the circuits from Task 3.
 - Produces: new `.zkey` / `verification_key.json` / `Groth16Verifier*.sol`, new constraint and timing numbers for Chapter 5.
 
@@ -911,10 +921,12 @@ If nothing changed, skip this commit.
 ### Task 6: Documentation — D41 in the decision log
 
 **Files:**
+
 - Modify: `CODING_ROADMAP.md`
 - Modify: `CLAUDE.md`
 
 **Interfaces:**
+
 - Consumes: the measured numbers from Task 5.
 - Produces: the binding record of this decision, which later phases read instead of re-deriving.
 
@@ -936,7 +948,7 @@ Append to `CODING_ROADMAP.md` §0, in the same format as the neighbouring entrie
   **Không giải quyết:** `transfer.circom` vẫn cần cả hai secret trong một witness (giả định "một phiên"). Xem Limitations.
 ```
 
-Then edit the **D24** entry in place: prefix it with `~~(SUPERSEDED bởi D41)~~` and add one line — *"Thứ tự không còn quyết định cây; `sortByPropertyId` giờ chỉ quyết định thứ tự danh sách trả về từ API."*
+Then edit the **D24** entry in place: prefix it with `~~(SUPERSEDED bởi D41)~~` and add one line — _"Thứ tự không còn quyết định cây; `sortByPropertyId` giờ chỉ quyết định thứ tự danh sách trả về từ API."_
 
 - [ ] **Step 2: Update §2.1 of the roadmap**
 
@@ -975,9 +987,11 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ### Task 7: Thesis-side wording
 
 **Files:**
+
 - Modify: `C:\Users\Snow_Ace\Downloads\Mẫu đăng ký đề tài LVTN - BuiCongVinh ITCSIU22165.docx` (Requirement 14)
 
 **Interfaces:**
+
 - Consumes: the completed implementation from Tasks 1–6.
 - Produces: registration-form wording that matches what the code actually guarantees.
 

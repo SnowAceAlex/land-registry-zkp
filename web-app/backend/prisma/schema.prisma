@@ -1,5 +1,7 @@
 // Prisma schema — synced with CODING_ROADMAP.md D19 (leaf schema) + D3 (off-chain
-// metadata) + Phase 5 additions (MerkleRoot, IssuedBundle, TransferRequest).
+// metadata) + Phase 5 additions (MerkleRoot, TransferRequest) + Phase 7 UC-flow
+// realignment (D42-D48: IssuanceBatch, ChangeSet, Revocation, PropertyEvent;
+// IssuedBundle dropped — see docs/superpowers/specs/2026-09-07-uc-flow-realignment-design.md).
 //
 // Connection URL lives in prisma.config.ts (Prisma 7 pattern), NOT here.
 // Default: postgresql://postgres:postgres@localhost:5433/land_registry?schema=public
@@ -40,6 +42,7 @@ enum TenureType {
 enum TransferStatus {
   PENDING
   APPROVED
+  PUBLISHED
   REJECTED
 }
 
@@ -56,6 +59,39 @@ enum LandUserType {
   TCN
   /// Tổ chức sự nghiệp công lập
   TSN
+}
+
+/// Lifecycle of a property record. Replaces the old implicit rule
+/// "ownerCommitment != null means issued": a REVOKED property still has a
+/// commitment, so that rule could not express the third state (D45).
+enum PropertyStatus {
+  /// Imported from CSV, no owner secret generated yet
+  IMPORTED
+  /// Issued and present in the Merkle tree
+  ISSUED
+  /// Revoked — leaf removed from the tree, proofs no longer producible
+  REVOKED
+}
+
+/// Shared lifecycle of both draft types (D43).
+enum DraftStatus {
+  DRAFT
+  PUBLISHED
+  DISCARDED
+}
+
+enum RevocationStatus {
+  PENDING
+  PUBLISHED
+  REJECTED
+}
+
+enum PropertyEventKind {
+  ISSUED
+  TRANSFERRED
+  REVOKED
+  ENCUMBRANCE_CHANGED
+  VALIDITY_CHANGED
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -86,22 +122,22 @@ model Property {
   tenureType        TenureType
 
   // Off-chain-only metadata (D3/D19) — displayed in UI/PDF, never hashed
-  landUseCode       String
+  landUseCode          String
   /// Đối tượng sử dụng đất; null = cá nhân (the ordinary case)
-  landUserType      LandUserType?
+  landUserType         LandUserType?
   /// Đất cộng đồng dùng để bảo tồn bản sắc dân tộc (Điều 178 khoản 4) — the
   /// condition that makes community land perpetual; community use alone is not
-  culturalPreservation Boolean   @default(false)
-  certificateSerial String
-  bookEntryNumber   String
+  culturalPreservation Boolean       @default(false)
+  certificateSerial    String
+  bookEntryNumber      String
   /// Số tờ bản đồ — mandatory on a real GCN (mẫu TT 10/2024)
-  mapSheetNumber    String?
+  mapSheetNumber       String?
   /// Nguồn gốc sử dụng đất — mandatory on a real GCN (Nhà nước giao/cho thuê/công nhận)
-  landOrigin        String?
-  address           String
-  area              Decimal       @db.Decimal(12, 2)
-  issuingAuthority  String
-  issueDate         DateTime      @db.Date
+  landOrigin           String?
+  address              String
+  area                 Decimal       @db.Decimal(12, 2)
+  issuingAuthority     String
+  issueDate            DateTime      @db.Date
 
   // Cache refreshed after every root publish (non-sensitive — safe to store)
   /// Poseidon leaf hash, decimal string
@@ -112,6 +148,12 @@ model Property {
   rootVersion Int?
   /// When the owner bundle was issued; NULL = not yet issued
   issuedAt    DateTime?
+
+  /// Lifecycle state. The tree contains exactly the ISSUED rows.
+  status PropertyStatus @default(IMPORTED)
+
+  issuanceBatchId Int?
+  issuanceBatch   IssuanceBatch? @relation(fields: [issuanceBatchId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -172,22 +214,115 @@ model MerkleRoot {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IssuedBundle — one-time-download bundle awaiting claim
+// IssuanceBatch — one issuance round, two-phase (D43/D44)
+// ─────────────────────────────────────────────────────────────────────────────
+// A DRAFT holds everything needed to finish the round — including the generated
+// owner secrets — and deliberately touches no Property row. That is what keeps
+// the safety invariant: an abandoned draft can never leave a property holding a
+// commitment whose secret is gone.
+
+model IssuanceBatch {
+  id     Int         @id @default(autoincrement())
+  status DraftStatus @default(DRAFT)
+
+  /// Projected root, decimal string — what the officer is asked to sign
+  newRoot     String
+  /// Filled at confirm time, read from the chain
+  rootVersion Int?
+  txHash      String?
+
+  /// { propertyId: ownerSecret } as decimal strings. Cleared on confirm/discard.
+  draftSecrets Json?
+
+  /// The complete batch archive, built at confirm time
+  archiveZip       Bytes?
+  /// TTL — after this the secrets are unrecoverable and the plot must be re-issued
+  archiveExpiresAt DateTime?
+
+  properties  Property[]
+  createdAt   DateTime   @default(now())
+  publishedAt DateTime?
+
+  @@index([status])
+  @@map("issuance_batches")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ChangeSet — one publishing round of approved transfers + revocations (D44)
 // ─────────────────────────────────────────────────────────────────────────────
 
-model IssuedBundle {
-  id         Int      @id @default(autoincrement())
-  /// One pending bundle per property
-  propertyId String   @unique
-  /// 32 random bytes, hex — the URL capability; treat as a secret
-  claimToken String   @unique
-  /// Complete bundle-<propertyId>.zip (receipt.json + secret.json + certificate.pdf)
-  bundleZip  Bytes
-  createdAt  DateTime @default(now())
-  /// TTL — expired rows are deleted on access (default: 7 days after issue)
-  expiresAt  DateTime
+model ChangeSet {
+  id     Int         @id @default(autoincrement())
+  status DraftStatus @default(DRAFT)
 
-  @@map("issued_bundles")
+  newRoot     String
+  rootVersion Int?
+  txHash      String?
+
+  transfers   TransferRequest[]
+  revocations Revocation[]
+
+  createdAt   DateTime  @default(now())
+  publishedAt DateTime?
+
+  @@index([status])
+  @@map("change_sets")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Revocation — a request to revoke a certificate (D45)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Revocation {
+  id         Int    @id @default(autoincrement())
+  propertyId String
+
+  /// 1=state reclamation, 2=issued in error, 3=dispute/court, 4=expired, 5=other
+  reasonCode Int
+  /// Free text, stays off-chain
+  detailText String
+  /// keccak256(detailText), 0x-prefixed hex — this is what goes on-chain
+  detailHash String
+
+  status      RevocationStatus @default(PENDING)
+  changeSetId Int?
+  changeSet   ChangeSet?       @relation(fields: [changeSetId], references: [id])
+
+  createdAt   DateTime  @default(now())
+  publishedAt DateTime?
+
+  @@index([status])
+  @@index([propertyId])
+  @@map("revocations")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PropertyEvent — per-plot history (D48)
+// ─────────────────────────────────────────────────────────────────────────────
+// Read publicly and unguarded, on the same reasoning as D39: every field here is
+// either a pseudonymous commitment (D8) or a Poseidon hash.
+
+model PropertyEvent {
+  id         Int               @id @default(autoincrement())
+  propertyId String
+  kind       PropertyEventKind
+
+  /// Root version this change took effect in; null while not yet published
+  rootVersion Int?
+  txHash      String?
+
+  previousOwnerCommitment String?
+  newOwnerCommitment      String?
+  previousLeaf            String?
+  newLeaf                 String?
+
+  /// Kind-specific extras: reasonCode + reason text, encumbrance from→to, …
+  detail Json?
+
+  occurredAt DateTime @default(now())
+
+  @@index([propertyId, occurredAt])
+  @@map("property_events")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -213,6 +348,9 @@ model TransferRequest {
   txHash             String?
   createdAt          DateTime       @default(now())
   decidedAt          DateTime?
+
+  changeSetId Int?
+  changeSet   ChangeSet? @relation(fields: [changeSetId], references: [id])
 
   @@map("transfer_requests")
 }

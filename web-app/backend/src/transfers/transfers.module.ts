@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 
 import { ChainModule } from '../chain/chain.module';
-import { GovernmentModule } from '../government/government.module';
 import { TransfersController } from './transfers.controller';
 import { TransfersService } from './transfers.service';
 import { TreeModule } from '../tree/tree.module';
@@ -15,12 +14,12 @@ import { TreeModule } from '../tree/tree.module';
  * because computing a projected root reveals nothing and needs no judgement,
  * while approval is deliberately a human at the authority.
  *
- * Imports GovernmentModule for RootService, which owns "publish a root and bring
- * every cached proof back in sync" — shared with issuance because both end in
- * exactly that step.
+ * Approval no longer publishes a root (D46): it records the officer's decision and
+ * the change goes on chain later, batched into a ChangeSet. That is why this module
+ * no longer needs GovernmentModule/RootService.
  */
 @Module({
-  imports: [ChainModule, TreeModule, GovernmentModule],
+  imports: [ChainModule, TreeModule],
   controllers: [TransfersController],
   providers: [TransfersService],
 })

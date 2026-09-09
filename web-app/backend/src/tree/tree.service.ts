@@ -23,15 +23,21 @@ import { toLURRecord } from '../records/record.mapper';
  */
 @Injectable()
 export class TreeService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Every issued property, in the canonical list order (D41: no longer the leaf order).
-   * Properties without an ownerCommitment are not yet issued and have no leaf.
+   * Every property currently in the tree, in canonical list order (D41: no
+   * longer the leaf order).
+   *
+   * Membership is `status === ISSUED`, not `ownerCommitment !== null` (D45): a
+   * REVOKED property keeps its commitment, so the old rule could not express
+   * it. Dropping the leaf is what makes revocation enforced rather than merely
+   * recorded — with no leaf there is no Merkle path, so the circuit cannot
+   * produce a proof at all.
    */
   async loadIssuedProperties(): Promise<Property[]> {
     const properties = await this.prisma.property.findMany({
-      where: { ownerCommitment: { not: null } },
+      where: { status: 'ISSUED' },
     });
     return sortByPropertyId(properties);
   }

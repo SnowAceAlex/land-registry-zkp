@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  GoneException,
   Injectable,
   Logger,
   NotFoundException,
@@ -88,8 +89,7 @@ export class ProofService {
     if (cached && !(await verifyMerkleProof(cached, latestRoot))) {
       this.logger.warn(
         `cached Merkle proof for property ${propertyId} claims root version ${onChainVersion} ` +
-          `but does not verify against it — rebuilding. Run POST /api/government/publish-root ` +
-          `to repair the cache.`,
+          `but does not verify against it — rebuilding.`,
       );
       cached = undefined;
     }
@@ -105,7 +105,7 @@ export class ProofService {
     if (!cached && !(await verifyMerkleProof(proof, root))) {
       throw new ServiceUnavailableException(
         `The Merkle proof rebuilt for property ${propertyId} does not verify against the ` +
-          `registry tree. Run POST /api/government/publish-root and check the server logs.`,
+          `registry tree. Check the server logs.`,
       );
     }
 
@@ -208,6 +208,12 @@ export class ProofService {
     const property = await this.prisma.property.findUnique({ where: { propertyId } });
     if (!property) {
       throw new NotFoundException(`Unknown propertyId ${propertyId}`);
+    }
+    if (property.status === 'REVOKED') {
+      throw new GoneException(
+        `The certificate for property ${propertyId} has been revoked. Its leaf is no longer in ` +
+          `the tree, so no Merkle proof exists — see the on-chain revocations mapping for the reason.`,
+      );
     }
     if (property.ownerCommitment === null) {
       throw new BadRequestException(

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  GoneException,
   Injectable,
   Logger,
   NotFoundException,
@@ -15,10 +16,9 @@ import {
   verifyGroth16Proof,
 } from '@land-registry/blockchain/shared';
 
-import { ChainService, ProofRejectedError, RootPublishError } from '../chain/chain.service';
+import { ChainService, ProofRejectedError } from '../chain/chain.service';
 import { blockchainDir } from '../common/paths';
 import { PrismaService } from '../prisma/prisma.service';
-import { RootService } from '../government/root.service';
 import { TreeService } from '../tree/tree.service';
 import { SubmitTransferDto, TransferPreviewDto } from './dto/transfer.dto';
 import {
@@ -55,7 +55,6 @@ export class TransfersService {
     private readonly prisma: PrismaService,
     private readonly tree: TreeService,
     private readonly chain: ChainService,
-    private readonly roots: RootService,
   ) {}
 
   /**
@@ -109,12 +108,22 @@ export class TransfersService {
       );
     }
 
-    const pending = await this.prisma.transferRequest.findFirst({
-      where: { propertyId: property.propertyId, status: TransferStatus.PENDING },
+    // Blocks APPROVED as well as PENDING (D46). Approval used to publish
+    // immediately, which serialised transfers per property as a side effect;
+    // now an approved transfer waits in a change set, so without this a second
+    // transfer could be submitted and approved for the same property while the
+    // first is still unbatched. The change set would then hold two different
+    // newOwnerCommitment values for one plot and silently apply one of them.
+    const open = await this.prisma.transferRequest.findFirst({
+      where: {
+        propertyId: property.propertyId,
+        status: { in: [TransferStatus.PENDING, TransferStatus.APPROVED] },
+      },
     });
-    if (pending) {
+    if (open) {
       throw new ConflictException(
-        `Transfer request #${pending.id} for property ${property.propertyId} is already pending approval`,
+        `Transfer request #${open.id} for property ${property.propertyId} is already ` +
+          `${open.status === TransferStatus.PENDING ? 'pending approval' : 'approved and awaiting publication'}`,
       );
     }
 
@@ -138,12 +147,21 @@ export class TransfersService {
   }
 
   /**
-   * D28 step 4 — the human decision, followed by the state change.
+   * D28 step 4 — the human decision.
    *
-   * Order matters: verify on-chain, re-derive the projected root from current
-   * DB state, publish, and only then write. The re-derivation is what stops an
-   * officer from approving a proof whose newRoot no longer corresponds to the
-   * registry (for example after another transfer landed first).
+   * This used to also publish the new root right here (verify on-chain,
+   * re-derive the projected root from current DB state, publish, then write
+   * Property.ownerCommitment). That coupling is gone: the backend can no
+   * longer sign a publishRoot() transaction, because on-chain writes are now
+   * signed in the officer's browser wallet (D43). Approval therefore stops at
+   * recording the decision — PENDING → APPROVED — and nothing else changes
+   * yet. The actual publish moves to a later batched change-set flow that
+   * groups every approved transfer (and revocation) into one root for an
+   * officer to sign; until that flow exists, an approved transfer sits at
+   * APPROVED with Property.ownerCommitment still unchanged.
+   *
+   * The proof is still verified here rather than only at publish time: a
+   * proof that does not verify must never sit in the approved queue.
    */
   async approve(id: number): Promise<TransferApprovalResponseDto> {
     const request = await this.requirePendingRequest(id);
@@ -180,68 +198,20 @@ export class TransfersService {
       throw error;
     }
 
-    const { tree, properties } = await this.tree.buildProjectedTree(
-      new Map([[request.propertyId, request.newOwnerCommitment]]),
-    );
-
-    if (tree.root !== BigInt(request.newRoot)) {
-      throw new UnprocessableEntityException(
-        `The registry no longer produces the new root this proof commits to ` +
-          `(expected ${request.newRoot}, current projection ${tree.root}). ` +
-          `The transfer must be re-proven against fresh state.`,
-      );
-    }
-
-    let published: { root: bigint; version: number; txHash: string };
-    try {
-      published = await this.chain.publishRoot(tree.root);
-    } catch (error) {
-      if (error instanceof RootPublishError) {
-        throw new UnprocessableEntityException({
-          reason: error.reason,
-          message:
-            error.reason === 'DuplicateRoot'
-              ? 'This transfer leaves the registry unchanged (the new owner commitment ' +
-                'equals the current one), so there is no new root to publish'
-              : error.message,
-        });
-      }
-      throw error;
-    }
-
-    try {
-      await this.prisma.$transaction([
-        this.prisma.property.update({
-          where: { propertyId: request.propertyId },
-          data: { ownerCommitment: request.newOwnerCommitment },
-        }),
-        this.roots.recordRootStatement(published),
-        ...(await this.roots.proofCacheStatements(tree, properties, published.version)),
-        this.prisma.transferRequest.update({
-          where: { id },
-          data: {
-            status: TransferStatus.APPROVED,
-            txHash: published.txHash,
-            decidedAt: new Date(),
-          },
-        }),
-      ]);
-    } catch (error) {
-      this.roots.warnChainAheadOfDatabase(published.txHash, error);
-      throw error;
-    }
+    const updated = await this.prisma.transferRequest.update({
+      where: { id },
+      data: { status: TransferStatus.APPROVED, decidedAt: new Date() },
+    });
 
     this.logger.log(
-      `transfer #${id} approved for property ${request.propertyId}; ` +
-        `root version ${published.version} (tx ${published.txHash})`,
+      `transfer #${id} approved for property ${request.propertyId} — queued for the next change set`,
     );
 
     return {
-      id,
-      propertyId: request.propertyId,
-      root: published.root.toString(),
-      version: published.version,
-      txHash: published.txHash,
+      id: updated.id,
+      propertyId: updated.propertyId,
+      status: updated.status,
+      decidedAt: updated.decidedAt,
     };
   }
 
@@ -298,6 +268,17 @@ export class TransfersService {
     const property = await this.prisma.property.findUnique({ where: { propertyId } });
     if (!property) {
       throw new NotFoundException(`Unknown propertyId ${propertyId}`);
+    }
+    // Mirrors ProofService.requireIssuedProperty: a revoked plot keeps its
+    // ownerCommitment (only leaf/merkleProof/rootVersion are cleared, D45), so
+    // the ownerCommitment check below alone would let it through and fail
+    // deep inside generateMerkleProof — "propertyId not found in tree" — as
+    // an unhandled 500 instead of a readable error.
+    if (property.status === 'REVOKED') {
+      throw new GoneException(
+        `The certificate for property ${propertyId} has been revoked. Its leaf is no longer in ` +
+          `the tree, so no Merkle proof exists — see the on-chain revocations mapping for the reason.`,
+      );
     }
     if (property.ownerCommitment === null) {
       throw new BadRequestException(

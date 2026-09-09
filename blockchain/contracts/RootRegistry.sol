@@ -55,6 +55,22 @@ contract RootRegistry is AccessControl {
     ///         is later revoked; off-chain verifiers must also check hasRole().
     mapping(address => bytes32) public authorityInstitute;
 
+    /// @notice Reason codes for a revocation (D45). 0 is reserved as "unset".
+    /// 1 = state reclamation decision, 2 = issued in error, 3 = dispute / court
+    /// order, 4 = expired without renewal, 5 = other.
+    uint8 public constant MIN_REASON_CODE = 1;
+    uint8 public constant MAX_REASON_CODE = 5;
+
+    struct Revocation {
+        uint8 reasonCode;
+        bytes32 detailHash;
+        uint256 rootVersion;
+        uint64 revokedAt;
+    }
+
+    /// @notice propertyId => revocation entry. A zero reasonCode means "not revoked".
+    mapping(uint256 => Revocation) public revocations;
+
     // -------------------------------------------------------------------------
     // Events
     // -------------------------------------------------------------------------
@@ -69,6 +85,13 @@ contract RootRegistry is AccessControl {
 
     event AuthorityRegistered(address indexed account, bytes32 instituteHash);
 
+    event PropertyRevoked(
+        uint256 indexed propertyId,
+        uint8 reasonCode,
+        bytes32 detailHash,
+        uint256 rootVersion
+    );
+
     // -------------------------------------------------------------------------
     // Errors
     // -------------------------------------------------------------------------
@@ -81,6 +104,15 @@ contract RootRegistry is AccessControl {
     error ZeroInstituteHash();
     /// @notice registerAuthority() for the zero address — nobody can ever sign as it.
     error ZeroAuthorityAccount();
+    /// @notice publishRootWithRevocations() with propertyIds/reasonCodes/detailHashes
+    ///         not all the same length.
+    error RevocationArrayLengthMismatch();
+    /// @notice publishRootWithRevocations() with a reasonCode outside
+    ///         MIN_REASON_CODE..MAX_REASON_CODE.
+    error InvalidReasonCode(uint8 reasonCode);
+    /// @notice publishRootWithRevocations() for a propertyId already revoked —
+    ///         also catches a duplicate propertyId within the same call.
+    error AlreadyRevoked(uint256 propertyId);
 
     // -------------------------------------------------------------------------
     // Constructor
@@ -105,6 +137,49 @@ contract RootRegistry is AccessControl {
      *                always fits in bytes32).
      */
     function publishRoot(bytes32 newRoot) external onlyRole(STATE_AUTHORITY_ROLE) {
+        _publishRoot(newRoot);
+    }
+
+    /**
+     * @notice Publish a new root and record revocations in the same transaction (D45).
+     * @dev The revocation list is for public auditability. Enforcement is already
+     *      absolute without it: a revoked property's leaf is absent from `newRoot`,
+     *      so no Merkle path to it exists and the circuits cannot produce a proof.
+     * @param propertyIds   Properties revoked by this publish. May be empty.
+     * @param reasonCodes   One code per property, in MIN_REASON_CODE..MAX_REASON_CODE.
+     * @param detailHashes  keccak256 of the free-text reason, stored off-chain.
+     */
+    function publishRootWithRevocations(
+        bytes32 newRoot,
+        uint256[] calldata propertyIds,
+        uint8[] calldata reasonCodes,
+        bytes32[] calldata detailHashes
+    ) external onlyRole(STATE_AUTHORITY_ROLE) {
+        if (propertyIds.length != reasonCodes.length || propertyIds.length != detailHashes.length) {
+            revert RevocationArrayLengthMismatch();
+        }
+
+        _publishRoot(newRoot);
+
+        for (uint256 i = 0; i < propertyIds.length; i++) {
+            uint8 code = reasonCodes[i];
+            if (code < MIN_REASON_CODE || code > MAX_REASON_CODE) revert InvalidReasonCode(code);
+            // Also catches a duplicate propertyId within this same call, since
+            // the first iteration has already written the entry.
+            if (revocations[propertyIds[i]].reasonCode != 0) revert AlreadyRevoked(propertyIds[i]);
+
+            revocations[propertyIds[i]] = Revocation({
+                reasonCode: code,
+                detailHash: detailHashes[i],
+                rootVersion: rootVersion,
+                revokedAt: uint64(block.timestamp)
+            });
+
+            emit PropertyRevoked(propertyIds[i], code, detailHashes[i], rootVersion);
+        }
+    }
+
+    function _publishRoot(bytes32 newRoot) private {
         if (newRoot == bytes32(0)) revert ZeroRoot();
         if (newRoot == latestRoot) revert DuplicateRoot(newRoot);
 
