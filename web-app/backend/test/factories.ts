@@ -33,6 +33,10 @@ export function makeProperty(overrides: Partial<Property> = {}): Property {
     merkleProof: null,
     rootVersion: null,
     issuedAt: new Date('2026-01-15T00:00:00.000Z'),
+    // Default factory output represents an already-issued property (it also
+    // carries a non-null ownerCommitment by default, above) — D45.
+    status: 'ISSUED',
+    issuanceBatchId: null,
     createdAt: new Date('2026-01-15T00:00:00.000Z'),
     updatedAt: new Date('2026-01-15T00:00:00.000Z'),
     ...overrides,

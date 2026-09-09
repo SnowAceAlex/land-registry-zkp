@@ -55,7 +55,7 @@ describe('record.mapper', () => {
   });
 
   it('refuses to map a property that has not been issued yet', () => {
-    const property = makeProperty({ ownerCommitment: null });
+    const property = makeProperty({ ownerCommitment: null, status: 'IMPORTED' });
 
     expect(() => toLURRecord(property)).toThrow(/no ownerCommitment/);
   });

@@ -1,5 +1,5 @@
 import { buildTree } from '@land-registry/blockchain/shared';
-import { sortByPropertyId } from './tree.service';
+import { sortByPropertyId, TreeService } from './tree.service';
 import { toLURRecord } from '../records/record.mapper';
 import { makeProperty } from '../../test/factories';
 
@@ -63,5 +63,16 @@ describe('leaf ordering (D41 supersedes D24)', () => {
     );
 
     expect(lexicographicOrder.root).toBe(numericOrder.root);
+  });
+});
+
+describe('TreeService.loadIssuedProperties — membership rule (D45)', () => {
+  it('excludes REVOKED properties from the tree (D45)', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const service = new TreeService({ property: { findMany } } as never);
+
+    await service.loadIssuedProperties();
+
+    expect(findMany).toHaveBeenCalledWith({ where: { status: 'ISSUED' } });
   });
 });

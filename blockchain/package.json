@@ -20,6 +20,8 @@
     "deploy:sepolia": "hardhat run scripts/chain/deploy.ts --network sepolia",
     "chain:smoke:localhost": "hardhat run scripts/chain/smokeDeployment.ts --network localhost",
     "chain:smoke:sepolia": "hardhat run scripts/chain/smokeDeployment.ts --network sepolia",
+    "sign:root": "hardhat run scripts/tools/signRoot.ts --network localhost",
+    "sign:root:sepolia": "hardhat run scripts/tools/signRoot.ts --network sepolia",
     "circuits:compile": "ts-node scripts/circuits/compile.ts",
     "circuits:setup": "ts-node scripts/circuits/setupAll.ts",
     "circuits:smoke": "ts-node scripts/circuits/smokeOwnership.ts",
@@ -27,7 +29,9 @@
     "mock:generate": "ts-node scripts/tools/generateMockData.ts",
     "receipt:verify": "ts-node scripts/tools/verifyReceipt.ts",
     "transfer:smoke": "ts-node scripts/tools/transferSmoke.ts",
-    "owner:smoke": "ts-node scripts/tools/ownerSmoke.ts"
+    "owner:smoke": "ts-node scripts/tools/ownerSmoke.ts",
+    "proof:bodies": "ts-node scripts/tools/proofBodies.ts",
+    "bundle:buyer": "ts-node scripts/tools/createBuyerBundle.ts"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.2",

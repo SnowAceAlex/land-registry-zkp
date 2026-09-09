@@ -3,8 +3,10 @@ import { ChainService } from './chain.service';
 
 /**
  * ChainModule
- * Handles all Ethereum smart contract interactions.
- * Exports ChainService so other modules (RecordsModule) can call publishRoot() after updates.
+ * Handles all Ethereum smart contract reads (RootRegistry/LandRegistryVerifier).
+ * Exports ChainService so other modules can read chain state and verify proofs;
+ * it no longer sends any transaction — on-chain writes are signed in the
+ * officer's browser wallet (D43).
  */
 @Module({
   providers: [ChainService],

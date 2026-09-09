@@ -2,16 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, Property } from '@prisma/client';
 import { LURMerkleTree, generateMerkleProof } from '@land-registry/blockchain/shared';
 
-import { ChainService } from '../chain/chain.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { TreeService } from '../tree/tree.service';
 import { toLURRecord } from '../records/record.mapper';
 
 /**
  * RootService
  * ─────────────────────────────────────────────────────────────────────────────
- * Owns the "publish a root and bring the cached proofs back in sync" step,
- * shared by issuance and transfer approval.
+ * Owns the "record a published root and bring the cached proofs back in sync"
+ * step, shared by issuance and (once the batched change-set flow lands) transfer
+ * approval. It no longer sends the publish transaction itself (D43) — that is
+ * now signed in the officer's browser and confirmed by the caller (see
+ * IssuanceBatchService.confirm()), which then hands the resulting {root,
+ * version, txHash} to recordRootStatement()/proofCacheStatements() below.
  *
  * ⚠️ Every published root invalidates EVERY cached Merkle proof, not just the
  * ones for records that changed: altering one leaf changes every node on its
@@ -24,48 +26,7 @@ import { toLURRecord } from '../records/record.mapper';
 export class RootService {
   private readonly logger = new Logger(RootService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly tree: TreeService,
-    private readonly chain: ChainService,
-  ) {}
-
-  /**
-   * Rebuild from current DB state, publish, and refresh every cached proof.
-   * Used after manual record edits and as the recovery path when an issuance
-   * batch published a root its DB write never caught up with.
-   *
-   * When the rebuilt root already equals the on-chain one there is nothing to
-   * publish: the contract rejects that with DuplicateRoot (D33), and sending
-   * the transaction anyway would turn a perfectly normal "already in sync" into
-   * an error. The proof cache is still refreshed, since that is the other half
-   * of what a caller pressing this button wants.
-   */
-  async rebuildAndPublish(): Promise<{
-    root: bigint;
-    version: number;
-    txHash: string | null;
-    published: boolean;
-  }> {
-    const { tree, properties } = await this.tree.buildCurrentTree();
-    const latestRoot = await this.chain.getLatestRoot();
-
-    if (tree.root === latestRoot) {
-      const version = await this.chain.getRootVersion();
-      await this.prisma.$transaction(await this.proofCacheStatements(tree, properties, version));
-      this.logger.log(`root unchanged (version ${version}) — refreshed proof cache only`);
-      return { root: tree.root, version, txHash: null, published: false };
-    }
-
-    const published = await this.chain.publishRoot(tree.root);
-
-    await this.prisma.$transaction([
-      this.recordRootStatement(published),
-      ...(await this.proofCacheStatements(tree, properties, published.version)),
-    ]);
-
-    return { ...published, published: true };
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   /** Prisma statement that mirrors an on-chain root into merkle_roots. */
   recordRootStatement(published: { root: bigint; version: number; txHash: string }) {
@@ -113,15 +74,13 @@ export class RootService {
   }
 
   /**
-   * Logged when the chain has advanced but the matching DB write failed. The
-   * two can be brought back together by calling the publish-root endpoint,
-   * which republishes whatever the DB currently implies.
+   * Logged when the chain has advanced but the matching DB write failed,
+   * leaving the database behind whatever was just published on-chain.
    */
   warnChainAheadOfDatabase(txHash: string, error: unknown): void {
     this.logger.error(
       `Root published on-chain (tx ${txHash}) but the database write failed: ` +
-        `${(error as Error)?.message}. The DB and chain are out of sync — ` +
-        `POST /api/government/publish-root to republish from current DB state.`,
+        `${(error as Error)?.message}. The DB and chain are now out of sync and need manual reconciliation.`,
     );
   }
 }

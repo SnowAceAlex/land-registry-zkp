@@ -83,7 +83,10 @@ async function main(): Promise<void> {
     refreshed.inSync,
     'registry tree matches the published root',
     `version ${refreshed.onChain.version}`,
-    'the database has unpublished changes — run POST /api/government/publish-root',
+    'the database and chain have drifted apart — either the chain was restarted/redeployed ' +
+      'while the database kept its rows (see PHASE_5_MANUAL_TEST.md §0b), or an issuance/' +
+      'change-set draft was signed but never confirmed. There is no longer a single call that ' +
+      'republishes to repair this (D43) — resolve the draft, or redeploy and re-issue.',
   );
 
   const rootChanged = refreshed.merkleRoot !== receipt.merkleRoot;
@@ -169,10 +172,10 @@ async function main(): Promise<void> {
       '',
       chainClockDrift
         ? `${onChain.body.message} — the off-chain check passed, so this is almost certainly an ` +
-          `IDLE LOCAL NODE whose block.timestamp has fallen behind. Mine a block ` +
-          `(curl -X POST -H "Content-Type: application/json" --data ` +
-          `'{"jsonrpc":"2.0","method":"evm_mine","params":[],"id":1}' http://127.0.0.1:8545) ` +
-          `and re-run.`
+            `IDLE LOCAL NODE whose block.timestamp has fallen behind. Mine a block ` +
+            `(curl -X POST -H "Content-Type: application/json" --data ` +
+            `'{"jsonrpc":"2.0","method":"evm_mine","params":[],"id":1}' http://127.0.0.1:8545) ` +
+            `and re-run.`
         : `HTTP ${onChain.status}: ${onChain.body?.message ?? ''}`,
     );
   }

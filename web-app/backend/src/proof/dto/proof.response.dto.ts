@@ -72,7 +72,7 @@ export class MerkleProofResponseDto {
    *
    * False is not a failure of this endpoint — it means the registry has changes
    * that are not published yet, so this proof will only start verifying once
-   * someone publishes. `POST /api/government/publish-root` reconciles.
+   * someone publishes the next root.
    */
   @ApiProperty({ example: true })
   inSync!: boolean;
