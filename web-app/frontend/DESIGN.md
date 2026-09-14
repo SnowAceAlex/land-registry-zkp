@@ -47,7 +47,7 @@ A restrained, highly-trusted interface with confident asymmetric layouts and mot
 
 ## 6. Motion & Interaction
 This is a public-sector registry, so motion is restrained on purpose: it confirms
-actions, it does not perform. Two utilities only, both in `app/globals.css`.
+actions, it does not perform. Two utilities only, both in `src/app/globals.css`.
 
 - **`ui-transition`** - the default. 180ms, `cubic-bezier(0.16, 1, 0.3, 1)`, scoped to
   `color, background-color, border-color, box-shadow, opacity, transform`. Never
@@ -88,7 +88,8 @@ actions, it does not perform. Two utilities only, both in `app/globals.css`.
 
 ## 10. Bundle Discipline
 The wallet stack (wagmi + RainbowKit + WalletConnect) mounts in
-`app/government/layout.tsx` only, never the root layout. The resident portal is
+`src/app/[lang]/government/layout.tsx` (via `features/government/wallet/`) only, never
+the root layout. `eslint.config.mjs` fails the lint if resident code imports it. The resident portal is
 logged-out by design (D39, D49) and its on-chain verify is an `eth_call` that needs no
 connector. Hoisting it to the root put ~665 KB of wallet code on the landing page and on
 all three resident pages.
