@@ -2,7 +2,8 @@
  * features/government/changes/components/changes-view.tsx - UC-4, batch changes
  * and revocations.
  *
- * TODO (Phase 8):
+ * Implemented in Phase 8 (ChangesWorkbench + publishing/DraftPanel); the list
+ * below is the spec they follow:
  *  1. GET /api/government/pending-changes for approved transfers plus queued
  *     revocations.
  *  2. POST /api/government/changesets to draft, sign with Metamask, then
@@ -16,27 +17,30 @@
  *  4. Warn before publishing: every root publish invalidates EVERY issued
  *     Merkle proof, not only the changed ones. RootService rewrites the whole
  *     proof cache in the same transaction.
+ *  5. A change set carries at most 50 revocations (D56); the rest wait and the
+ *     draft reports them as deferredRevocations.
  */
-import { FolderSync } from 'lucide-react';
-
+import type { Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { PageHeader } from '@/components/ui/page-header';
-import { EmptyState } from '@/components/ui/empty-state';
-import { buttonStyles } from '@/components/ui/button';
 
-export function ChangesView({ t }: { t: Dictionary['govChanges'] }) {
+import { ChangesWorkbench } from './changes-workbench';
+
+export function ChangesView({
+  lang,
+  t,
+  draftT,
+  errors,
+}: {
+  lang: Locale;
+  t: Dictionary['govChanges'];
+  draftT: Dictionary['govDraft'];
+  errors: Dictionary['govErrors'];
+}) {
   return (
     <div className="space-y-8">
-      <PageHeader
-        title={t.title}
-        description={t.description}
-        action={
-          <button type="button" disabled className={buttonStyles.primary}>
-            {t.action}
-          </button>
-        }
-      />
-      <EmptyState icon={FolderSync} title={t.emptyTitle} description={t.emptyBody} />
+      <PageHeader title={t.title} description={t.description} />
+      <ChangesWorkbench lang={lang} t={t} draftT={draftT} errors={errors} />
     </div>
   );
 }

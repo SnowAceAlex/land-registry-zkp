@@ -8,7 +8,9 @@ import { ChangesView } from '@/features/government/changes/components/changes-vi
 export default async function Page({ params }: PageProps<'/[lang]'>) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  const t = (await getDictionary(lang)).govChanges;
+  const dict = await getDictionary(lang);
 
-  return <ChangesView t={t} />;
+  return (
+    <ChangesView lang={lang} t={dict.govChanges} draftT={dict.govDraft} errors={dict.govErrors} />
+  );
 }
