@@ -13,9 +13,23 @@ const nextConfig: NextConfig = {
       ...config.experiments,
       asyncWebAssembly: true,
     };
+
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+      // Optional deps of the wallet stack that never run in a browser:
+      // @metamask/sdk imports React Native storage for its RN build only.
+      "@react-native-async-storage/async-storage": false,
+    };
+
+    // pino (via @walletconnect/logger) requires pino-pretty only when configured
+    // to pretty-print; lokijs/encoding are the same kind of optional import.
+    config.externals.push("pino-pretty", "lokijs", "encoding");
+
     return config;
   },
 };
 
 export default nextConfig;
-

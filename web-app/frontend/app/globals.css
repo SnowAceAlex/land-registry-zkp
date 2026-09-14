@@ -1,26 +1,64 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-canvas: #F9FAFB;
+  --color-surface: #FFFFFF;
+  --color-ink: #18181B;
+  --color-steel: #71717A;
+  --color-whisper: rgba(226, 232, 240, 0.5);
+  --color-hairline: #E4E4E7;
+  --color-authority: #0F172A;
+  --font-sans: var(--font-sans-face), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-face), ui-monospace, SFMono-Regular, monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Keyboard focus is visible everywhere. Pointer focus stays quiet. */
+:focus-visible {
+  outline: 2px solid var(--color-authority);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@utility ui-transition {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  transition-duration: 180ms;
+}
+
+@utility spring-transition {
+  transition-property: transform, opacity;
+  transition-timing-function: linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.728 25.3%, 0.849 31.5%,
+      0.937 38.1%, 0.996 45%, 1.033 52.4%, 1.054 60.6%, 1.059 69.8%, 1.054 80.3%,
+      1.037 92.4%, 1.024);
+  transition-duration: 420ms;
+}
+
+@utility whisper-shadow {
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.03);
+}
+
+@utility tap-active {
+  &:active {
+    transform: translateY(1px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

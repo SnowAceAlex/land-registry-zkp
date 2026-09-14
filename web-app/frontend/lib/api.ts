@@ -28,6 +28,14 @@
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
 
+/**
+ * Must stay identical to GOV_API_KEY_HEADER in
+ * web-app/backend/src/common/api-key.guard.ts. Duplicated rather than imported
+ * because the backend is not a workspace dependency of the frontend; a mismatch
+ * shows up as a blanket 401 on every government route.
+ */
+export const GOV_API_KEY_HEADER = 'x-gov-api-key';
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BACKEND_URL}/api${path}`, {
     headers: { 'Content-Type': 'application/json' },

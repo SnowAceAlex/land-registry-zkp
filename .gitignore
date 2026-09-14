@@ -91,6 +91,7 @@ CLAUDE.md
 #Agent Skills
 .agents/
 skills-lock.json
+.claude/
 
 #Documentation
 CODING_ROADMAP.md
