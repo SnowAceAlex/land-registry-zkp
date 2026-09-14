@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { PropertyStatus } from '@prisma/client';
 
 import { ChainService } from '../chain/chain.service';
 import {
@@ -45,6 +46,22 @@ const FULL_PROPERTY_SELECT = {
 } as const;
 
 /**
+ * Parse the `status` query of `GET /government/properties`.
+ *
+ * An unknown value is a 400, not an ignored filter: the issuance screen asks
+ * for `IMPORTED` precisely so it never offers an issued plot, and a typo that
+ * silently returned every row would do exactly that.
+ */
+export function parsePropertyStatus(value: string | undefined): PropertyStatus | undefined {
+  if (value === undefined || value === '') return undefined;
+  const statuses = Object.values(PropertyStatus) as string[];
+  if (!statuses.includes(value)) {
+    throw new BadRequestException(`status must be one of ${statuses.join(', ')}`);
+  }
+  return value as PropertyStatus;
+}
+
+/**
  * GovernmentService
  * ─────────────────────────────────────────────────────────────────────────────
  * What is left of the state-authority operations after the single-phase
@@ -65,14 +82,24 @@ export class GovernmentService {
     private readonly chain: ChainService,
   ) {}
 
-  async listProperties(params: PaginationParams = {}): Promise<PropertyListResponseDto> {
+  /**
+   * One page of properties, optionally of a single status. The total is counted
+   * under the same filter, so page math on the issuance screen (IMPORTED only)
+   * matches what it can actually page through.
+   */
+  async listProperties(
+    params: PaginationParams = {},
+    status?: PropertyStatus,
+  ): Promise<PropertyListResponseDto> {
+    const where = status ? { status } : {};
     const [items, total] = await this.prisma.$transaction([
       this.prisma.property.findMany({
         ...pageArgs(params),
+        where,
         orderBy: { id: 'asc' },
         select: SUMMARY_PROPERTY_SELECT,
       }),
-      this.prisma.property.count(),
+      this.prisma.property.count({ where }),
     ]);
 
     return {
@@ -106,6 +133,7 @@ export class GovernmentService {
 
     return {
       network: this.chain.network,
+      chainId: this.chain.chainId,
       contractAddress: this.chain.rootRegistryAddress,
       authority: this.chain.authorityAddress,
       onChain: { root: root.toString(), version },

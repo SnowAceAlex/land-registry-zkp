@@ -30,7 +30,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { ApiKeyGuard, GOV_API_KEY_HEADER, GOV_API_KEY_SECURITY } from '../common/api-key.guard';
 import { parsePageQuery } from '../common/pagination';
 import { ChangeSetService } from './changeset.service';
-import { GovernmentService } from './government.service';
+import { GovernmentService, parsePropertyStatus } from './government.service';
 import { ImportService } from '../import/import.service';
 import { ImportResult } from '../import/dto/import.response.dto';
 import { IssuanceBatchService } from '../issuance/issuance-batch.service';
@@ -80,9 +80,19 @@ export class GovernmentController {
   @ApiOperation({ summary: 'List properties with their issuance status' })
   @ApiQuery({ name: 'skip', required: false, type: Number, example: 0 })
   @ApiQuery({ name: 'take', required: false, type: Number, example: 50, description: 'Max 200' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['IMPORTED', 'ISSUED', 'REVOKED'],
+    description: 'Only this status; `total` is counted under the same filter',
+  })
   @ApiOkResponse({ type: PropertyListResponseDto })
-  listProperties(@Query('skip') skip?: string, @Query('take') take?: string) {
-    return this.government.listProperties(parsePageQuery(skip, take));
+  listProperties(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.government.listProperties(parsePageQuery(skip, take), parsePropertyStatus(status));
   }
 
   @Get('properties/:propertyId')

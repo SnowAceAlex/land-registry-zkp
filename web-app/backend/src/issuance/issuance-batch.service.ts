@@ -268,8 +268,7 @@ export class IssuanceBatchService {
       merkleRoot: tree.root,
       transactionHash: draft.txHash ?? '',
       contractAddress: this.chain.rootRegistryAddress,
-      explorerTxUrlPrefix:
-        this.chain.network === 'sepolia' ? 'https://sepolia.etherscan.io/tx/' : undefined,
+      explorerTxUrlPrefix: this.chain.explorerTxUrlPrefix,
     };
 
     const archiveEntries: ArchiveEntry[] = [];
