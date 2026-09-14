@@ -8,7 +8,16 @@ Next.js version postdates most training data — and `DESIGN.md` before touching
 pnpm run dev:frontend                    # from the repo root, port 3000 (--webpack)
 pnpm --filter frontend run build
 pnpm --filter frontend run lint          # also enforces the feature boundaries below
+pnpm --filter frontend run test          # Vitest — pure logic only, node environment (D57)
 ```
+
+Before `dev`/`build`, two generated inputs must exist (both gitignored):
+
+- `pnpm run compile` — the portal takes RootRegistry's ABI from the compiler artifact
+  (`blockchain/artifacts/…/RootRegistry.json`), typed by typechain's const ABI.
+- `pnpm --filter blockchain run circuits:setup` (or `circuits:sync-frontend` to re-copy) —
+  the browser proves with `public/circuits/<circuit>/{<circuit>.wasm, .zkey, verification_key.json}`
+  (D55). A missing copy shows up as a 404 inside the proving worker.
 
 ## Project structure
 
@@ -30,20 +39,23 @@ src/
 │   ├── landing/components/          landing-view.tsx
 │   ├── government/
 │   │   ├── auth/                    portal infra: GOV_API_KEY gate + session storage
-│   │   ├── shell/                   portal infra: sidebar / tab-bar nav
-│   │   ├── wallet/                  portal infra: wagmi + RainbowKit config & providers
-│   │   ├── import/                  UC-2   CSV bulk import
-│   │   ├── issuance/                UC-1   draft → sign → confirm → archive
-│   │   ├── transfers/               UC-3   transfer counter + approval queue
-│   │   └── changes/                 UC-4   change sets + revocations
+│   │   ├── api/                     portal infra: key-aware client, response types, shared queries, error codes
+│   │   ├── publishing/              portal infra: nextDraftStep + DraftPanel (sign → mine → confirm, D43/D53)
+│   │   ├── shell/                   portal infra: nav + registry status bar (chain, root, open draft, wallet)
+│   │   ├── wallet/                  portal infra: wagmi config, RootRegistry ABI/codec, chain reads + publish
+│   │   ├── import/                  UC-2   dry run → import (D52)
+│   │   ├── issuance/                UC-1   pick → draft → sign → confirm → archive
+│   │   ├── transfers/               UC-3   transfer counter (client-side proof) + approval queue
+│   │   └── changes/                 UC-4   change sets + revocation requests
 │   └── resident/
 │       ├── shell/                   portal infra: header nav
 │       ├── lookup/                  D48    public property history
 │       ├── proof/                   UC-5   client-side proof generation
 │       └── verify/                  UC-6   off-chain + on-chain verification
-├── components/ui/                   design-system primitives (button, empty-state, page-header)
+├── components/ui/                   design-system primitives (button, empty-state, page-header, notice, skeleton, hash-text)
 ├── i18n/                            locales, server-only dictionaries, format, locale switcher
-└── lib/                             cross-feature infra: api-client (transport), zkp (snarkjs)
+└── lib/                             cross-portal infra: api-client (transport + ApiError), bundle (receipt + secret reader),
+                                     download, zkp + zkp.worker (proving in a Web Worker)
 ```
 
 ### Inside a feature
@@ -52,9 +64,24 @@ src/
 features/<portal>/<feature>/
 ├── components/     <feature>-view.tsx is the screen; sub-components sit beside it
 ├── hooks/          client hooks, when the feature needs them
-├── lib/            pure helpers owned by this feature
+├── lib/            pure helpers owned by this feature (tests sit beside them: *.test.ts)
 └── api.ts          this feature's backend calls, built on lib/api-client.ts
 ```
+
+Government use cases call the backend through `features/government/api/gov-client.ts` (it adds
+the portal key and returns to the gate on a 401). Screens branch on `apiErrorCode()` /
+`walletErrorCode()` and show the backend's text only as the detail line — never on message text.
+
+### Browser bundling notes (learned the hard way)
+
+- `blockchain/shared` must stay free of `node:` specifiers and static `fs`/`crypto` imports —
+  `blockchain/test/shared/browserSafety.test.ts` fails the blockchain suite otherwise.
+- `next.config.ts` aliases `crypto` to `false` for the client build. A `resolve.fallback` entry
+  does not work: Next 16 sets its Node polyfills as a module-rule-level fallback that overrides it,
+  and the barrel would pull ~325 KB of crypto-browserify for code the browser never runs.
+- Import proving code (`lib/zkp.ts`) with types only from the shared barrel; snarkjs and
+  circomlibjs belong in the worker chunk. The `web-worker` "Critical dependency" build warning
+  comes from ffjavascript inside circomlibjs and is expected.
 
 Only create a folder once it has a file. The view's header comment is the feature's
 implementation spec (the TODO list for Phase 8/9) — keep it when implementing, don't

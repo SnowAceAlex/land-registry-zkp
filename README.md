@@ -181,8 +181,13 @@ See [`.env.example`](./.env.example) for the full list.
 | `AUTHORITY_ADDRESS`                    | Account granted `STATE_AUTHORITY_ROLE` — blank = deployer | Any deploy     |
 | `AUTHORITY_ORG_NAME`                   | X.509 Subject `O` anchored on-chain (D30)                 | Any deploy     |
 | `DATABASE_URL`                         | PostgreSQL connection (port 5433 via Docker)              | Phase 5+       |
-| `NEXT_PUBLIC_CONTRACT_ADDRESS`         | Deployed `RootRegistry` address                           | Phase 8+       |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | From cloud.walletconnect.com                              | Phase 8+       |
+| `NEXT_PUBLIC_BACKEND_URL`              | Backend base URL — blank = `http://localhost:3001`        | Phase 8+       |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | From cloud.walletconnect.com (Metamask works without it)  | Phase 8+       |
+| `NEXT_PUBLIC_SEPOLIA_RPC_URL`          | Optional Sepolia RPC for the portal's chain reads         | Sepolia        |
+
+The government portal does **not** read a contract address from the environment: it takes the
+`RootRegistry` address and chain id from `GET /api/government/status` (D54), so it always signs
+against the deployment the backend confirms against. `NEXT_PUBLIC_CONTRACT_ADDRESS` is unused.
 
 ---
 
