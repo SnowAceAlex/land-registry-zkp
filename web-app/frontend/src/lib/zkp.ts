@@ -1,64 +1,88 @@
 /**
  * lib/zkp.ts - shared by UC-3 (transfers), UC-5 (proof) and UC-6 (verify)
  * ─────────────────────────────────────────────────────────────────────────────
- * Client-side ZKP proof generation using snarkjs (runs in the browser).
+ * Client-side Groth16 proving, in a Web Worker.
  *
  * ⚠️  PRIVACY NOTE:
- *   Proof generation MUST happen client-side (in the browser) so that the
- *   owner's private witness (ownerSecret, full record) never leaves their device.
- *   The backend only receives the proof + public signals, not the private inputs.
+ *   Proof generation MUST happen client-side so the private witness
+ *   (ownerSecret, the full record) never leaves the browser. At the government
+ *   transfer counter that browser is the officer's, not the owner's (D47) — the
+ *   secret still never reaches the backend, which is the claim that holds.
+ *   Only the resulting proof + public signals go over the network.
  *
- * TODO:
- *  1. Import snarkjs (already added to package.json):
- *     import * as snarkjs from 'snarkjs';
+ * WHY A WORKER. fullProve takes seconds (transfer: ~24k constraints) and would
+ * freeze the tab — the officer would see a dead page with both parties waiting
+ * at the counter. The worker calls shared/zkpHelper's generateGroth16Proof, so
+ * proving still goes through the one entry point every other layer uses.
  *
- *  2. Import shared types from @land-registry/blockchain/shared:
- *     import { ProofInput, ProofPackage, MerkleProofData } from '@land-registry/blockchain/shared';
- *     NOTE: Do NOT import merkleTree or zkpHelper directly — only types.
- *           The actual proof generation uses snarkjs directly here (browser context).
+ * ARTIFACTS. The wasm/zkey are served from public/circuits/<circuit>/, copied
+ * there by `circuits:sync-frontend` (run automatically by `circuits:setup`,
+ * D55). A missing copy surfaces as a 404 inside the worker, reported here.
  *
- *  3. Implement generateOwnershipProof(input):
- *     - input includes: ownerSecret (bigint), full LURRecord, MerkleProofData from backend
- *     - Fetch WASM and zkey from /public/circuits/ (serve build artifacts statically)
- *     - Call snarkjs.groth16.fullProve(input, wasmUrl, zkeyUrl)
- *     - Return { proof, publicSignals }
- *
- *  4. Circuit artifacts should be placed in web-app/frontend/public/circuits/ (public/ stays at the package root, outside src/):
- *     public/circuits/ownership/ownership.wasm
- *     public/circuits/ownership/ownership.zkey
- *     (copy from blockchain/circuits/build/ after compilation)
- *
- *  5. Implement verifyProofClientSide(vkey, publicSignals, proof):
- *     Use snarkjs.groth16.verify() for immediate UI feedback before sending to backend.
- *
- * PERFORMANCE:
- *   snarkjs proof generation can be slow (1-30s depending on circuit size).
- *   Consider running it in a Web Worker to avoid blocking the UI thread.
- *   See: https://snarkjs.io/#8-verifying-from-a-smart-contract
+ * This module imports types only from the shared barrel: snarkjs and
+ * circomlibjs load inside the worker chunk, not with the page.
  */
 
-// TODO: uncomment after setting up circuit artifacts in /public/circuits/
-//
-// import * as snarkjs from 'snarkjs';
-// import type { ProofInput } from '@land-registry/blockchain/shared';
-//
-// const CIRCUITS_BASE_URL = '/circuits';
-//
-// export async function generateOwnershipProof(input: ProofInput) {
-//   const wasmUrl = `${CIRCUITS_BASE_URL}/ownership/ownership.wasm`;
-//   const zkeyUrl = `${CIRCUITS_BASE_URL}/ownership/ownership.zkey`;
-//
-//   const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, wasmUrl, zkeyUrl);
-//   return { proof, publicSignals };
-// }
-//
-// export async function verifyProofClientSide(
-//   vkeyUrl: string,
-//   publicSignals: string[],
-//   proof: object
-// ): Promise<boolean> {
-//   const vkey = await fetch(vkeyUrl).then(r => r.json());
-//   return snarkjs.groth16.verify(vkey, publicSignals, proof);
-// }
+import type { CircuitType, ProofInput, ProofPackage } from '@land-registry/blockchain/shared';
 
-export {};
+export interface CircuitArtifactUrls {
+  wasmUrl: string;
+  zkeyUrl: string;
+  vkeyUrl: string;
+}
+
+/**
+ * Absolute URLs of one circuit's artifacts. Absolute on purpose: a
+ * root-relative path inside a worker resolves against the worker script's
+ * location in `/_next/static/chunks/`, which is not where the files are.
+ */
+export function circuitArtifactUrls(circuitType: CircuitType, origin: string): CircuitArtifactUrls {
+  const base = `${origin}/circuits/${circuitType}`;
+  return {
+    wasmUrl: `${base}/${circuitType}.wasm`,
+    zkeyUrl: `${base}/${circuitType}.zkey`,
+    vkeyUrl: `${base}/verification_key.json`,
+  };
+}
+
+/** Message the page posts to the worker. */
+export interface ProverRequest {
+  circuitType: CircuitType;
+  input: ProofInput;
+  wasmUrl: string;
+  zkeyUrl: string;
+}
+
+/** Message the worker posts back — exactly one per request. */
+export type ProverResponse = { ok: true; pkg: ProofPackage } | { ok: false; message: string };
+
+/**
+ * Prove in a fresh worker and terminate it afterwards: snarkjs keeps its own
+ * thread pool alive, and a long-lived worker would hold the witness in memory
+ * after the counter has moved on.
+ */
+export function generateProof(
+  circuitType: CircuitType,
+  input: ProofInput,
+): Promise<{ pkg: ProofPackage; durationMs: number }> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./zkp.worker.ts', import.meta.url));
+    const startedAt = performance.now();
+
+    worker.onmessage = (event: MessageEvent<ProverResponse>) => {
+      worker.terminate();
+      if (event.data.ok) {
+        resolve({ pkg: event.data.pkg, durationMs: Math.round(performance.now() - startedAt) });
+      } else {
+        reject(new Error(event.data.message));
+      }
+    };
+    worker.onerror = (event) => {
+      worker.terminate();
+      reject(new Error(event.message || 'The proving worker stopped unexpectedly'));
+    };
+
+    const { wasmUrl, zkeyUrl } = circuitArtifactUrls(circuitType, window.location.origin);
+    worker.postMessage({ circuitType, input, wasmUrl, zkeyUrl } satisfies ProverRequest);
+  });
+}
