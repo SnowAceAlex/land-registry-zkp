@@ -1,29 +1,25 @@
 /**
  * features/government/wallet/wallet-config.ts
  * ─────────────────────────────────────────────────────────────────────────────
- * wagmi v2 + RainbowKit configuration.
+ * wagmi v2 + RainbowKit configuration for the government portal.
  *
- * TODO:
- *  1. Fill in NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in .env
- *     Get your project ID at: https://cloud.walletconnect.com
+ * The officer's wallet signs every on-chain write (D43); which chain and which
+ * RootRegistry it signs against are NOT configured here but read from
+ * GET /government/status (D54), and the portal refuses to sign from any other
+ * chain. Both chains the project deploys to are listed so wagmi can read the
+ * registry on either one before a wallet is even connected:
+ *   - hardhat (31337) at http://127.0.0.1:8545 for local development;
+ *   - sepolia (11155111), public RPC unless NEXT_PUBLIC_SEPOLIA_RPC_URL is set.
  *
- *  2. Configure supported chains:
- *     For development: hardhat local (chainId: 31337)
- *     For testnet:     sepolia (chainId: 11155111)
+ * NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID (cloud.walletconnect.com) enables the
+ * WalletConnect connector; Metamask in the browser works without it.
  *
- *  3. Configure transports (Alchemy/Infura RPC URL or public fallback):
- *     import { http } from 'wagmi'
- *     transport: http(process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL)
- *
- *  (Done) The <WagmiProvider> + <RainbowKitProvider> wrapper is
- *     wallet-providers.tsx, mounted by app/[lang]/government/layout.tsx only.
- *
- * DOCUMENTATION:
- *   wagmi v2 docs:      https://wagmi.sh
- *   RainbowKit docs:    https://www.rainbowkit.com/docs/installation
+ * Mounted by features/government/wallet/wallet-providers.tsx, from
+ * app/[lang]/government/layout.tsx only — never on the resident pages.
  */
 
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { http } from 'wagmi';
 import { hardhat, sepolia } from 'wagmi/chains';
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? '';
@@ -35,7 +31,11 @@ if (!projectId) {
 export const wagmiConfig = getDefaultConfig({
   appName: 'Land Registry ZKP',
   projectId,
-  chains: [sepolia, hardhat],
+  chains: [hardhat, sepolia],
+  transports: {
+    [hardhat.id]: http(),
+    [sepolia.id]: http(process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || undefined),
+  },
   ssr: true, // Required for Next.js App Router
 });
 

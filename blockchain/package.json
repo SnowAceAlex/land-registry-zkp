@@ -5,7 +5,8 @@
   "main": "./shared/index.ts",
   "exports": {
     "./shared": "./shared/index.ts",
-    "./typechain-types": "./typechain-types/index.ts"
+    "./typechain-types": "./typechain-types/index.ts",
+    "./artifacts/*": "./artifacts/*"
   },
   "engines": {
     "node": ">=20"
