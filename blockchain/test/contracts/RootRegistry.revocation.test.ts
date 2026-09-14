@@ -114,6 +114,27 @@ describe('RootRegistry — revocations (D45)', () => {
     ).to.be.revertedWithCustomError(registry, 'AccessControlUnauthorizedAccount');
   });
 
+  it('keeps a full change-set batch (D56: 50 revocations) far below the block gas limit', async () => {
+    // Mirrors MAX_REVOCATIONS_PER_CHANGESET in web-app/backend/src/government/
+    // changeset.service.ts. The contract itself has no length cap, so a batch
+    // past the block gas limit would revert wholesale — the backend cap exists
+    // to stop that, and this is the number that justifies its value.
+    const batch = 50;
+    const propertyIds = Array.from({ length: batch }, (_, i) => 2000n + BigInt(i));
+
+    const gas = await registry.publishRootWithRevocations.estimateGas(
+      ROOT_A,
+      propertyIds,
+      propertyIds.map(() => 1),
+      propertyIds.map(() => DETAIL),
+    );
+
+    console.log(`      publishRootWithRevocations × ${batch}: ${gas} gas`);
+    // A third of a 30M block: leaves headroom for gas price spikes and for the
+    // estimate being lower than a real mined call.
+    expect(gas).to.be.lessThan(10_000_000n);
+  });
+
   it('still rejects a zero or duplicate root', async () => {
     await expect(
       registry.publishRootWithRevocations(ethers.ZeroHash, [], [], []),
