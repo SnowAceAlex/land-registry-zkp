@@ -45,7 +45,18 @@ export class ImportService {
     private readonly administrativeUnits: AdministrativeUnitsService,
   ) {}
 
-  async importCsv(csv: string): Promise<ImportResult> {
+  /**
+   * Validate a CSV export and, unless `dryRun`, write the valid rows.
+   *
+   * A dry run exists because an IMPORTED row cannot be edited or deleted
+   * through the API, while a row that is valid but wrong (a mistyped area)
+   * would pass every check (D52). The commit path re-validates from scratch
+   * rather than trusting an earlier dry run's verdict.
+   */
+  async importCsv(
+    csv: string,
+    { dryRun = false }: { dryRun?: boolean } = {},
+  ): Promise<ImportResult> {
     const parsed = Papa.parse<ImportRow>(csv, {
       header: true,
       skipEmptyLines: true,
@@ -94,6 +105,25 @@ export class ImportService {
       }
     });
 
+    const catalogEmpty = addresses.catalogEmpty;
+
+    if (dryRun) {
+      // Same arithmetic skipDuplicates applies below, so the preview predicts
+      // the commit rather than approximating it.
+      const existing = await this.prisma.property.findMany({
+        where: { propertyId: { in: creates.map((input) => input.propertyId) } },
+        select: { propertyId: true },
+      });
+      return {
+        dryRun,
+        imported: creates.length - existing.length,
+        skipped: existing.length,
+        errors,
+        warnings,
+        catalogEmpty,
+      };
+    }
+
     // skipDuplicates keeps a re-run of the same file from failing wholesale on
     // records already in the registry.
     const { count } = await this.prisma.property.createMany({
@@ -101,7 +131,14 @@ export class ImportService {
       skipDuplicates: true,
     });
 
-    return { imported: count, skipped: creates.length - count, errors, warnings };
+    return {
+      dryRun,
+      imported: count,
+      skipped: creates.length - count,
+      errors,
+      warnings,
+      catalogEmpty,
+    };
   }
 
   private toCreateInput(

@@ -119,7 +119,15 @@ export class GovernmentController {
       'tenure), encumbranceStatus. `useType` and `tenureType` are derived server-side from ' +
       '`landUseCode` (D2) rather than read from the file, so a typo cannot reach a leaf hash. ' +
       'Bad rows are reported individually and the rest still import. ' +
+      'Send `?dryRun=true` first to see the per-row verdict without writing anything (D52) — ' +
+      'an imported row cannot be edited or deleted through the API. ' +
       'Sample file: blockchain/fixtures/mockImport.csv.',
+  })
+  @ApiQuery({
+    name: 'dryRun',
+    required: false,
+    type: Boolean,
+    description: 'Validate and count, write nothing',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -130,11 +138,13 @@ export class GovernmentController {
     },
   })
   @ApiOkResponse({ type: ImportResult })
-  async import(@UploadedFile() file?: Express.Multer.File) {
+  async import(@UploadedFile() file?: Express.Multer.File, @Query('dryRun') dryRun?: string) {
     if (!file) {
       throw new BadRequestException("Upload a CSV file in the 'file' field");
     }
-    return this.importService.importCsv(file.buffer.toString('utf8'));
+    return this.importService.importCsv(file.buffer.toString('utf8'), {
+      dryRun: dryRun === 'true',
+    });
   }
 
   @Get('drafts/open')

@@ -34,11 +34,18 @@ export class ImportRowWarning {
 }
 
 export class ImportResult {
-  /** Rows written to the registry. */
+  /**
+   * True when nothing was written (`?dryRun=true`, D52). The counts then
+   * predict what the same file would do if imported for real.
+   */
+  @ApiProperty({ example: false })
+  dryRun!: boolean;
+
+  /** Rows written to the registry — or, on a dry run, rows that would be. */
   @ApiProperty({ example: 8 })
   imported!: number;
 
-  /** Rows skipped because that propertyId already exists. */
+  /** Valid rows skipped because that propertyId already exists. */
   @ApiProperty({ example: 0 })
   skipped!: number;
 
@@ -47,10 +54,20 @@ export class ImportResult {
   errors!: ImportRowError[];
 
   /**
-   * Rows that imported but look questionable. Used where the reference data
-   * shipped with the project is incomplete (the ward catalog), so rejecting
-   * would risk refusing valid records — review these before issuing.
+   * Rows that imported but look questionable — the channel for rules where
+   * rejecting would risk refusing valid records, so a human reviews them before
+   * issuing. Its one former source, the unseeded ward catalog, is now reported
+   * once through `catalogEmpty` (D52), so no current rule emits a row warning;
+   * the field stays as the contract for the next rule that needs one.
    */
   @ApiProperty({ type: [ImportRowWarning] })
   warnings!: ImportRowWarning[];
+
+  /**
+   * The administrative-unit catalog is empty, so no commune name in this file
+   * could be checked (D52). Reported once here instead of as a warning on every
+   * row. Seed it with `pnpm --filter backend run seed:admin-units <file>`.
+   */
+  @ApiProperty({ example: false })
+  catalogEmpty!: boolean;
 }

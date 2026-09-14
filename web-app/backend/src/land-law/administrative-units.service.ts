@@ -121,12 +121,10 @@ export function checkAddress(address: string, catalog: Set<string>): AddressChec
   }
 
   const communeName = segments[communeIndex].replace(COMMUNE_PREFIX, '').trim();
-  if (catalog.size === 0) {
-    warnings.push(
-      `could not verify that '${segments[communeIndex]}' exists — the administrative catalog ` +
-        `is empty (seed it with: pnpm --filter backend run seed:admin-units <file>)`,
-    );
-  } else if (!catalog.has(normalise(communeName))) {
+  // An empty catalog cannot be checked against. That is reported ONCE per
+  // import through AddressValidator.catalogEmpty (D52) — repeating it on every
+  // row buried each real warning under hundreds of identical ones.
+  if (catalog.size > 0 && !catalog.has(normalise(communeName))) {
     errors.push(
       `'${segments[communeIndex]}' is not in the administrative catalog — check the name ` +
         `against the units in force since 01/7/2025`,
