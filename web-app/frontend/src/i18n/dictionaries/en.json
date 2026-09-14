@@ -1,0 +1,103 @@
+{
+  "metadata": {
+    "title": "Land Registry ZKP",
+    "description": "Privacy-preserving Land Use Rights registry using a Merkle tree and Zero-Knowledge Proofs on Ethereum"
+  },
+  "localeSwitcher": {
+    "label": "Language"
+  },
+  "landing": {
+    "residentTitle": "Check a land title without reading the file.",
+    "residentBody": "An owner generates a proof in their own browser. A buyer, bank or agency checks it against the root the registry published on Ethereum.",
+    "residentCta": "Enter public portal",
+    "shortcutsLabel": "Go straight to",
+    "shortcutProof": "Generate a proof",
+    "shortcutVerify": "Verify a proof",
+    "shortcutHistory": "Property history",
+    "govTitle": "Government portal",
+    "govBody": "Issue certificates, handle transfers at the counter, and publish batched changes to the registry root. Requires an officer key and a wallet.",
+    "govCta": "Officer sign-in"
+  },
+  "gate": {
+    "title": "Registry officer sign-in",
+    "intro": "The portal key authenticates this browser to the registry API. Publishing a root is signed separately, with your wallet.",
+    "label": "Portal key",
+    "hint": "Held for this tab only. Closing it signs you out.",
+    "checking": "Checking stored key",
+    "verifying": "Verifying",
+    "submit": "Continue",
+    "errorRejected": "That key was rejected by the registry API.",
+    "errorUnreachable": "Could not reach the registry API. The key was not checked.",
+    "errorUnreachableDetail": "Could not reach the registry API ({detail}). The key was not checked."
+  },
+  "govNav": {
+    "ariaLabel": "Registry operations",
+    "brand": "Government",
+    "brandSub": "Land Registry ZKP",
+    "operations": "Operations",
+    "import": "Import",
+    "issuance": "Issuance",
+    "transfers": "Transfers",
+    "changes": "Changes",
+    "signOut": "Sign out"
+  },
+  "residentNav": {
+    "ariaLabel": "Resident services",
+    "brand": "Public Portal",
+    "history": "History",
+    "proof": "Generate proof",
+    "verify": "Verify proof",
+    "historyShort": "History",
+    "proofShort": "Generate",
+    "verifyShort": "Verify"
+  },
+  "govImport": {
+    "title": "Import records",
+    "description": "Upload a cadastral CSV export. Every row is validated against the statutory land-use code table before it can be issued.",
+    "emptyTitle": "No file selected",
+    "emptyBody": "Drop a .csv export here or browse for one. Rows are checked one by one and nothing is written until you confirm the batch."
+  },
+  "govIssuance": {
+    "title": "Issuance",
+    "description": "Select imported properties, sign the new Merkle root with your wallet, then download the certificate archive.",
+    "action": "Start a batch",
+    "emptyTitle": "Nothing waiting to be issued",
+    "emptyBody": "Properties appear here once a CSV import has been accepted. Import a file first, then come back to draft a batch."
+  },
+  "govTransfers": {
+    "title": "Transfers",
+    "description": "Run a transfer with both parties present, then work the approval queue. Approving queues the change, it does not publish it.",
+    "action": "New transfer",
+    "emptyTitle": "The queue is empty",
+    "emptyBody": "Transfers submitted at the counter wait here for a second officer to approve or reject them."
+  },
+  "govChanges": {
+    "title": "Changes",
+    "description": "Collect approved transfers and revocations into one ChangeSet, sign it, and publish a single new root.",
+    "action": "Draft a ChangeSet",
+    "emptyTitle": "Nothing to publish",
+    "emptyBody": "Approved transfers and queued revocations collect here. Batching them means one root publish instead of one per change."
+  },
+  "residentProof": {
+    "title": "Generate a proof",
+    "description": "Prove a fact about your title without handing over the certificate. The proof is computed on this device and your secret never leaves it.",
+    "emptyTitle": "Load your certificate bundle",
+    "emptyBody": "Select the ZIP you received from the registry. It holds the receipt and the secret needed to compute a proof, both of which stay in this browser.",
+    "action": "Select bundle"
+  },
+  "residentVerify": {
+    "title": "Verify a proof",
+    "description": "Check a proof against the registry root published on chain, confirm the issuing authority, and see whether the title has been revoked.",
+    "emptyTitle": "No proof loaded",
+    "emptyBody": "Upload the proof.json an owner gave you. You will see which claims it establishes, and nothing about the record beyond them.",
+    "action": "Select proof.json"
+  },
+  "residentLookup": {
+    "title": "Property history",
+    "description": "Every registry event for a parcel, by its property ID. Owners appear as commitments, never as names.",
+    "label": "Property ID",
+    "search": "Search",
+    "emptyTitle": "Enter a property ID",
+    "emptyBody": "Parcel IDs run from 0 to 1048575, the range of the depth-20 tree. The history shows issuance, transfers and revocations with the root version each was published under."
+  }
+}

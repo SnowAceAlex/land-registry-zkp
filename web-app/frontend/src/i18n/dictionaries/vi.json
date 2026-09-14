@@ -1,0 +1,103 @@
+{
+  "metadata": {
+    "title": "Land Registry ZKP",
+    "description": "Hệ thống đăng ký quyền sử dụng đất bảo vệ riêng tư, dùng cây Merkle và bằng chứng không tiết lộ tri thức trên Ethereum"
+  },
+  "localeSwitcher": {
+    "label": "Ngôn ngữ"
+  },
+  "landing": {
+    "residentTitle": "Kiểm tra một thửa đất mà không cần đọc hồ sơ.",
+    "residentBody": "Người sử dụng đất tạo bằng chứng ngay trên trình duyệt của mình. Bên mua, ngân hàng hoặc cơ quan nhà nước đối chiếu bằng chứng đó với gốc Merkle mà cơ quan đăng ký đã công bố trên Ethereum.",
+    "residentCta": "Vào cổng công dân",
+    "shortcutsLabel": "Đi thẳng tới",
+    "shortcutProof": "Tạo bằng chứng",
+    "shortcutVerify": "Xác minh bằng chứng",
+    "shortcutHistory": "Lịch sử thửa đất",
+    "govTitle": "Cổng cơ quan nhà nước",
+    "govBody": "Cấp giấy chứng nhận, xử lý chuyển nhượng tại quầy và công bố các thay đổi theo lô lên gốc Merkle. Cần khóa cán bộ và ví.",
+    "govCta": "Cán bộ đăng nhập"
+  },
+  "gate": {
+    "title": "Đăng nhập cán bộ đăng ký",
+    "intro": "Khóa cổng xác thực trình duyệt này với API đăng ký. Việc công bố gốc Merkle được ký riêng bằng ví của bạn.",
+    "label": "Khóa cổng",
+    "hint": "Chỉ giữ trong tab này. Đóng tab là đăng xuất.",
+    "checking": "Đang kiểm tra khóa đã lưu",
+    "verifying": "Đang xác thực",
+    "submit": "Tiếp tục",
+    "errorRejected": "API đăng ký đã từ chối khóa này.",
+    "errorUnreachable": "Không kết nối được tới API đăng ký. Khóa chưa được kiểm tra.",
+    "errorUnreachableDetail": "Không kết nối được tới API đăng ký ({detail}). Khóa chưa được kiểm tra."
+  },
+  "govNav": {
+    "ariaLabel": "Nghiệp vụ đăng ký",
+    "brand": "Cơ quan nhà nước",
+    "brandSub": "Land Registry ZKP",
+    "operations": "Nghiệp vụ",
+    "import": "Nhập dữ liệu",
+    "issuance": "Cấp giấy",
+    "transfers": "Chuyển nhượng",
+    "changes": "Thay đổi",
+    "signOut": "Đăng xuất"
+  },
+  "residentNav": {
+    "ariaLabel": "Dịch vụ công dân",
+    "brand": "Cổng công dân",
+    "history": "Lịch sử",
+    "proof": "Tạo bằng chứng",
+    "verify": "Xác minh bằng chứng",
+    "historyShort": "Lịch sử",
+    "proofShort": "Tạo",
+    "verifyShort": "Xác minh"
+  },
+  "govImport": {
+    "title": "Nhập dữ liệu",
+    "description": "Tải lên tệp CSV trích xuất từ hồ sơ địa chính. Mỗi dòng được kiểm tra theo bảng mã loại đất do luật quy định trước khi có thể cấp giấy.",
+    "emptyTitle": "Chưa chọn tệp",
+    "emptyBody": "Kéo thả tệp .csv vào đây hoặc chọn từ máy. Từng dòng được kiểm tra riêng và không có gì được ghi cho tới khi bạn xác nhận lô."
+  },
+  "govIssuance": {
+    "title": "Cấp giấy chứng nhận",
+    "description": "Chọn các thửa đất đã nhập, ký gốc Merkle mới bằng ví, rồi tải về gói giấy chứng nhận.",
+    "action": "Tạo lô mới",
+    "emptyTitle": "Chưa có thửa đất nào chờ cấp giấy",
+    "emptyBody": "Thửa đất xuất hiện ở đây sau khi một tệp CSV được chấp nhận. Hãy nhập dữ liệu trước, rồi quay lại tạo lô."
+  },
+  "govTransfers": {
+    "title": "Chuyển nhượng",
+    "description": "Thực hiện chuyển nhượng khi có mặt cả hai bên, sau đó xử lý hàng chờ phê duyệt. Phê duyệt chỉ đưa thay đổi vào hàng chờ, chưa công bố.",
+    "action": "Chuyển nhượng mới",
+    "emptyTitle": "Hàng chờ đang trống",
+    "emptyBody": "Hồ sơ chuyển nhượng nộp tại quầy sẽ chờ ở đây để một cán bộ khác phê duyệt hoặc từ chối."
+  },
+  "govChanges": {
+    "title": "Thay đổi",
+    "description": "Gom các chuyển nhượng đã duyệt và các quyết định thu hồi vào một ChangeSet, ký và công bố một gốc Merkle mới duy nhất.",
+    "action": "Tạo ChangeSet",
+    "emptyTitle": "Không có gì để công bố",
+    "emptyBody": "Chuyển nhượng đã duyệt và thu hồi đang chờ sẽ gom về đây. Gom theo lô nghĩa là chỉ công bố gốc Merkle một lần, thay vì mỗi thay đổi một lần."
+  },
+  "residentProof": {
+    "title": "Tạo bằng chứng",
+    "description": "Chứng minh một điều về giấy chứng nhận của bạn mà không phải đưa giấy ra. Bằng chứng được tính ngay trên thiết bị này và bí mật của bạn không rời khỏi đây.",
+    "emptyTitle": "Tải gói giấy chứng nhận của bạn",
+    "emptyBody": "Chọn tệp ZIP bạn nhận từ cơ quan đăng ký. Tệp này chứa biên nhận và bí mật cần để tính bằng chứng, cả hai đều ở lại trong trình duyệt này.",
+    "action": "Chọn gói"
+  },
+  "residentVerify": {
+    "title": "Xác minh bằng chứng",
+    "description": "Đối chiếu bằng chứng với gốc Merkle đã công bố trên chuỗi, xác nhận cơ quan cấp giấy và kiểm tra giấy chứng nhận đã bị thu hồi hay chưa.",
+    "emptyTitle": "Chưa tải bằng chứng",
+    "emptyBody": "Tải lên tệp proof.json mà người sử dụng đất đưa cho bạn. Bạn sẽ thấy những điều bằng chứng đó khẳng định, và không thấy gì thêm về hồ sơ.",
+    "action": "Chọn proof.json"
+  },
+  "residentLookup": {
+    "title": "Lịch sử thửa đất",
+    "description": "Toàn bộ sự kiện đăng ký của một thửa đất, tra theo mã thửa. Người sử dụng đất hiện ra dưới dạng cam kết mật mã, không bao giờ là tên.",
+    "label": "Mã thửa đất",
+    "search": "Tra cứu",
+    "emptyTitle": "Nhập mã thửa đất",
+    "emptyBody": "Mã thửa chạy từ 0 đến 1048575, là khoảng của cây Merkle độ sâu 20. Lịch sử hiển thị việc cấp giấy, chuyển nhượng và thu hồi kèm phiên bản gốc Merkle tương ứng."
+  }
+}
