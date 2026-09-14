@@ -1,8 +1,10 @@
 /**
  * features/government/issuance/components/issuance-view.tsx - UC-1, issue a batch.
  *
- * TODO (Phase 8), and the ordering here is load-bearing (D43):
- *  1. GET /api/government/properties?status=IMPORTED for the selectable rows.
+ * Implemented in Phase 8; the ordering below is load-bearing (D43) and is what
+ * IssuanceWorkbench + publishing/DraftPanel follow:
+ *  1. GET /api/government/properties?status=IMPORTED for the selectable rows
+ *     (the filter exists since D54's backend change).
  *  2. POST /api/government/issuance-batches -> the backend generates secrets,
  *     builds the tree and stores a durable DRAFT without touching Property.
  *  3. The browser signs publishRoot(newRoot) with Metamask. The backend never
@@ -16,28 +18,29 @@
  *  Only one DRAFT may exist at a time across IssuanceBatch and ChangeSet (D44):
  *  a root commits to the whole tree, so two parallel drafts silently overwrite
  *  each other. The UI must show the existing draft instead of offering to open
- *  a second one.
+ *  a second one — GET /api/government/drafts/open (D53) tells it which.
  */
-import { FileSignature } from 'lucide-react';
-
+import type { Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { PageHeader } from '@/components/ui/page-header';
-import { EmptyState } from '@/components/ui/empty-state';
-import { buttonStyles } from '@/components/ui/button';
 
-export function IssuanceView({ t }: { t: Dictionary['govIssuance'] }) {
+import { IssuanceWorkbench } from './issuance-workbench';
+
+export function IssuanceView({
+  lang,
+  t,
+  draftT,
+  errors,
+}: {
+  lang: Locale;
+  t: Dictionary['govIssuance'];
+  draftT: Dictionary['govDraft'];
+  errors: Dictionary['govErrors'];
+}) {
   return (
     <div className="space-y-8">
-      <PageHeader
-        title={t.title}
-        description={t.description}
-        action={
-          <button type="button" disabled className={buttonStyles.primary}>
-            {t.action}
-          </button>
-        }
-      />
-      <EmptyState icon={FileSignature} title={t.emptyTitle} description={t.emptyBody} />
+      <PageHeader title={t.title} description={t.description} />
+      <IssuanceWorkbench lang={lang} t={t} draftT={draftT} errors={errors} />
     </div>
   );
 }
