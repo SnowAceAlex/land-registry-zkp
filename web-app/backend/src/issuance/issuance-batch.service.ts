@@ -6,7 +6,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { DraftStatus, Property } from '@prisma/client';
+import { DraftStatus, IssuanceBatch, Property } from '@prisma/client';
 
 import { ArchiveEntry, ArchiveService } from './archive.service';
 import { ChainService } from '../chain/chain.service';
@@ -14,7 +14,7 @@ import { DraftLockService } from '../common/draft-lock.service';
 import { RootService } from '../government/root.service';
 import { PropertyEventService } from '../history/property-event.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { TreeService } from '../tree/tree.service';
+import { TreeService, sortByPropertyId } from '../tree/tree.service';
 import { IssuanceService } from './issuance.service';
 
 /** How long the batch archive — and therefore the only copy of the secrets — survives. */
@@ -31,6 +31,19 @@ export interface IssuanceBatchSummary {
   publishedAt: Date | null;
   archiveExpiresAt: Date | null;
   propertyCount: number;
+}
+
+/**
+ * What a portal needs to resume an open issuance draft (D53): enough to show
+ * the round and ask the wallet to sign `newRoot` again. Never the secrets —
+ * they stay in `draftSecrets` until confirm() packs them into the archive.
+ */
+export interface IssuanceDraftDetail {
+  kind: 'issuance';
+  id: number;
+  newRoot: string;
+  createdAt: Date;
+  propertyIds: string[];
 }
 
 /**
@@ -101,9 +114,7 @@ export class IssuanceBatchService {
    * Phase 1 — generate secrets, project the tree, store everything as a draft.
    * `Property` is deliberately left untouched until confirm().
    */
-  async createDraft(
-    propertyIds: string[],
-  ): Promise<{ id: number; newRoot: string; propertyIds: string[] }> {
+  async createDraft(propertyIds: string[]): Promise<IssuanceDraftDetail> {
     await this.lock.assertNoOpenDraft();
 
     const batch = await this.loadIssuable(propertyIds);
@@ -135,10 +146,42 @@ export class IssuanceBatchService {
       `issuance draft #${draft.id}: ${batch.length} propert(ies), projected root ${tree.root}`,
     );
 
+    return this.toDraftDetail(draft);
+  }
+
+  /**
+   * An open draft as the portal sees it (D53) — the same shape createDraft()
+   * returned, rebuilt from the stored row. This is how a session that lost
+   * that response (a closed tab, a crash between signing and confirming)
+   * finds the root it was asked to sign.
+   */
+  async draftDetail(id: number): Promise<IssuanceDraftDetail> {
+    const draft = await this.prisma.issuanceBatch.findUnique({ where: { id } });
+    if (!draft) throw new NotFoundException(`Issuance batch #${id} not found`);
+    if (draft.status !== 'DRAFT') {
+      throw new ConflictException(`Issuance batch #${id} is already ${draft.status}`);
+    }
+    return this.toDraftDetail(draft);
+  }
+
+  /**
+   * One mapping for both createDraft() and draftDetail(). The draft's
+   * membership is the key set of `draftSecrets` (see the class doc), sorted
+   * numerically: JSON keeps insertion order and "10" sorts before "9" as a
+   * string, so an unsorted list would reorder itself between the two calls.
+   */
+  private toDraftDetail(
+    draft: Pick<IssuanceBatch, 'id' | 'newRoot' | 'createdAt' | 'draftSecrets'>,
+  ): IssuanceDraftDetail {
+    const secrets = (draft.draftSecrets ?? {}) as Record<string, string>;
     return {
+      kind: 'issuance',
       id: draft.id,
       newRoot: draft.newRoot,
-      propertyIds: batch.map((property) => property.propertyId),
+      createdAt: draft.createdAt,
+      propertyIds: sortByPropertyId(Object.keys(secrets).map((propertyId) => ({ propertyId }))).map(
+        (row) => row.propertyId,
+      ),
     };
   }
 

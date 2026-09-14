@@ -42,6 +42,7 @@ import {
   PropertyDetailDto,
   RegistryStatusResponseDto,
 } from './dto/government.response.dto';
+import { OpenDraftService } from './open-draft.service';
 import { RevocationService } from './revocation.service';
 
 @ApiTags('Government')
@@ -60,6 +61,7 @@ export class GovernmentController {
     private readonly issuanceBatches: IssuanceBatchService,
     private readonly revocations: RevocationService,
     private readonly changeSets: ChangeSetService,
+    private readonly openDrafts: OpenDraftService,
   ) {}
 
   @Get('status')
@@ -123,6 +125,20 @@ export class GovernmentController {
       throw new BadRequestException("Upload a CSV file in the 'file' field");
     }
     return this.importService.importCsv(file.buffer.toString('utf8'));
+  }
+
+  @Get('drafts/open')
+  @ApiOperation({
+    summary: 'The draft currently waiting to be signed, if any (D53)',
+    description:
+      'At most one draft exists across issuance batches and change sets (D44). Returns ' +
+      '`{ draft: null }` when none is open; otherwise the same shape its create call returned — ' +
+      'for a change set that includes the revocationCalldata to sign. This is how a portal ' +
+      'resumes after losing the create response: compare `newRoot` with the on-chain ' +
+      'latestRoot to decide between signing again and calling confirm.',
+  })
+  openDraft() {
+    return this.openDrafts.current();
   }
 
   // Issuance draft — two-phase flow (D43), Metamask signs instead of the backend
