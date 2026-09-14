@@ -32,7 +32,7 @@ land-registry-zkp/
 
 ## Current Status
 
-Phases 0–4 of the roadmap are implemented and tested. The cryptographic and on-chain layers are complete; the web application is scaffolded but its service bodies are not written yet.
+Phases 0–7 of the roadmap are implemented and tested. The cryptographic layer, the contracts and the backend API (realigned to the UC-1…UC-6 flow) are complete; the frontend is scaffolded (routes, i18n, API-key gate, wallet providers) and its use-case screens are in progress.
 
 | Phase | Area                                                                     | Status         |
 | ----- | ------------------------------------------------------------------------ | -------------- |
@@ -43,12 +43,12 @@ Phases 0–4 of the roadmap are implemented and tested. The cryptographic and on
 | 4     | Smart contracts — `RootRegistry`, `LandRegistryVerifier`, deploy scripts | ✅ Done        |
 | 5     | Backend — government portal API (import, issue, publish)                 | ✅ Done        |
 | 6     | Backend — owner/proof API (refresh Merkle proof, verify off/on-chain)    | ✅ Done        |
-| 7     | Realign chain + backend to the UC-1…UC-6 flow (D42–D48)                  | ⬜ Not started |
-| 8     | Frontend — Government portal (UC-1…UC-4)                                 | ⬜ Not started |
+| 7     | Realign chain + backend to the UC-1…UC-6 flow (D42–D48)                  | ✅ Done        |
+| 8     | Frontend — Government portal (UC-1…UC-4)                                 | 🟡 In progress |
 | 9     | Frontend — Resident portal (UC-5, UC-6, history lookup)                  | ⬜ Not started |
 | 10–11 | E2E integration, evaluation metrics, thesis writing                      | ⬜ Not started |
 
-**Test suite**: 118 passing (`pnpm run test:blockchain`) + 105 passing (`pnpm run test:backend`). On a checkout without trusted-setup artifacts the proof-dependent blockchain tests self-skip → 102 passing + 16 pending, never failing.
+**Test suite**: 129 passing (`pnpm run test:blockchain`) + 153 passing (`pnpm run test:backend`). On a checkout without trusted-setup artifacts the proof-dependent blockchain tests self-skip → 113 passing + 16 pending, never failing.
 
 ---
 
