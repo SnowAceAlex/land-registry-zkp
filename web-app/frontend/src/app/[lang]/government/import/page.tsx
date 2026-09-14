@@ -8,7 +8,7 @@ import { ImportView } from '@/features/government/import/components/import-view'
 export default async function Page({ params }: PageProps<'/[lang]'>) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  const t = (await getDictionary(lang)).govImport;
+  const dict = await getDictionary(lang);
 
-  return <ImportView t={t} />;
+  return <ImportView lang={lang} t={dict.govImport} errors={dict.govErrors} />;
 }
