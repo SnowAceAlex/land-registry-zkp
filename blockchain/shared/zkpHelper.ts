@@ -101,9 +101,12 @@ export async function verifyGroth16Proof(
   publicSignals: PublicSignals,
   proof: Groth16Proof,
 ): Promise<boolean> {
-  // Lazy import keeps `fs` out of the static module graph so the shared barrel
-  // stays browser-safe (see the file-header note).
-  const { readFileSync } = await import('node:fs');
+  // Lazy `require('fs')` keeps `fs` out of the static module graph so the
+  // shared barrel stays browser-safe (see the file-header note). Never a
+  // dynamic import of the node-scheme specifier: webpack's client build cannot
+  // read that scheme at all and fails `next build` (browserSafety.test.ts).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { readFileSync } = require('fs') as typeof import('fs');
   const vkey = JSON.parse(readFileSync(vkeyPath, 'utf8'));
   return snarkjs.groth16.verify(vkey, publicSignals, proof);
 }

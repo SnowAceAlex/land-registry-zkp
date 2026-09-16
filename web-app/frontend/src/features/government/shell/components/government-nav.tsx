@@ -55,7 +55,7 @@ export function GovernmentNav({
   function signOut() {
     clearGovKey();
     // Full reload so every provider and cached query is dropped with the key.
-    window.location.assign(`/${lang}/government`);
+    window.location.assign(`/${lang}`);
   }
 
   return (

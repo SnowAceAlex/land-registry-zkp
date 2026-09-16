@@ -172,11 +172,13 @@ describe('IssuanceBatchService (D43)', () => {
 
   it('createDraft persists the draft and never touches a Property row', async () => {
     const propertyUpdate = jest.fn();
+    const createdAt = new Date('2026-09-14T02:00:00.000Z');
     const batchCreate = jest.fn().mockResolvedValue({
       id: 42,
       newRoot: '555',
       status: 'DRAFT',
       draftSecrets: { '1001': '111', '1002': '222' },
+      createdAt,
     });
     const prisma = {
       issuanceBatch: { findUnique: jest.fn(), update: jest.fn(), create: batchCreate },
@@ -215,7 +217,15 @@ describe('IssuanceBatchService (D43)', () => {
 
     const result = await service.createDraft(['1001', '1002']);
 
-    expect(result).toEqual({ id: 42, newRoot: '555', propertyIds: ['1001', '1002'] });
+    // The same shape draftDetail() rebuilds later (D53), so a portal that lost
+    // this response can recover the draft from GET /government/drafts/open.
+    expect(result).toEqual({
+      kind: 'issuance',
+      id: 42,
+      newRoot: '555',
+      createdAt,
+      propertyIds: ['1001', '1002'],
+    });
     expect(batchCreate).toHaveBeenCalledWith({
       data: {
         status: 'DRAFT',
@@ -604,5 +614,66 @@ describe('IssuanceBatchService (D43)', () => {
       expect.any(Array),
       expect.objectContaining({ txHash: '0xdeadbeef' }),
     );
+  });
+  describe('draftDetail (D53)', () => {
+    const serviceWith = (findUnique: jest.Mock) =>
+      new IssuanceBatchService(
+        { issuanceBatch: { findUnique } } as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        { assertNoOpenDraft: jest.fn() } as never,
+        {} as never,
+        {} as never,
+      );
+
+    it('rebuilds an open draft from its stored secrets, in propertyId order', async () => {
+      const createdAt = new Date('2026-09-14T02:00:00.000Z');
+      // Key order is insertion order in JSON — and "10" < "9" as strings — so
+      // the numeric sort is what makes the list stable for the portal.
+      const findUnique = jest
+        .fn()
+        .mockResolvedValue(
+          draftRow({
+            id: 7,
+            newRoot: '555',
+            createdAt,
+            draftSecrets: { '10': '1', '9': '2', '1001': '3' },
+          }),
+        );
+
+      await expect(serviceWith(findUnique).draftDetail(7)).resolves.toEqual({
+        kind: 'issuance',
+        id: 7,
+        newRoot: '555',
+        createdAt,
+        propertyIds: ['9', '10', '1001'],
+      });
+    });
+
+    it('never exposes the secrets themselves', async () => {
+      const findUnique = jest
+        .fn()
+        .mockResolvedValue(draftRow({ createdAt: new Date(), draftSecrets: { '1001': '424242' } }));
+
+      const detail = await serviceWith(findUnique).draftDetail(1);
+
+      expect(JSON.stringify(detail)).not.toContain('424242');
+    });
+
+    it('404s on an unknown batch', async () => {
+      const findUnique = jest.fn().mockResolvedValue(null);
+      await expect(serviceWith(findUnique).draftDetail(99)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('409s on a batch that is no longer a draft', async () => {
+      const findUnique = jest.fn().mockResolvedValue(draftRow({ status: 'PUBLISHED' }));
+      await expect(serviceWith(findUnique).draftDetail(1)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
   });
 });

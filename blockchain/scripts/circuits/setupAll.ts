@@ -29,6 +29,7 @@ import {
 import { BLOCKCHAIN_DIR, setupCircuit } from './trustedSetup';
 import { buildSampleInput } from './sampleWitness';
 import { syncVerifier } from './syncVerifiers';
+import { syncFrontendArtifacts } from './syncFrontendArtifacts';
 
 type CircuitType = ProofPackage['circuitType'];
 const CIRCUITS: CircuitType[] = ['ownership', 'mortgage', 'transfer'];
@@ -50,6 +51,10 @@ async function runCircuit(circuit: CircuitType): Promise<Metric> {
   // gitignored) so the on-chain contracts can never drift from this zkey.
   const syncedPath = path.relative(BLOCKCHAIN_DIR, syncVerifier(circuit));
   console.log(`  verifier → ${syncedPath}`);
+  // Phase 8 (D55): the browser prover must fetch this same zkey, never an
+  // older copy left in web-app/frontend/public/circuits/.
+  const frontendCopies = syncFrontendArtifacts(circuit);
+  console.log(`  frontend → ${path.relative(BLOCKCHAIN_DIR, path.dirname(frontendCopies[0]))}`);
   const { wasmPath, zkeyPath, vkeyPath } = getCircuitPaths(circuit, BLOCKCHAIN_DIR);
 
   const { input, expectedPublicSignals } = await buildSampleInput(circuit);

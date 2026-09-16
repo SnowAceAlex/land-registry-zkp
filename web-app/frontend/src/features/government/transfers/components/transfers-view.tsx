@@ -2,7 +2,8 @@
  * features/government/transfers/components/transfers-view.tsx - UC-3, transfer
  * at the counter.
  *
- * TODO (Phase 8):
+ * Implemented in Phase 8 (TransferCounter + TransferQueue); the list below is
+ * the spec they follow:
  *  1. All five transfer routes are behind the guard in Phase 7 (D47): the
  *     transfer is an officer's action at the counter, so preview/submit are no
  *     longer public the way D28 left them.
@@ -14,27 +15,39 @@
  *     The publish happens in UC-4 as part of a ChangeSet (D46).
  *  4. Needs a per-row rejection reason, and an inline error when a submitted
  *     transfer's proof has gone stale against a newer root.
+ *  5. The buyer's secret is generated at the counter and must be downloaded
+ *     before submit; the buyer's receipt is downloaded once PUBLISHED (D51).
  */
-import { ArrowRightLeft } from 'lucide-react';
-
 import type { Dictionary } from '@/i18n/dictionaries';
 import { PageHeader } from '@/components/ui/page-header';
-import { EmptyState } from '@/components/ui/empty-state';
-import { buttonStyles } from '@/components/ui/button';
 
-export function TransfersView({ t }: { t: Dictionary['govTransfers'] }) {
+import { TransferCounter } from './transfer-counter';
+import { TransferQueue } from './transfer-queue';
+
+export function TransfersView({
+  t,
+  errors,
+}: {
+  t: Dictionary['govTransfers'];
+  errors: Dictionary['govErrors'];
+}) {
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title={t.title}
-        description={t.description}
-        action={
-          <button type="button" disabled className={buttonStyles.primary}>
-            {t.action}
-          </button>
-        }
-      />
-      <EmptyState icon={ArrowRightLeft} title={t.emptyTitle} description={t.emptyBody} />
+    <div className="space-y-10">
+      <PageHeader title={t.title} description={t.description} />
+
+      <section aria-labelledby="transfer-counter" className="space-y-4">
+        <h2 id="transfer-counter" className="text-lg font-semibold tracking-tight">
+          {t.counterTitle}
+        </h2>
+        <TransferCounter t={t} errors={errors} />
+      </section>
+
+      <section aria-labelledby="transfer-queue" className="space-y-4">
+        <h2 id="transfer-queue" className="text-lg font-semibold tracking-tight">
+          {t.queueTitle}
+        </h2>
+        <TransferQueue t={t} errors={errors} />
+      </section>
     </div>
   );
 }

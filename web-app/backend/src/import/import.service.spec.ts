@@ -11,13 +11,22 @@ import { PrismaService } from '../prisma/prisma.service';
 /** Commune-level units the address tests resolve against, standing in for the seeded catalog. */
 const CATALOG = ['Sài Gòn', 'Tân Định', 'Bình Mỹ'];
 
-function makeService({ catalog = CATALOG }: { catalog?: string[] } = {}) {
+function makeService({
+  catalog = CATALOG,
+  existing = [],
+}: { catalog?: string[]; existing?: string[] } = {}) {
   const createMany = jest.fn(async ({ data }: { data: Prisma.PropertyCreateManyInput[] }) => ({
-    count: data.length,
+    // Mirrors skipDuplicates: rows whose propertyId is already registered are not written.
+    count: data.filter((input) => !existing.includes(input.propertyId)).length,
   }));
   const findMany = jest.fn(async () => catalog.map((name) => ({ name })));
+  const propertyFindMany = jest.fn(async ({ where }: { where: { propertyId: { in: string[] } } }) =>
+    existing
+      .filter((propertyId) => where.propertyId.in.includes(propertyId))
+      .map((propertyId) => ({ propertyId })),
+  );
   const prisma = {
-    property: { createMany },
+    property: { createMany, findMany: propertyFindMany },
     administrativeUnit: { findMany },
   } as unknown as PrismaService;
 
@@ -79,6 +88,38 @@ function row(overrides: Partial<Record<(typeof COLUMNS)[number], string>> = {}):
 }
 
 describe('ImportService', () => {
+  describe('dry run before writing (D52)', () => {
+    const twoRows = [
+      HEADER,
+      row({ propertyId: '1', certificateSerial: 'CT 100001' }),
+      row({ propertyId: '2', certificateSerial: 'CT 100002' }),
+      row({ propertyId: '3', landUseCode: 'ZZZ', certificateSerial: 'CT 100003' }),
+    ].join('\n');
+
+    it('validates every row but writes nothing', async () => {
+      const { service, createMany } = makeService();
+
+      const result = await service.importCsv(twoRows, { dryRun: true });
+
+      expect(createMany).not.toHaveBeenCalled();
+      expect(result.dryRun).toBe(true);
+      expect(result.imported).toBe(2);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].propertyId).toBe('3');
+    });
+
+    it('counts valid rows already in the registry as skipped, as the real import would', async () => {
+      const { service } = makeService({ existing: ['2'] });
+
+      const preview = await service.importCsv(twoRows, { dryRun: true });
+      const written = await service.importCsv(twoRows);
+
+      expect(preview).toMatchObject({ imported: 1, skipped: 1 });
+      // The preview is only useful if it predicts the commit exactly.
+      expect(written).toMatchObject({ dryRun: false, imported: 1, skipped: 1 });
+    });
+  });
+
   it('derives useType from landUseCode rather than trusting the file (D2)', async () => {
     const { service, created } = makeService();
 
@@ -422,17 +463,35 @@ describe('ImportService', () => {
       expect(result.errors[0].message).toMatch(/not in the administrative catalog/);
     });
 
-    it('imports with a warning when the catalog has not been seeded yet', async () => {
+    it('imports and flags an unseeded catalog once, not as a warning on every row (D52)', async () => {
       const { service } = makeService({ catalog: [] });
 
       // Without a catalog the check cannot run. Blocking every import until the
-      // official list is loaded would be worse than saying so plainly.
+      // official list is loaded would be worse than saying so plainly — but
+      // saying it once per row buries every real warning under identical noise.
       const result = await service.importCsv(
-        [HEADER, row({ address: 'Số 3, Đường Lê Lợi, Phường Đa Kao, TP.HCM' })].join('\n'),
+        [
+          HEADER,
+          row({ address: 'Số 3, Đường Lê Lợi, Phường Đa Kao, TP.HCM' }),
+          row({
+            propertyId: '2',
+            certificateSerial: 'CT 100002',
+            address: 'Số 5, Đường Lê Lợi, Phường Đa Kao, TP.HCM',
+          }),
+        ].join('\n'),
       );
 
-      expect(result.imported).toBe(1);
-      expect(result.warnings[0].message).toMatch(/catalog\s+is empty/);
+      expect(result.imported).toBe(2);
+      expect(result.catalogEmpty).toBe(true);
+      expect(result.warnings).toEqual([]);
+    });
+
+    it('reports catalogEmpty: false once the catalog is seeded', async () => {
+      const { service } = makeService();
+
+      const result = await service.importCsv([HEADER, row()].join('\n'));
+
+      expect(result.catalogEmpty).toBe(false);
     });
 
     it('rejects an agency that is not competent under the current law', async () => {

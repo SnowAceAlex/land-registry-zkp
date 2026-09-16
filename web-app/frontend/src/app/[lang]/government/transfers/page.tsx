@@ -8,7 +8,7 @@ import { TransfersView } from '@/features/government/transfers/components/transf
 export default async function Page({ params }: PageProps<'/[lang]'>) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  const t = (await getDictionary(lang)).govTransfers;
+  const dict = await getDictionary(lang);
 
-  return <TransfersView t={t} />;
+  return <TransfersView t={dict.govTransfers} errors={dict.govErrors} />;
 }

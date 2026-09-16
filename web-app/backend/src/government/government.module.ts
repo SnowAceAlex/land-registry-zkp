@@ -8,6 +8,7 @@ import { GovernmentService } from './government.service';
 import { HistoryModule } from '../history/history.module';
 import { ImportModule } from '../import/import.module';
 import { IssuanceModule } from '../issuance/issuance.module';
+import { OpenDraftService } from './open-draft.service';
 import { RevocationService } from './revocation.service';
 import { RootModule } from './root.module';
 import { TreeModule } from '../tree/tree.module';
@@ -53,7 +54,7 @@ import { TreeModule } from '../tree/tree.module';
     DraftLockModule,
   ],
   controllers: [GovernmentController],
-  providers: [GovernmentService, RevocationService, ChangeSetService],
+  providers: [GovernmentService, RevocationService, ChangeSetService, OpenDraftService],
   exports: [RootModule],
 })
 export class GovernmentModule {}

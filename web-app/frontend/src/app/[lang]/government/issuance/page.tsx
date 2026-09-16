@@ -8,7 +8,9 @@ import { IssuanceView } from '@/features/government/issuance/components/issuance
 export default async function Page({ params }: PageProps<'/[lang]'>) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  const t = (await getDictionary(lang)).govIssuance;
+  const dict = await getDictionary(lang);
 
-  return <IssuanceView t={t} />;
+  return (
+    <IssuanceView lang={lang} t={dict.govIssuance} draftT={dict.govDraft} errors={dict.govErrors} />
+  );
 }

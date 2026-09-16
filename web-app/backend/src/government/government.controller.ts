@@ -30,7 +30,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { ApiKeyGuard, GOV_API_KEY_HEADER, GOV_API_KEY_SECURITY } from '../common/api-key.guard';
 import { parsePageQuery } from '../common/pagination';
 import { ChangeSetService } from './changeset.service';
-import { GovernmentService } from './government.service';
+import { GovernmentService, parsePropertyStatus } from './government.service';
 import { ImportService } from '../import/import.service';
 import { ImportResult } from '../import/dto/import.response.dto';
 import { IssuanceBatchService } from '../issuance/issuance-batch.service';
@@ -42,6 +42,7 @@ import {
   PropertyDetailDto,
   RegistryStatusResponseDto,
 } from './dto/government.response.dto';
+import { OpenDraftService } from './open-draft.service';
 import { RevocationService } from './revocation.service';
 
 @ApiTags('Government')
@@ -60,6 +61,7 @@ export class GovernmentController {
     private readonly issuanceBatches: IssuanceBatchService,
     private readonly revocations: RevocationService,
     private readonly changeSets: ChangeSetService,
+    private readonly openDrafts: OpenDraftService,
   ) {}
 
   @Get('status')
@@ -78,9 +80,19 @@ export class GovernmentController {
   @ApiOperation({ summary: 'List properties with their issuance status' })
   @ApiQuery({ name: 'skip', required: false, type: Number, example: 0 })
   @ApiQuery({ name: 'take', required: false, type: Number, example: 50, description: 'Max 200' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['IMPORTED', 'ISSUED', 'REVOKED'],
+    description: 'Only this status; `total` is counted under the same filter',
+  })
   @ApiOkResponse({ type: PropertyListResponseDto })
-  listProperties(@Query('skip') skip?: string, @Query('take') take?: string) {
-    return this.government.listProperties(parsePageQuery(skip, take));
+  listProperties(
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.government.listProperties(parsePageQuery(skip, take), parsePropertyStatus(status));
   }
 
   @Get('properties/:propertyId')
@@ -107,7 +119,15 @@ export class GovernmentController {
       'tenure), encumbranceStatus. `useType` and `tenureType` are derived server-side from ' +
       '`landUseCode` (D2) rather than read from the file, so a typo cannot reach a leaf hash. ' +
       'Bad rows are reported individually and the rest still import. ' +
+      'Send `?dryRun=true` first to see the per-row verdict without writing anything (D52) — ' +
+      'an imported row cannot be edited or deleted through the API. ' +
       'Sample file: blockchain/fixtures/mockImport.csv.',
+  })
+  @ApiQuery({
+    name: 'dryRun',
+    required: false,
+    type: Boolean,
+    description: 'Validate and count, write nothing',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -118,11 +138,27 @@ export class GovernmentController {
     },
   })
   @ApiOkResponse({ type: ImportResult })
-  async import(@UploadedFile() file?: Express.Multer.File) {
+  async import(@UploadedFile() file?: Express.Multer.File, @Query('dryRun') dryRun?: string) {
     if (!file) {
       throw new BadRequestException("Upload a CSV file in the 'file' field");
     }
-    return this.importService.importCsv(file.buffer.toString('utf8'));
+    return this.importService.importCsv(file.buffer.toString('utf8'), {
+      dryRun: dryRun === 'true',
+    });
+  }
+
+  @Get('drafts/open')
+  @ApiOperation({
+    summary: 'The draft currently waiting to be signed, if any (D53)',
+    description:
+      'At most one draft exists across issuance batches and change sets (D44). Returns ' +
+      '`{ draft: null }` when none is open; otherwise the same shape its create call returned — ' +
+      'for a change set that includes the revocationCalldata to sign. This is how a portal ' +
+      'resumes after losing the create response: compare `newRoot` with the on-chain ' +
+      'latestRoot to decide between signing again and calling confirm.',
+  })
+  openDraft() {
+    return this.openDrafts.current();
   }
 
   // Issuance draft — two-phase flow (D43), Metamask signs instead of the backend

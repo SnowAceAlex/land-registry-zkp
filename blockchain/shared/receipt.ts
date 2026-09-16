@@ -21,11 +21,16 @@
  * owners. Renaming one breaks every issued bundle.
  *
  * Browser-safety: this module is pure types plus field mapping. The only
- * hashing it triggers is `hashOffchainMetadata`, which the barrel already
- * exposes.
+ * hashing it triggers is the descriptive-field digest — `node:crypto` for the
+ * sync reader, WebCrypto for the async one — and the node route loads its
+ * `crypto` lazily, so importing this module in a browser pulls in nothing.
  */
 
-import { hashOffchainMetadata, OffchainMetadata } from './offchainMetadata';
+import {
+  hashOffchainMetadata,
+  hashOffchainMetadataAsync,
+  OffchainMetadata,
+} from './offchainMetadata';
 import { EncumbranceStatus, LURRecord, TenureType, UseType } from './types';
 
 export interface ReceiptMerkleProof {
@@ -140,11 +145,25 @@ export function receiptOffchainMetadata(record: ReceiptDescriptiveFields): Offch
  * number, so an edited `area` or `address` leaves the proof verifying while the
  * certificate says something the registry never attested.
  *
- * Phase 9 note: the browser verifier needs an async twin of this that calls
- * `hashOffchainMetadataAsync` (node:crypto is unavailable there). Add it beside
- * this function so the field mapping still exists once.
+ * Node only — it hashes through `node:crypto`. Browser code (the Phase 8
+ * transfer counter, the Phase 9 portal) calls {@link receiptToLURRecordAsync}.
  */
 export function receiptToLURRecord(record: ReceiptRecord): LURRecord {
+  return withOffchainHash(record, hashOffchainMetadata(receiptOffchainMetadata(record)));
+}
+
+/**
+ * The browser twin of {@link receiptToLURRecord}: identical record, but the
+ * descriptive-field digest goes through WebCrypto because `node:crypto` does
+ * not exist in a browser. Both share {@link withOffchainHash}, so the field
+ * mapping still exists exactly once.
+ */
+export async function receiptToLURRecordAsync(record: ReceiptRecord): Promise<LURRecord> {
+  return withOffchainHash(record, await hashOffchainMetadataAsync(receiptOffchainMetadata(record)));
+}
+
+/** The six leaf fields of a receipt plus an already-computed `offchainHash`. */
+function withOffchainHash(record: ReceiptRecord, offchainHash: bigint): LURRecord {
   return {
     propertyId: BigInt(record.propertyId),
     ownerCommitment: BigInt(record.ownerCommitment),
@@ -152,6 +171,6 @@ export function receiptToLURRecord(record: ReceiptRecord): LURRecord {
     validityPeriod: BigInt(record.validityPeriod),
     encumbranceStatus: record.encumbranceStatus as EncumbranceStatus,
     tenureType: record.tenureType as TenureType,
-    offchainHash: hashOffchainMetadata(receiptOffchainMetadata(record)),
+    offchainHash,
   };
 }

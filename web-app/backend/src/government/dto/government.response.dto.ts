@@ -32,6 +32,13 @@ export class RegistryStatusResponseDto {
   @ApiProperty({ example: 'localhost', enum: ['localhost', 'sepolia', 'hardhat'] })
   network!: string;
 
+  /**
+   * Chain id of that deployment (D54). A wallet on any other chain would publish
+   * a root this backend never reads, so the portal checks this before signing.
+   */
+  @ApiProperty({ example: 31337 })
+  chainId!: number;
+
   /** RootRegistry the backend is talking to. */
   @ApiProperty({ example: '0x5FbDB2315678afecb367f032d93F642f64180aa3' })
   contractAddress!: string;
@@ -93,7 +100,7 @@ export class PropertySummaryDto {
   @ApiPropertyOptional({ nullable: true, format: 'date-time' })
   issuedAt!: Date | null;
 
-  @ApiProperty({ example: 'IMPORTED', enum: ['IMPORTED', 'ISSUED'] })
+  @ApiProperty({ example: 'IMPORTED', enum: ['IMPORTED', 'ISSUED', 'REVOKED'] })
   status!: string;
 }
 

@@ -27,10 +27,14 @@ dayjs.extend(timezone);
  * Turns published registry state into per-property owner bundles (D31, §3.1).
  */
 
-export interface BundleSource {
+/** What a receipt is built from: a row and its proof against a published root. */
+export interface ReceiptSource {
   property: Property;
-  ownerSecret: bigint;
   merkleProof: MerkleProofData;
+}
+
+export interface BundleSource extends ReceiptSource {
+  ownerSecret: bigint;
 }
 
 export interface PublishedRootContext {
@@ -79,8 +83,7 @@ export class IssuanceService {
     sources: BundleSource[],
     context: PublishedRootContext,
   ): Promise<BuiltBundle[]> {
-    const issuer = this.issuer.buildIssuerBlock();
-    const issuedOn = dayjs().tz(VN_TIMEZONE).format('YYYY-MM-DDTHH:mm:ssZ');
+    const { issuer, issuedOn } = this.batchContext();
 
     const bundles: BuiltBundle[] = [];
     for (const source of sources) {
@@ -102,6 +105,70 @@ export class IssuanceService {
     issuer: ReturnType<IssuerService['buildIssuerBlock']>,
     issuedOn: string,
   ): Promise<{ propertyId: string; receipt: Receipt; files: ZipEntry[] }> {
+    const { receipt, receiptFile, certificateFile } = await this.buildReceiptFiles(
+      source,
+      context,
+      issuer,
+      issuedOn,
+    );
+
+    return {
+      propertyId: source.property.propertyId,
+      receipt,
+      files: [
+        receiptFile,
+        {
+          name: 'secret.json',
+          content: JSON.stringify(
+            buildSecretFile(BigInt(source.property.propertyId), source.ownerSecret),
+            null,
+            2,
+          ),
+        },
+        certificateFile,
+        { name: 'README.txt', content: OWNER_README },
+      ],
+    };
+  }
+
+  /**
+   * The new owner's bundle after a published transfer (D51): receipt.json,
+   * certificate.pdf and README.txt — and deliberately no secret.json.
+   *
+   * The buyer's secret was generated in the officer's browser at the counter
+   * and never reached this backend, so there is nothing to put in one. The
+   * README tells the buyer to pair this with the secret.json handed over there.
+   */
+  async buildBuyerBundle(
+    source: ReceiptSource,
+    context: PublishedRootContext,
+    issuedAt: Date,
+  ): Promise<{ zip: Buffer; receipt: Receipt }> {
+    const { receipt, receiptFile, certificateFile } = await this.buildReceiptFiles(
+      source,
+      context,
+      this.issuer.buildIssuerBlock(),
+      formatIssuedOn(issuedAt),
+    );
+    const zip = await this.zip.create([
+      receiptFile,
+      certificateFile,
+      { name: 'README.txt', content: BUYER_README },
+    ]);
+    return { zip, receipt };
+  }
+
+  /**
+   * The shareable half of any bundle: the receipt and the certificate printed
+   * from it. One implementation for the owner bundle and the buyer bundle, so
+   * the two can never describe a record differently.
+   */
+  private async buildReceiptFiles(
+    source: ReceiptSource,
+    context: PublishedRootContext,
+    issuer: ReturnType<IssuerService['buildIssuerBlock']>,
+    issuedOn: string,
+  ): Promise<{ receipt: Receipt; receiptFile: ZipEntry; certificateFile: ZipEntry }> {
     const record: LURRecord = toLURRecord(source.property);
 
     const receipt = buildReceipt({
@@ -122,17 +189,9 @@ export class IssuanceService {
     const pdf = await this.pdf.renderCertificate(receipt, explorerUrl);
 
     return {
-      propertyId: source.property.propertyId,
       receipt,
-      files: [
-        { name: 'receipt.json', content: JSON.stringify(receipt, null, 2) },
-        {
-          name: 'secret.json',
-          content: JSON.stringify(buildSecretFile(record.propertyId, source.ownerSecret), null, 2),
-        },
-        { name: 'certificate.pdf', content: pdf },
-        { name: 'README.txt', content: OWNER_README },
-      ],
+      receiptFile: { name: 'receipt.json', content: JSON.stringify(receipt, null, 2) },
+      certificateFile: { name: 'certificate.pdf', content: pdf },
     };
   }
 
@@ -155,9 +214,14 @@ export class IssuanceService {
   batchContext() {
     return {
       issuer: this.issuer.buildIssuerBlock(),
-      issuedOn: dayjs().tz(VN_TIMEZONE).format('YYYY-MM-DDTHH:mm:ssZ'),
+      issuedOn: formatIssuedOn(new Date()),
     };
   }
+}
+
+/** `issuedOn` wire format: ISO-8601 with the +07:00 offset (D10). */
+function formatIssuedOn(date: Date): string {
+  return dayjs(date).tz(VN_TIMEZONE).format('YYYY-MM-DDTHH:mm:ssZ');
 }
 
 const OWNER_README = `BỘ HỒ SƠ QUYỀN SỬ DỤNG ĐẤT (BẢN ĐIỆN TỬ)
@@ -182,5 +246,31 @@ LƯU Ý VỀ TÍNH MỚI CỦA BẰNG CHỨNG MERKLE
 Mỗi lần có giao dịch chuyển nhượng trong hệ thống, gốc Merkle thay đổi và
 trường "merkleProof" trong receipt.json trở nên cũ. Cổng Chủ sở hữu tự động
 lấy bằng chứng mới trước khi tạo proof — bạn không cần thao tác gì. Trường
+"rootVersion" là dấu hiệu để đối chiếu.
+`;
+
+const BUYER_README = `BỘ HỒ SƠ QUYỀN SỬ DỤNG ĐẤT SAU CHUYỂN NHƯỢNG (BẢN ĐIỆN TỬ)
+==========================================================
+
+Bộ hồ sơ này gồm 2 tệp, cấp cho chủ sử dụng đất MỚI sau khi giao dịch chuyển
+nhượng đã được công bố lên blockchain:
+
+1. receipt.json   — CHIA SẺ ĐƯỢC.
+   Thông tin thửa đất đứng tên commitment của bạn, bằng chứng Merkle theo gốc
+   Merkle hiện hành và chuỗi chứng thư của cơ quan phát hành.
+
+2. certificate.pdf — bản in thông tin kèm mã QR đối chiếu gốc Merkle on-chain.
+
+BỘ HỒ SƠ NÀY KHÔNG CÓ secret.json
+---------------------------------
+secret.json của bạn đã được tạo và giao cho bạn TẠI QUẦY khi làm thủ tục chuyển
+nhượng. Hệ thống không bao giờ nhận được tệp đó, nên không thể gửi lại. Hãy đặt
+secret.json đã nhận tại quầy cùng thư mục với receipt.json này: cổng Chủ sở hữu
+cần cả hai để tạo bằng chứng ZK. TUYỆT ĐỐI KHÔNG CHIA SẺ secret.json.
+
+LƯU Ý VỀ TÍNH MỚI CỦA BẰNG CHỨNG MERKLE
+---------------------------------------
+Mỗi lần gốc Merkle thay đổi, trường "merkleProof" trong receipt.json trở nên cũ.
+Cổng Chủ sở hữu tự động lấy bằng chứng mới trước khi tạo proof. Trường
 "rootVersion" là dấu hiệu để đối chiếu.
 `;

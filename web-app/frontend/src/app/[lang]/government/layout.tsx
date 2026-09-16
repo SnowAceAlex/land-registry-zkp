@@ -16,6 +16,7 @@ import { getDictionary } from '@/i18n/dictionaries';
 import { WalletProviders } from '@/features/government/wallet/wallet-providers';
 import { GovernmentGate } from '@/features/government/auth/components/government-gate';
 import { GovernmentNav } from '@/features/government/shell/components/government-nav';
+import { RegistryStatusBar } from '@/features/government/shell/components/registry-status-bar';
 
 export default async function GovernmentLayout({ children, params }: LayoutProps<'/[lang]'>) {
   const { lang } = await params;
@@ -29,6 +30,7 @@ export default async function GovernmentLayout({ children, params }: LayoutProps
           <GovernmentNav lang={lang} t={dict.govNav} switcherLabel={dict.localeSwitcher.label} />
           {/* pb-20 clears the phone tab bar; md:pb-8 drops it back on desktop. */}
           <main className="mx-auto w-full max-w-300 flex-1 px-4 pt-6 pb-20 sm:px-6 md:px-8 md:pt-8 md:pb-8">
+            <RegistryStatusBar lang={lang} t={dict.govShell} />
             {children}
           </main>
         </div>

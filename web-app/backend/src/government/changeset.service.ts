@@ -5,7 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { Prisma, Property, Revocation, TransferRequest } from '@prisma/client';
+import { ChangeSet, Prisma, Property, Revocation, TransferRequest } from '@prisma/client';
 
 import { ChainService } from '../chain/chain.service';
 import { DraftLockService } from '../common/draft-lock.service';
@@ -13,6 +13,38 @@ import { PropertyEventService } from '../history/property-event.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TreeService } from '../tree/tree.service';
 import { RootService } from './root.service';
+
+/**
+ * Most revocations one change set may carry (D56).
+ *
+ * `publishRootWithRevocations` has no length cap of its own, and a batch past
+ * the block gas limit reverts wholesale — nothing publishes. Measured in
+ * `blockchain/test/contracts/RootRegistry.revocation.test.ts`: 4,743,185 gas
+ * for 50 (~95k each), a sixth of a 30M block. The cap lives here rather than in
+ * the portal because createDraft() takes the WHOLE queue: there is no selection
+ * step a UI could limit.
+ */
+export const MAX_REVOCATIONS_PER_CHANGESET = 50;
+
+/** Arguments for `RootRegistry.publishRootWithRevocations`, index-aligned. */
+export interface RevocationCalldata {
+  propertyIds: string[];
+  reasonCodes: number[];
+  detailHashes: string[];
+}
+
+/** What a portal needs to sign (or resume signing) a change-set draft (D53). */
+export interface ChangeSetDraftDetail {
+  kind: 'changeset';
+  id: number;
+  newRoot: string;
+  createdAt: Date;
+  transferIds: number[];
+  revocationIds: number[];
+  revocationCalldata: RevocationCalldata;
+  /** Pending revocations left for a later round by the cap (D56). */
+  deferredRevocations: number;
+}
 
 /**
  * ChangeSetService — one publishing round of approved transfers and revocations (D44/D46).
@@ -81,17 +113,11 @@ export class ChangeSetService {
    * only `connect`ed to the new draft — so an abandoned draft can never leave
    * any of them in a half-applied state.
    */
-  async createDraft(): Promise<{
-    id: number;
-    newRoot: string;
-    transferIds: number[];
-    revocationIds: number[];
-    revocationCalldata: { propertyIds: string[]; reasonCodes: number[]; detailHashes: string[] };
-  }> {
+  async createDraft(): Promise<ChangeSetDraftDetail> {
     await this.lock.assertNoOpenDraft();
 
-    const { transfers, revocations } = await this.pending();
-    if (transfers.length === 0 && revocations.length === 0) {
+    const { transfers, revocations: pendingRevocations } = await this.pending();
+    if (transfers.length === 0 && pendingRevocations.length === 0) {
       throw new ConflictException('Nothing to publish — no approved transfers, no revocations');
     }
 
@@ -102,8 +128,12 @@ export class ChangeSetService {
     // had both, this batch would be asked to simultaneously keep it (under a
     // new owner) and drop it from the tree. Refuse instead of silently
     // picking one.
+    //
+    // Checked against the WHOLE queue, deferred revocations included: a plot
+    // transferred in this round and revoked in the next is the same conflict,
+    // just spread over two publishes.
     const seen = new Set<string>();
-    for (const item of [...transfers, ...revocations]) {
+    for (const item of [...transfers, ...pendingRevocations]) {
       if (seen.has(item.propertyId)) {
         throw new ConflictException(
           `Property ${item.propertyId} has both a transfer and a revocation pending — ` +
@@ -112,6 +142,9 @@ export class ChangeSetService {
       }
       seen.add(item.propertyId);
     }
+
+    // D56 — oldest first (pending() orders by createdAt), the rest wait.
+    const revocations = pendingRevocations.slice(0, MAX_REVOCATIONS_PER_CHANGESET);
 
     // Apply every change in memory, then take ONE root from the result. N
     // transfers and revocations batched together produce one root, not N.
@@ -135,9 +168,56 @@ export class ChangeSetService {
         `${revocations.length} revocation(s), projected root ${tree.root}`,
     );
 
+    return this.toDraftDetail(
+      draft,
+      transfers,
+      revocations,
+      pendingRevocations.length - revocations.length,
+    );
+  }
+
+  /**
+   * An open draft as the portal sees it (D53) — the same shape createDraft()
+   * returned, rebuilt from the stored relations. Without it a session that
+   * lost that response could never sign again: pending() excludes everything
+   * already connected to a draft, so the calldata would exist nowhere.
+   */
+  async draftDetail(id: number): Promise<ChangeSetDraftDetail> {
+    const draft = await this.prisma.changeSet.findUnique({
+      where: { id },
+      include: {
+        transfers: { orderBy: { createdAt: 'asc' } },
+        revocations: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+    if (!draft) throw new NotFoundException(`Change set #${id} not found`);
+    if (draft.status !== 'DRAFT') {
+      throw new ConflictException(`Change set #${id} is already ${draft.status}`);
+    }
+
+    const deferred = await this.prisma.revocation.count({
+      where: { status: 'PENDING', changeSetId: null },
+    });
+    return this.toDraftDetail(draft, draft.transfers, draft.revocations, deferred);
+  }
+
+  /**
+   * One mapping for createDraft() and draftDetail(), so the calldata a resumed
+   * session signs is built by the same code as the calldata first shown. Order
+   * does not affect the root (it is rebuilt from the database) — only the
+   * order the contract writes its `revocations` mapping in.
+   */
+  private toDraftDetail(
+    draft: Pick<ChangeSet, 'id' | 'newRoot' | 'createdAt'>,
+    transfers: Pick<TransferRequest, 'id'>[],
+    revocations: Pick<Revocation, 'id' | 'propertyId' | 'reasonCode' | 'detailHash'>[],
+    deferredRevocations: number,
+  ): ChangeSetDraftDetail {
     return {
+      kind: 'changeset',
       id: draft.id,
       newRoot: draft.newRoot,
+      createdAt: draft.createdAt,
       transferIds: transfers.map((t) => t.id),
       revocationIds: revocations.map((r) => r.id),
       revocationCalldata: {
@@ -145,6 +225,7 @@ export class ChangeSetService {
         reasonCodes: revocations.map((r) => r.reasonCode),
         detailHashes: revocations.map((r) => r.detailHash),
       },
+      deferredRevocations,
     };
   }
 

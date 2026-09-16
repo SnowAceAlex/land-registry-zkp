@@ -1,7 +1,19 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { TransferStatus } from '@prisma/client';
+import { Response } from 'express';
 import {
   ApiConflictResponse,
+  ApiGoneResponse,
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
@@ -18,6 +30,7 @@ import {
   TransferPreviewResult,
   TransferRequestDto,
 } from './dto/transfer.response.dto';
+import { TransferBundleService } from './transfer-bundle.service';
 import { TransfersService } from './transfers.service';
 
 /**
@@ -39,7 +52,10 @@ import { TransfersService } from './transfers.service';
 @ApiTags('Transfers')
 @Controller('transfers')
 export class TransfersController {
-  constructor(private readonly transfers: TransfersService) {}
+  constructor(
+    private readonly transfers: TransfersService,
+    private readonly bundles: TransferBundleService,
+  ) {}
 
   @Post('preview')
   @UseGuards(ApiKeyGuard)
@@ -117,6 +133,35 @@ export class TransfersController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid x-gov-api-key header' })
   approve(@Param('id', ParseIntPipe) id: number) {
     return this.transfers.approve(id);
+  }
+
+  @Get(':id/bundle')
+  @UseGuards(ApiKeyGuard)
+  @ApiSecurity(GOV_API_KEY_SECURITY)
+  @ApiOperation({
+    summary: "Download the new owner's receipt + certificate once published (officer, D51)",
+    description:
+      'A ZIP of receipt.json, certificate.pdf and README.txt describing the plot under its new ' +
+      'owner at the current root. It never contains secret.json: the buyer’s secret was ' +
+      'generated in the officer’s browser at the counter and never reached the backend. ' +
+      'Officer-only because the certificate carries the descriptive fields D50 keeps off ' +
+      'the public tier; the officer hands the files to the buyer, as with the issuance archive.',
+  })
+  @ApiConflictResponse({
+    description:
+      'Not published yet, the plot has changed hands again since, or the database tree is not ' +
+      'the published root',
+  })
+  @ApiGoneResponse({ description: 'The certificate has since been revoked' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid x-gov-api-key header' })
+  async downloadBundle(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    const { zip, filename } = await this.bundles.build(id);
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': String(zip.length),
+    });
+    res.end(zip);
   }
 
   @Post(':id/reject')

@@ -109,6 +109,20 @@ export class ChainService implements OnModuleInit {
     return (process.env.CHAIN_NETWORK ?? 'localhost') as ChainNetwork;
   }
 
+  /**
+   * Chain id of the deployment this service reads (D54). The government portal
+   * checks its wallet against this before signing: a root published on another
+   * chain is one confirm() can never find.
+   */
+  get chainId(): number {
+    return this.deployment.chainId;
+  }
+
+  /** Block-explorer prefix for a transaction hash; none on a local node. */
+  get explorerTxUrlPrefix(): string | undefined {
+    return this.network === 'sepolia' ? 'https://sepolia.etherscan.io/tx/' : undefined;
+  }
+
   /** keccak256 of the X.509 organization name anchored on-chain for an authority (D30). */
   async getAuthorityInstitute(account: string): Promise<string> {
     return this.registry.authorityInstitute(account);

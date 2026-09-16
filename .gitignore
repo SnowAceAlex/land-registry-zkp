@@ -18,6 +18,9 @@ blockchain/circuits/build/
 # Auto-synced from circuits/build/ by verifiers:sync — must match the gitignored
 # .zkey, so never committed; regenerate via circuits:setup
 blockchain/contracts/verifiers/*.sol
+# Auto-synced from circuits/build/ by circuits:sync-frontend (D55) — the browser's
+# copy of the proving artifacts; must match the gitignored .zkey, never committed
+web-app/frontend/public/circuits/
 # Throwaway local deployments (chain resets, addresses are deterministic).
 # deployments/sepolia.json IS committed — it is the record of the live demo.
 blockchain/deployments/hardhat.json
@@ -104,6 +107,7 @@ DEFECTS-land-registry-audit.md
 PHASE_4_NOTES.md
 PHASE_5_MANUAL_TEST.md
 PHASE_6_MANUAL_TEST.md
+PHASE_8_MANUAL_TEST.md
 PHASE_5_CODE_MAP.md
 PHASE_6_CODE_MAP.md
 DEFENSE_SCRIPT.md
