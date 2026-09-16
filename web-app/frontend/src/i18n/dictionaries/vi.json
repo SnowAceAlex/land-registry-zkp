@@ -7,8 +7,8 @@
     "label": "Ngôn ngữ"
   },
   "landing": {
-    "residentTitle": "Kiểm tra một thửa đất mà không cần đọc hồ sơ.",
-    "residentBody": "Người sử dụng đất tạo bằng chứng ngay trên trình duyệt của mình. Bên mua, ngân hàng hoặc cơ quan nhà nước đối chiếu bằng chứng đó với gốc Merkle mà cơ quan đăng ký đã công bố trên Ethereum.",
+    "residentTitle": "Cổng công dân",
+    "residentBody": "Tạo bằng chứng từ bộ hồ sơ được cấp, xác minh một bằng chứng nhận được, hoặc tra cứu lịch sử một thửa đất.",
     "residentCta": "Vào cổng công dân",
     "shortcutsLabel": "Đi thẳng tới",
     "shortcutProof": "Tạo bằng chứng",

@@ -1,7 +1,7 @@
 {
   "network": "sepolia",
   "chainId": 11155111,
-  "deployedAt": "2026-09-03T07:03:50.427Z",
+  "deployedAt": "2026-09-16T02:31:26.536Z",
   "deployer": "0xc128Eb26F177BB6a3b4374A715be350887ED7726",
   "authority": {
     "address": "0xc128Eb26F177BB6a3b4374A715be350887ED7726",
@@ -9,10 +9,10 @@
     "instituteHash": "0x1f730914c2418f93d7466bfc23ec84f2790208f8c887355a7acaa798fa0ba603"
   },
   "contracts": {
-    "RootRegistry": "0x3CBD3283Fb68161eEBC3562DA932FA2069B79051",
-    "Groth16VerifierOwnership": "0xdb6Ff4C5AccDDCE18FeA15F142e2cA0522622191",
-    "Groth16VerifierMortgage": "0x09b58698794616C9CBa7e93Dc5ec50Ce2EcaC4E1",
-    "Groth16VerifierTransfer": "0xAc67625eBc18EE181457eF43066852b1C95B3F7e",
-    "LandRegistryVerifier": "0x2b3c99069AC88cD5eBd20f9657B35364aF25a367"
+    "RootRegistry": "0xc20ebA65859D394CEFe38B5e8CDD9f7bEce51B06",
+    "Groth16VerifierOwnership": "0xe1EeA3021BFa69CcBcE72A1d5b677F47900d1615",
+    "Groth16VerifierMortgage": "0xD02B852aECBf63d3854Cdd02e6D2d1beF2691332",
+    "Groth16VerifierTransfer": "0x20e420E0749bF9224AD72bf577f513ed70e60baa",
+    "LandRegistryVerifier": "0xE3708C5ed76028800DAf2e1e3BD320ff46fAE19B"
   }
 }

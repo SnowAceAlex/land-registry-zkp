@@ -7,8 +7,8 @@
     "label": "Language"
   },
   "landing": {
-    "residentTitle": "Check a land title without reading the file.",
-    "residentBody": "An owner generates a proof in their own browser. A buyer, bank or agency checks it against the root the registry published on Ethereum.",
+    "residentTitle": "Resident portal",
+    "residentBody": "Generate a proof from your certificate bundle, verify one you were given, or look up a property’s history.",
     "residentCta": "Enter public portal",
     "shortcutsLabel": "Go straight to",
     "shortcutProof": "Generate a proof",
