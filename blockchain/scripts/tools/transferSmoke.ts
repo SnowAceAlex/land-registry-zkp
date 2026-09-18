@@ -34,6 +34,11 @@
  *
  * The directory is a claimed bundle: it must contain receipt.json AND
  * secret.json — the secret never leaves the owner, so only they can do this.
+ *
+ * SAVE_PROOF_DIR=<dir> also writes the transfer proof to
+ * <dir>/transfer.verify.json, in the shape proof:bodies writes. That file is
+ * how the Phase-9 `/resident/verify` runbook gets a transfer proof to check;
+ * nothing in the resident portal can generate one (see the note at the call).
  */
 
 import { randomBytes } from 'crypto';
@@ -184,6 +189,27 @@ async function main(): Promise<void> {
   const startedAt = Date.now();
   const proof = await generateGroth16Proof(input, wasmPath, zkeyPath, 'transfer');
   console.log(`proof     generated in ${Date.now() - startedAt} ms`);
+
+  // The only way to obtain a transfer proof.json for the Phase-9 verifier
+  // runbook. No resident screen can produce one: a transfer witness needs BOTH
+  // parties' secrets and the guarded preview (D47/D51), so /resident/proof
+  // deliberately offers ownership and mortgage only. Same file shape as
+  // proof:bodies writes, so `/resident/verify` reads it with no special case.
+  if (process.env.SAVE_PROOF_DIR) {
+    const outDir = process.env.SAVE_PROOF_DIR;
+    const filePath = path.join(outDir, 'transfer.verify.json');
+    const body = {
+      circuitType: 'transfer',
+      proof: proof.proof,
+      publicSignals: proof.publicSignals,
+      onChain: false,
+    };
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(body, null, 2), 'utf8');
+    // ⚠️ Expires with the proof: currentTimestamp is baked in and the registry
+    // rejects anything more than 600s off (D26).
+    console.log(`saved     ${filePath} — paste within ~10 minutes (D26)`);
+  }
 
   const submission = {
     propertyId,

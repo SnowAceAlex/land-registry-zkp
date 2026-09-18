@@ -6,12 +6,17 @@
  * ⚠️  IMPORTANT DESIGN RULE:
  *   This file is the single entry point for Groth16 proof GENERATION and
  *   VERIFICATION (snarkjs.groth16.fullProve / groth16.verify). Backend
- *   (proof.service.ts), the trusted-setup scripts, and tests prove/verify only
- *   through here — never call groth16.fullProve/verify directly elsewhere. The
- *   browser prover (frontend lib/zkp.ts) is the one documented exception: it
- *   calls snarkjs directly with fetched WASM/zkey URLs, and reuses only the
- *   browser-safe primitives (assertTimestampFresh + PUBLIC_SIGNAL_ORDER) — see
- *   the lazy `fs` note below.
+ *   (proof.service.ts), the trusted-setup scripts, tests AND the browser
+ *   (frontend lib/zkp.worker.ts) prove/verify only through here — never call
+ *   groth16.fullProve/verify directly elsewhere.
+ *
+ *   The browser differs only in how it names its artifacts and its vkey:
+ *   `generateGroth16Proof` takes fetched WASM/zkey URLs where Node passes file
+ *   paths, and verification splits in two (D59) —
+ *   `verifyGroth16ProofWithKey` takes a vkey the caller already parsed (the
+ *   browser fetches the JSON), while `verifyGroth16Proof` reads the file from
+ *   disk and delegates to it. So each snarkjs call still has exactly one call
+ *   site. See the lazy `fs` note below for why the split is necessary.
  *
  *   The one-time trusted-setup APIs (snarkjs.r1cs.* / snarkjs.zKey.*) are a
  *   different concern — key generation, not proving — and are called directly
@@ -82,7 +87,13 @@ export async function generateGroth16Proof(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Verify a Groth16 proof off-chain using the verification key.
+ * Verify a Groth16 proof off-chain against an ALREADY-PARSED verification key.
+ *
+ * This is the browser's entry point (D59): a page cannot read a vkey from disk,
+ * so it fetches `verification_key.json` over HTTP and hands the parsed object
+ * here — from inside the Web Worker, so snarkjs stays out of the page chunk.
+ * {@link verifyGroth16Proof} is the Node path and delegates to this, which is
+ * what keeps `snarkjs.groth16.verify` to exactly one call site in the repo.
  *
  * This is a THIN cryptographic check — it proves the witness satisfied the
  * circuit, nothing more. It deliberately does NOT check timestamp freshness:
@@ -90,6 +101,26 @@ export async function generateGroth16Proof(
  * (D26), because `currentTimestamp` is a prover-chosen public input and a stale
  * proof verifies perfectly. On-chain verification uses the generated Solidity
  * verifier plus a block.timestamp check in LandRegistryVerifier (Phase 4).
+ *
+ * @param vkey          The parsed contents of a verification_key.json.
+ * @param publicSignals The public signals from the prover.
+ * @param proof         The Groth16 proof object.
+ * @returns             true if the proof is cryptographically valid.
+ */
+export async function verifyGroth16ProofWithKey(
+  vkey: unknown,
+  publicSignals: PublicSignals,
+  proof: Groth16Proof,
+): Promise<boolean> {
+  return snarkjs.groth16.verify(vkey, publicSignals, proof);
+}
+
+/**
+ * Verify a Groth16 proof off-chain, reading the verification key from disk.
+ *
+ * The Node path (backend, scripts, tests). Reads the file and delegates to
+ * {@link verifyGroth16ProofWithKey}; see that function for what the check does
+ * and does not cover.
  *
  * @param vkeyPath      Path to the verification_key.json file.
  * @param publicSignals The public signals from the prover.
@@ -108,7 +139,7 @@ export async function verifyGroth16Proof(
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { readFileSync } = require('fs') as typeof import('fs');
   const vkey = JSON.parse(readFileSync(vkeyPath, 'utf8'));
-  return snarkjs.groth16.verify(vkey, publicSignals, proof);
+  return verifyGroth16ProofWithKey(vkey, publicSignals, proof);
 }
 
 /**

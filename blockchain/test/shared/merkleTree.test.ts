@@ -2,11 +2,14 @@ import { expect } from 'chai';
 
 import { generateMockRecords } from '../../scripts/tools/generateMockData';
 import {
+  LEAF_FIELD_ORDER,
   MAX_PROPERTY_ID,
   TREE_DEPTH,
   buildTree,
   generateMerkleProof,
   getMerkleRoot,
+  hashRecord,
+  poseidonHash,
   verifyMerkleProof,
 } from '../../shared/merkleTree';
 
@@ -20,6 +23,41 @@ function indexFromPathIndices(pathIndices: number[]): bigint {
 }
 
 describe('merkleTree (Phase 1)', () => {
+  // D67: hashRecord maps over LEAF_FIELD_ORDER, so the array IS the D4 order.
+  // These two tests restate that order literally — a reorder of the array is
+  // then a test failure here, not a silently different tree. The circuit-side
+  // copy (leafHasher.circom) is guarded separately by test/circuits/*.
+  describe('LEAF_FIELD_ORDER (D4/D67)', () => {
+    it('is the 7 leaf fields in the order the circuits hash them', () => {
+      expect([...LEAF_FIELD_ORDER]).to.deep.equal([
+        'propertyId',
+        'ownerCommitment',
+        'useType',
+        'validityPeriod',
+        'encumbranceStatus',
+        'tenureType',
+        'offchainHash',
+      ]);
+    });
+
+    it('is the order hashRecord actually hashes in', async () => {
+      const { records } = await generateMockRecords(1);
+      const record = records[0];
+
+      expect(await hashRecord(record)).to.equal(
+        await poseidonHash([
+          record.propertyId,
+          record.ownerCommitment,
+          BigInt(record.useType),
+          record.validityPeriod,
+          BigInt(record.encumbranceStatus),
+          BigInt(record.tenureType),
+          record.offchainHash,
+        ]),
+      );
+    });
+  });
+
   it('builds a tree and produces a non-zero root', async () => {
     const { records } = await generateMockRecords(20);
     const tree = await buildTree(records);

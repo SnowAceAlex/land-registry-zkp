@@ -69,21 +69,41 @@ export async function poseidonHash(inputs: bigint[]): Promise<bigint> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * The order of the 7 fields hashed into a leaf (D4) — the ONLY TypeScript-side
+ * copy. The circuit-side copy is `LeafHasher()` in
+ * `circuits/common/leafHasher.circom`; drift between the two is caught by the
+ * positive tests in `test/circuits/{ownership,mortgage,transfer}.test.ts`.
+ *
+ * Exported because readers need the list as data, not just as a hash: the
+ * Phase-9 verifier page derives "which fields were never revealed" by
+ * subtracting a circuit's `PUBLIC_SIGNAL_ORDER` from this (D67). Retyping the
+ * names there would be a second copy, and a silent one.
+ *
+ * ⚠️  Never reorder. `hashRecord` maps over this array, so a reorder here is a
+ *     reorder of every leaf in the tree.
+ */
+export const LEAF_FIELD_ORDER = [
+  'propertyId',
+  'ownerCommitment',
+  'useType',
+  'validityPeriod',
+  'encumbranceStatus',
+  'tenureType',
+  'offchainHash',
+] as const satisfies readonly (keyof LURRecord)[];
+
+/**
  * Compute the Poseidon leaf hash for a LUR record.
  * leaf = Poseidon([propertyId, ownerCommitment, useType, validityPeriod,
  *                  encumbranceStatus, tenureType, offchainHash])
- * This exact field order must match the circom circuits (D4) — never reorder.
+ * This exact field order must match the circom circuits (D4) — it is
+ * {@link LEAF_FIELD_ORDER}, and nothing else here restates it.
+ *
+ * `BigInt()` covers both member types: four fields are already `bigint`, the
+ * other three are numeric enums (`useType`, `encumbranceStatus`, `tenureType`).
  */
 export async function hashRecord(record: LURRecord): Promise<bigint> {
-  return poseidonHash([
-    record.propertyId,
-    record.ownerCommitment,
-    BigInt(record.useType),
-    record.validityPeriod,
-    BigInt(record.encumbranceStatus),
-    BigInt(record.tenureType),
-    record.offchainHash,
-  ]);
+  return poseidonHash(LEAF_FIELD_ORDER.map((field) => BigInt(record[field])));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
