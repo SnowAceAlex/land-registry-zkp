@@ -55,22 +55,28 @@ describe('blockchain/shared stays bundleable for the browser (Phase 8/9)', () =>
   });
 
   /**
-   * `treeDimensions.ts` is imported directly by a browser page that hashes
-   * nothing (`/resident/lookup`), precisely so that page does not load
-   * cryptography. The barrel re-exports `merkleTree.ts`, whose top-level
-   * `circomlibjs` import costs ~3 MB through ffjavascript and web-worker; this
-   * page was 3.7 MB before the split and is 0.6 MB after it.
+   * `treeDimensions.ts` and `leafFields.ts` are imported DIRECTLY, by subpath,
+   * from browser pages that hash nothing — `/resident/lookup` needs the id
+   * range, `/resident/verify` needs the leaf field list to say which fields a
+   * proof never revealed (D67). The barrel re-exports `merkleTree.ts`, whose
+   * top-level `circomlibjs` import costs ~3 MB through ffjavascript and
+   * web-worker; `/resident/lookup` was 3.7 MB before this split and 0.6 MB
+   * after it.
    *
-   * One import added here would quietly put all of that back, and only a
-   * bundle measurement would notice. So: no imports at all.
+   * One runtime import added to either file would quietly put all of that
+   * back, and only a bundle measurement would notice. Type-only imports are
+   * fine: they are erased before the bundler ever sees them.
    */
-  it('keeps treeDimensions.ts free of every import, so a page can read the tree size cheaply', () => {
-    const source = fs.readFileSync(path.join(SHARED_DIR, 'treeDimensions.ts'), 'latin1');
-    const imports = [
-      ...source.matchAll(/^\s*(?:import\b|export\s+[^;]*\bfrom\b)/gm),
-      ...source.matchAll(/\brequire\(/g),
-    ].map((match) => match[0].trim());
+  for (const file of ['treeDimensions.ts', 'leafFields.ts']) {
+    it(`keeps ${file} free of runtime imports, so a page can read it cheaply`, () => {
+      const source = fs.readFileSync(path.join(SHARED_DIR, file), 'latin1');
+      const runtimeImports = [
+        ...source.matchAll(/^\s*import\b(?!\s+type\b)[^;]*;/gm),
+        ...source.matchAll(/^\s*export\s+(?!type\b)[^;]*\bfrom\b[^;]*;/gm),
+        ...source.matchAll(/\brequire\(/g),
+      ].map((match) => match[0].trim());
 
-    expect(imports).to.deep.equal([]);
-  });
+      expect(runtimeImports).to.deep.equal([]);
+    });
+  }
 });

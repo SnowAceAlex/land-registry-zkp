@@ -19,7 +19,10 @@
  */
 
 import { LURRecord, MerkleProofData, ProofInput, ProofPackage } from './types';
-import { TREE_DEPTH } from './merkleTree';
+// From treeDimensions, not merkleTree: merkleTree imports circomlibjs at the
+// top level, and pulling that in here would drag ~3 MB of cryptography into
+// every browser page that only needs a signal name or an index.
+import { TREE_DEPTH } from './treeDimensions';
 
 /** The three circuits. Declared in types.ts; named here for the lookups below. */
 export type CircuitType = ProofPackage['circuitType'];

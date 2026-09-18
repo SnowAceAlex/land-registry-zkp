@@ -26,16 +26,18 @@
  */
 
 import { buildPoseidon, Poseidon } from 'circomlibjs';
+import { LEAF_FIELD_ORDER } from './leafFields';
 import { MAX_PROPERTY_ID, TREE_DEPTH } from './treeDimensions';
 import { LURRecord, MerkleProofData } from './types';
 
 /**
  * Re-exported so every existing importer — and the shared barrel — keeps
- * finding these here. They are DEFINED in `treeDimensions.ts`, which has no
- * dependencies, so a browser page can read the tree's dimensions without
- * pulling circomlibjs in through this module. See that file for why.
+ * finding these here. They are DEFINED in `treeDimensions.ts` and
+ * `leafFields.ts`, neither of which has a runtime dependency, so a browser
+ * page can read the tree's shape without pulling circomlibjs in through this
+ * module. See those files for why.
  */
-export { MAX_PROPERTY_ID, TREE_DEPTH };
+export { LEAF_FIELD_ORDER, MAX_PROPERTY_ID, TREE_DEPTH };
 
 /** Sentinel value for an empty leaf (level 0 of the zero-hash chain). */
 const EMPTY_LEAF = 0n;
@@ -67,30 +69,6 @@ export async function poseidonHash(inputs: bigint[]): Promise<bigint> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Record Leaf Hashing
 // ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * The order of the 7 fields hashed into a leaf (D4) — the ONLY TypeScript-side
- * copy. The circuit-side copy is `LeafHasher()` in
- * `circuits/common/leafHasher.circom`; drift between the two is caught by the
- * positive tests in `test/circuits/{ownership,mortgage,transfer}.test.ts`.
- *
- * Exported because readers need the list as data, not just as a hash: the
- * Phase-9 verifier page derives "which fields were never revealed" by
- * subtracting a circuit's `PUBLIC_SIGNAL_ORDER` from this (D67). Retyping the
- * names there would be a second copy, and a silent one.
- *
- * ⚠️  Never reorder. `hashRecord` maps over this array, so a reorder here is a
- *     reorder of every leaf in the tree.
- */
-export const LEAF_FIELD_ORDER = [
-  'propertyId',
-  'ownerCommitment',
-  'useType',
-  'validityPeriod',
-  'encumbranceStatus',
-  'tenureType',
-  'offchainHash',
-] as const satisfies readonly (keyof LURRecord)[];
 
 /**
  * Compute the Poseidon leaf hash for a LUR record.
