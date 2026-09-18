@@ -47,15 +47,18 @@ src/
 │   │   ├── issuance/                UC-1   pick → draft → sign → confirm → archive
 │   │   ├── transfers/               UC-3   transfer counter (client-side proof) + approval queue
 │   │   └── changes/                 UC-4   change sets + revocation requests
-│   └── resident/
-│       ├── shell/                   portal infra: header nav
+│   └── resident/                    logged-out, no wallet, no provider (D61)
+│       ├── shell/                   portal infra: nav, /public/config cache + hook, error wording
 │       ├── lookup/                  D48    public property history
 │       ├── proof/                   UC-5   client-side proof generation
-│       └── verify/                  UC-6   off-chain + on-chain verification
+│       └── verify/                  UC-6   four ordered checks + D30 issuer chain + revocation
 ├── components/ui/                   design-system primitives (button, empty-state, page-header, notice, skeleton, hash-text)
 ├── i18n/                            locales, server-only dictionaries, format, locale switcher
-└── lib/                             cross-portal infra: api-client (transport + ApiError), bundle (receipt + secret reader),
-                                     download, zkp + zkp.worker (proving in a Web Worker)
+└── lib/                             cross-portal infra (D66): api-client (transport + ApiError), api-error-code,
+                                     bundle (receipt + secret reader), proof-file (proof.json reader), disclosure
+                                     (what a proof reveals / never reveals), contracts (both ABIs + root codec),
+                                     chain-config (/public/config + RPC choice + viem client), registry-reads,
+                                     revocation-reason, term, download, zkp + zkp.worker (prove AND verify in a worker)
 ```
 
 ### Inside a feature
@@ -69,8 +72,14 @@ features/<portal>/<feature>/
 ```
 
 Government use cases call the backend through `features/government/api/gov-client.ts` (it adds
-the portal key and returns to the gate on a 401). Screens branch on `apiErrorCode()` /
-`walletErrorCode()` and show the backend's text only as the detail line — never on message text.
+the portal key and returns to the gate on a 401); resident features call `apiFetch` directly,
+because every route they touch is public by design (D39/D48/D50). Screens branch on
+`apiErrorCode()` / `residentErrorCode()` / `walletErrorCode()` and show the backend's text only
+as the detail line — never on message text.
+
+Anything two sibling features need is **promoted**, never reached for sideways (D66): code to
+`src/lib/`, and shared STRINGS as an extra dictionary slice passed from `page.tsx`
+(`residentSignals`, `residentRevocation`) — through the route, not through an import.
 
 ### Browser bundling notes (learned the hard way)
 
@@ -82,10 +91,26 @@ the portal key and returns to the gate on a 401). Screens branch on `apiErrorCod
 - Import proving code (`lib/zkp.ts`) with types only from the shared barrel; snarkjs and
   circomlibjs belong in the worker chunk. The `web-worker` "Critical dependency" build warning
   comes from ffjavascript inside circomlibjs and is expected.
+- **Import shared VALUES by subpath, not through the barrel** (D67). The barrel re-exports
+  `merkleTree.ts` (circomlibjs) and `zkpHelper.ts` (snarkjs), so importing one constant costs
+  ~3 MB: `/resident/lookup` was 3.7 MB before this was measured, for the sake of
+  `MAX_PROPERTY_ID`. Use `@land-registry/blockchain/shared/{treeDimensions,leafFields,`
+  `solidityCalldata,circuitInputs,datetime,types,receipt}`. `import type` from the barrel is
+  fine — it is erased before the bundler sees it.
+- Load a heavy module at the moment it is needed, not at page load. `/resident/proof` imports
+  `bundle-integrity.ts` dynamically (it is the only hashing on that page: 4071 → 872 kB), and
+  `/resident/verify` imports `@peculiar/x509` dynamically (194 kB, only once a receipt is
+  supplied). ⚠️ `reflect-metadata` must be imported **before** `@peculiar/x509`, which builds
+  on tsyringe and throws at module init without it — `next build` does not catch this, because
+  the failure is at runtime.
+- Measure, do not assume. `next build`, then read the chunk list out of
+  `.next/server/app/en/<route>.html`: resident routes must carry **zero** wagmi/RainbowKit
+  chunks. Beware a naive grep for `walletconnect` — viem defines its own
+  `WalletConnectSessionSettlementError` and will match.
 
-Only create a folder once it has a file. The view's header comment is the feature's
-implementation spec (the TODO list for Phase 8/9) — keep it when implementing, don't
-delete it as dead code.
+Only create a folder once it has a file. Each view's header comment records what the screen
+does and why — in Phases 8–9 these replaced the original TODO specs as the screens landed.
+Keep them; they are where the reasoning lives.
 
 ### Rules
 
