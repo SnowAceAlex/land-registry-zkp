@@ -179,35 +179,12 @@ export function assertProofFresh(
 // On-chain Calldata Formatting
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Groth16 proof shaped as the (a, b, c) arguments of the generated Solidity verifiers. */
-export interface SolidityProofArgs {
-  a: [string, string];
-  b: [[string, string], [string, string]];
-  c: [string, string];
-}
-
 /**
- * Format a snarkjs Groth16 proof as the (a, b, c) calldata arguments expected
- * by the generated verifiers / LandRegistryVerifier (Phase 4 tests, Phase 9
- * wagmi on-chain verify). The publicSignals array is passed alongside as-is.
- *
- * ⚠️  The G2 point pi_b must have EACH coordinate pair SWAPPED for the EVM
- *     pairing precompile (snarkjs emits [x.a, x.b]; Solidity expects
- *     [x.b, x.a]). This is the single place that swap lives — never hand-build
- *     these arrays elsewhere (same spirit as D25). The third projective
- *     coordinate of pi_a/pi_c and third pair of pi_b are the constant (1, 0)
- *     affine markers and are dropped.
+ * Re-exported so every existing importer keeps finding these here. They are
+ * DEFINED in `solidityCalldata.ts`, which has no runtime imports, so a browser
+ * page can format an eth_call without pulling snarkjs in through this module.
  */
-export function toSolidityCalldata(proof: Groth16Proof): SolidityProofArgs {
-  return {
-    a: [proof.pi_a[0], proof.pi_a[1]],
-    b: [
-      [proof.pi_b[0][1], proof.pi_b[0][0]],
-      [proof.pi_b[1][1], proof.pi_b[1][0]],
-    ],
-    c: [proof.pi_c[0], proof.pi_c[1]],
-  };
-}
+export { toSolidityCalldata, type SolidityProofArgs } from './solidityCalldata';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Circuit Paths Helper

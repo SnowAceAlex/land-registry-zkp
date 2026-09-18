@@ -55,19 +55,21 @@ describe('blockchain/shared stays bundleable for the browser (Phase 8/9)', () =>
   });
 
   /**
-   * `treeDimensions.ts` and `leafFields.ts` are imported DIRECTLY, by subpath,
-   * from browser pages that hash nothing — `/resident/lookup` needs the id
-   * range, `/resident/verify` needs the leaf field list to say which fields a
-   * proof never revealed (D67). The barrel re-exports `merkleTree.ts`, whose
-   * top-level `circomlibjs` import costs ~3 MB through ffjavascript and
-   * web-worker; `/resident/lookup` was 3.7 MB before this split and 0.6 MB
-   * after it.
+   * These three are imported DIRECTLY, by subpath, from browser pages that do
+   * no cryptography at all: `/resident/lookup` needs the id range,
+   * `/resident/verify` needs the leaf field list to say which fields a proof
+   * never revealed (D67) and the calldata formatter to make an `eth_call`.
+   *
+   * Each is split out of a module that imports something large at the top
+   * level — `merkleTree.ts` pulls circomlibjs, `zkpHelper.ts` pulls snarkjs.
+   * Measured: `/resident/lookup` was 3.7 MB before the first split and 0.6 MB
+   * after; `/resident/verify` was 4.1 MB before the calldata split.
    *
    * One runtime import added to either file would quietly put all of that
    * back, and only a bundle measurement would notice. Type-only imports are
    * fine: they are erased before the bundler ever sees them.
    */
-  for (const file of ['treeDimensions.ts', 'leafFields.ts']) {
+  for (const file of ['treeDimensions.ts', 'leafFields.ts', 'solidityCalldata.ts']) {
     it(`keeps ${file} free of runtime imports, so a page can read it cheaply`, () => {
       const source = fs.readFileSync(path.join(SHARED_DIR, file), 'latin1');
       const runtimeImports = [

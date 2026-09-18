@@ -18,13 +18,14 @@
  * signal count has been edited, and is rejected rather than reinterpreted.
  */
 
+// Subpath imports, not the barrel: the barrel re-exports merkleTree.ts and its
+// circomlibjs, which this module has no use for — it does no crypto at all.
 import {
   PUBLIC_SIGNAL_ORDER,
   type CircuitType,
-  type Groth16Proof,
-  type ProofPackage,
   circuitTypeForSignalCount,
-} from '@land-registry/blockchain/shared';
+} from '@land-registry/blockchain/shared/circuitInputs';
+import type { Groth16Proof, ProofPackage } from '@land-registry/blockchain/shared/types';
 
 export type ProofFileErrorCode =
   | 'invalid-json'

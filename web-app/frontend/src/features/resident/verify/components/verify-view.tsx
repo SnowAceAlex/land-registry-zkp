@@ -1,56 +1,66 @@
 /**
  * features/resident/verify/components/verify-view.tsx - UC-6, verify a proof.
  *
- * Carries forward the implementation spec from the former app/verifier/page.tsx,
- * which D49 folded into /resident. Verifiers are banks, buyers, agencies.
+ * Verifiers are banks, buyers, agencies. Implemented in Phase 9; what the
+ * original TODO asked for, and where it went:
  *
- * TODO (Phase 9):
- *  1. Accept a proof.json by upload or paste. Parse to
- *     { proof, publicSignals, circuitType }.
- *  2. Check freshness FIRST, via assertTimestampFresh() in shared/datetime.ts.
- *     currentTimestamp is a public input the PROVER picks, so a proof dated back
- *     to when an expired title was still valid verifies perfectly (D26). The
- *     order matters: StaleTimestamp, then InvalidProof, then RootMismatch, the
- *     same three rules under the same three names the contract uses (D33).
- *  3. Off-chain: snarkjs.groth16.verify (lib/zkp.ts) against
- *     /public/circuits/<type>/verification_key.json for immediate feedback.
- *  4. On-chain: read latestRoot from RootRegistry and call LandRegistryVerifier.
- *     This is an eth_call, so use a viem public client. It needs no wallet, and
- *     the resident portal is logged-out by design (D39, D49). Never import from
- *     features/government/wallet here - that is the bundle DESIGN.md §10 keeps
- *     off resident pages.
- *  5. The D30 issuer chain: verify the X.509 signature over the issuer address
- *     with verifyIssuerSignature(), then check the anchored authorityInstitute
- *     hash matches. Chain verification is off-chain on purpose, because
+ *  1. A proof.json is accepted by upload or paste and parsed by
+ *     `lib/proof-file.ts` into { proof, publicSignals, circuitType } — inferred
+ *     from the signal count when the file omits it, and refused rather than
+ *     reinterpreted when the file contradicts itself.
+ *  2. Freshness is checked FIRST, via `isTimestampFresh`. currentTimestamp is a
+ *     public input the PROVER picks, so a proof dated back to when an expired
+ *     title was still valid verifies perfectly (D26). The order is the
+ *     contract's own — StaleTimestamp, then InvalidProof, then RootMismatch
+ *     (D33) — and lives in the pure `lib/proof-pipeline.ts`.
+ *  3. Off-chain: snarkjs in the Web Worker, against this deployment's
+ *     verification_key.json, through `verifyGroth16ProofWithKey` (D59).
+ *  4. On-chain: `lib/on-chain-verify.ts` reads LandRegistryVerifier with a
+ *     plain viem public client. It is an eth_call, so it needs no wallet, and
+ *     the resident portal is logged-out by design (D39, D49). Nothing here
+ *     imports from features/government/wallet.
+ *  5. The D30 issuer chain is `lib/issuer-chain.ts`: @peculiar/x509 plus
+ *     WebCrypto, reusing only `issuerSignatureMessage` from the Node-only
+ *     shared module. Chain verification is off-chain on purpose, because
  *     RSA-2048 and P-256 are not secp256k1.
- *  6. Revocation status for the property (D45).
- *  7. Render only the disclosed public signals. Say plainly which fields were
- *     proven and which were never revealed. That distinction is the whole point
- *     of the system and a verifier will not infer it.
+ *  6. Revocation status comes from the chain's own `revocations` mapping (D45),
+ *     not from the registry's API.
+ *  7. Only the disclosed public signals are rendered, beside an explicit list
+ *     of what was never revealed. That distinction is the whole point of the
+ *     system and a verifier will not infer it.
  *
- * STATES TO BUILD: idle / parsing / verifying each of the four checks / valid /
- * invalid with the specific failing rule named / chain unreachable.
+ *  The states the TODO listed — idle / parsing / each check / valid / invalid
+ *  with the failing rule named / chain unreachable — are the step machine, and
+ *  `lib/trust-summary.ts` turns them into the verdict a person acts on.
  */
-import { SquareCheckBig } from 'lucide-react';
 
 import type { Dictionary } from '@/i18n/dictionaries';
 import { PageHeader } from '@/components/ui/page-header';
-import { EmptyState } from '@/components/ui/empty-state';
-import { buttonStyles } from '@/components/ui/button';
 
-export function VerifyView({ t }: { t: Dictionary['residentVerify'] }) {
+import { VerifyWorkbench } from './verify-workbench';
+
+export function VerifyView({
+  t,
+  errors,
+  signals,
+  revocation,
+  shell,
+}: {
+  t: Dictionary['residentVerify'];
+  errors: Dictionary['residentErrors'];
+  signals: Dictionary['residentSignals'];
+  revocation: Dictionary['residentRevocation'];
+  shell: Dictionary['residentShell'];
+}) {
   return (
     <div className="space-y-8">
       <PageHeader title={t.title} description={t.description} />
-      <EmptyState
-        icon={SquareCheckBig}
-        title={t.emptyTitle}
-        description={t.emptyBody}
-        action={
-          <button type="button" disabled className={buttonStyles.primary}>
-            {t.action}
-          </button>
-        }
+      <VerifyWorkbench
+        t={t}
+        errors={errors}
+        signals={signals}
+        revocationStrings={revocation}
+        shell={shell}
       />
     </div>
   );

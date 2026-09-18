@@ -11,10 +11,12 @@
  * worker chunk.
  */
 
+// Subpath: the worker needs snarkjs, but not circomlibjs, which the barrel
+// would drag in through merkleTree.ts.
 import {
   generateGroth16Proof,
   verifyGroth16ProofWithKey,
-} from '@land-registry/blockchain/shared';
+} from '@land-registry/blockchain/shared/zkpHelper';
 
 import type { WorkerRequest, WorkerResponse } from './zkp';
 

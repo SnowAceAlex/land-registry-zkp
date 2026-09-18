@@ -8,7 +8,17 @@ import { VerifyView } from '@/features/resident/verify/components/verify-view';
 export default async function Page({ params }: PageProps<'/[lang]'>) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  const t = (await getDictionary(lang)).residentVerify;
+  const dict = await getDictionary(lang);
 
-  return <VerifyView t={t} />;
+  return (
+    <VerifyView
+      t={dict.residentVerify}
+      errors={dict.residentErrors}
+      // Sibling features share strings through the route, never through an
+      // import: `proof` and `lookup` use these same two slices (D66).
+      signals={dict.residentSignals}
+      revocation={dict.residentRevocation}
+      shell={dict.residentShell}
+    />
+  );
 }
