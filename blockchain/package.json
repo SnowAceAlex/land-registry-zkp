@@ -5,6 +5,7 @@
   "main": "./shared/index.ts",
   "exports": {
     "./shared": "./shared/index.ts",
+    "./shared/*": "./shared/*.ts",
     "./typechain-types": "./typechain-types/index.ts",
     "./artifacts/*": "./artifacts/*"
   },

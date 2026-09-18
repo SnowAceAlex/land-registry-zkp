@@ -26,16 +26,16 @@
  */
 
 import { buildPoseidon, Poseidon } from 'circomlibjs';
+import { MAX_PROPERTY_ID, TREE_DEPTH } from './treeDimensions';
 import { LURRecord, MerkleProofData } from './types';
 
-export const TREE_DEPTH = 20;
-
 /**
- * Largest addressable propertyId (D41). A leaf's position IS its propertyId, so
- * the tree can hold ids 0..2^TREE_DEPTH-1. Depth 20 already capped the registry
- * at ~1.05M leaves (D20), so this adds no capacity limit that did not exist.
+ * Re-exported so every existing importer — and the shared barrel — keeps
+ * finding these here. They are DEFINED in `treeDimensions.ts`, which has no
+ * dependencies, so a browser page can read the tree's dimensions without
+ * pulling circomlibjs in through this module. See that file for why.
  */
-export const MAX_PROPERTY_ID = (1n << BigInt(TREE_DEPTH)) - 1n;
+export { MAX_PROPERTY_ID, TREE_DEPTH };
 
 /** Sentinel value for an empty leaf (level 0 of the zero-hash chain). */
 const EMPTY_LEAF = 0n;

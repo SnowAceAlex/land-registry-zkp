@@ -53,4 +53,24 @@ describe('blockchain/shared stays bundleable for the browser (Phase 8/9)', () =>
 
     expect(offenders).to.deep.equal([]);
   });
+
+  /**
+   * `treeDimensions.ts` is imported directly by a browser page that hashes
+   * nothing (`/resident/lookup`), precisely so that page does not load
+   * cryptography. The barrel re-exports `merkleTree.ts`, whose top-level
+   * `circomlibjs` import costs ~3 MB through ffjavascript and web-worker; this
+   * page was 3.7 MB before the split and is 0.6 MB after it.
+   *
+   * One import added here would quietly put all of that back, and only a
+   * bundle measurement would notice. So: no imports at all.
+   */
+  it('keeps treeDimensions.ts free of every import, so a page can read the tree size cheaply', () => {
+    const source = fs.readFileSync(path.join(SHARED_DIR, 'treeDimensions.ts'), 'latin1');
+    const imports = [
+      ...source.matchAll(/^\s*(?:import\b|export\s+[^;]*\bfrom\b)/gm),
+      ...source.matchAll(/\brequire\(/g),
+    ].map((match) => match[0].trim());
+
+    expect(imports).to.deep.equal([]);
+  });
 });
