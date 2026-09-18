@@ -45,6 +45,7 @@
 
 import * as path from 'path';
 import * as snarkjs from 'snarkjs';
+import type { VerificationKey } from 'snarkjs';
 
 import { CircuitType, PUBLIC_SIGNAL_ORDER } from './circuitInputs';
 import {
@@ -108,7 +109,7 @@ export async function generateGroth16Proof(
  * @returns             true if the proof is cryptographically valid.
  */
 export async function verifyGroth16ProofWithKey(
-  vkey: unknown,
+  vkey: VerificationKey,
   publicSignals: PublicSignals,
   proof: Groth16Proof,
 ): Promise<boolean> {

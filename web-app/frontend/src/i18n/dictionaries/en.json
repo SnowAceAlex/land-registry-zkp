@@ -340,5 +340,32 @@
     "walletAlreadyRevoked": "A plot in this change set is already revoked on chain; discard the draft",
     "walletInvalidRevocation": "The contract rejected the revocation data; discard the draft",
     "walletUnknown": "The transaction did not go through"
+  },
+  "residentShell": {
+    "networkLabel": "Network",
+    "chainIdLabel": "Chain",
+    "readOnlyNote": "This page only reads the blockchain. No wallet, no sign-in, nothing to install.",
+    "configUnavailableTitle": "Could not reach the registry API",
+    "configUnavailableBody": "The portal asks the registry which chain and which contracts to read. Without that answer it cannot check anything on chain.",
+    "chainUnreachableTitle": "Could not reach the blockchain",
+    "chainUnreachableBody": "The contract addresses loaded, but the node did not answer. Checks that need the chain are reported as unavailable rather than passed.",
+    "retry": "Try again"
+  },
+  "residentErrors": {
+    "badRequest": "The registry rejected the request as invalid",
+    "unauthorized": "This page is not allowed to read that",
+    "notFound": "No plot with that ID",
+    "conflict": "The registry refused this in its current state",
+    "gone": "No longer available",
+    "unprocessable": "The registry could not apply this",
+    "rootMismatch": "The registry root has moved on since this proof was made",
+    "staleTimestamp": "The proof timestamp is outside the 10-minute window",
+    "invalidProof": "The proof is not cryptographically valid",
+    "unreachable": "Could not reach the registry API",
+    "unknown": "Something went wrong",
+    "revoked": "This certificate has been revoked",
+    "notIssued": "This plot has not been issued yet",
+    "vkeyMissing": "The registry cannot serve a proof right now",
+    "artifactsMissing": "This deployment is missing its proving files"
   }
 }

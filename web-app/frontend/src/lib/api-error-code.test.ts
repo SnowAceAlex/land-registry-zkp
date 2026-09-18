@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ApiError } from '@/lib/api-client';
 
-import { apiErrorCode } from './error-code';
+import { apiErrorCode } from './api-error-code';
 
 describe('apiErrorCode', () => {
   it('names each status the portal explains differently', () => {

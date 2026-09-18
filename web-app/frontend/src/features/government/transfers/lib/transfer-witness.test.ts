@@ -2,7 +2,7 @@ import { type LURRecord, TREE_DEPTH, buildTransferInput } from '@land-registry/b
 import { describe, expect, it } from 'vitest';
 
 import type { TransferPreview } from '../../api/types';
-import { buildCounterTransferInput, yearsToSeconds } from './transfer-witness';
+import { buildCounterTransferInput } from './transfer-witness';
 
 const sellerRecord: LURRecord = {
   propertyId: 1001n,
@@ -82,18 +82,5 @@ describe('buildCounterTransferInput (D28 step 3, at the counter)', () => {
         minRequiredRemainingTerm: 0n,
       }),
     ).toThrow(/1002/);
-  });
-});
-
-describe('yearsToSeconds (D27 threshold)', () => {
-  it('counts 365-day years in seconds', () => {
-    expect(yearsToSeconds(0)).toBe(0n);
-    expect(yearsToSeconds(20)).toBe(20n * 365n * 24n * 3600n);
-  });
-
-  it('rejects anything but a whole, non-negative number of years', () => {
-    expect(() => yearsToSeconds(-1)).toThrow();
-    expect(() => yearsToSeconds(1.5)).toThrow();
-    expect(() => yearsToSeconds(Number.NaN)).toThrow();
   });
 });

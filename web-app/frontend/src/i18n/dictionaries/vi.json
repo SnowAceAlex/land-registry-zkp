@@ -340,5 +340,32 @@
     "walletAlreadyRevoked": "Một thửa trong ChangeSet này đã bị thu hồi trên chuỗi; hãy huỷ nháp",
     "walletInvalidRevocation": "Hợp đồng từ chối dữ liệu thu hồi; hãy huỷ nháp",
     "walletUnknown": "Giao dịch không thực hiện được"
+  },
+  "residentShell": {
+    "networkLabel": "Mạng",
+    "chainIdLabel": "Chain",
+    "readOnlyNote": "Trang này chỉ đọc blockchain. Không cần ví, không cần đăng nhập, không phải cài gì.",
+    "configUnavailableTitle": "Không kết nối được API của cơ quan đăng ký",
+    "configUnavailableBody": "Trang cần hỏi cơ quan đăng ký xem phải đọc chain nào và hợp đồng nào. Không có thông tin đó thì không kiểm tra được gì trên chain.",
+    "chainUnreachableTitle": "Không kết nối được blockchain",
+    "chainUnreachableBody": "Đã lấy được địa chỉ hợp đồng nhưng node không trả lời. Các bước kiểm tra cần đến chain sẽ báo là chưa kiểm được, chứ không báo là đã đạt.",
+    "retry": "Thử lại"
+  },
+  "residentErrors": {
+    "badRequest": "Cơ quan đăng ký từ chối vì yêu cầu không hợp lệ",
+    "unauthorized": "Trang này không được phép đọc dữ liệu đó",
+    "notFound": "Không có thửa đất nào mang mã này",
+    "conflict": "Cơ quan đăng ký từ chối ở trạng thái hiện tại",
+    "gone": "Không còn khả dụng",
+    "unprocessable": "Cơ quan đăng ký không xử lý được yêu cầu này",
+    "rootMismatch": "Gốc Merkle của cơ quan đăng ký đã thay đổi sau khi proof này được tạo",
+    "staleTimestamp": "Mốc thời gian của proof nằm ngoài cửa sổ 10 phút",
+    "invalidProof": "Proof không hợp lệ về mặt mật mã",
+    "unreachable": "Không kết nối được API của cơ quan đăng ký",
+    "unknown": "Đã có lỗi xảy ra",
+    "revoked": "Giấy chứng nhận này đã bị thu hồi",
+    "notIssued": "Thửa đất này chưa được cấp giấy",
+    "vkeyMissing": "Cơ quan đăng ký hiện chưa cấp được proof",
+    "artifactsMissing": "Bản triển khai này thiếu tệp tạo proof"
   }
 }

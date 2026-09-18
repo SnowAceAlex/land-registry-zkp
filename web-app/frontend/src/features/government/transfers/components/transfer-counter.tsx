@@ -36,7 +36,8 @@ import type { PropertyDetail } from '../../api/types';
 import { getPropertyDetail, previewTransfer, submitTransfer } from '../api';
 import { buyerSecretArchive, generateOwnerSecret } from '../lib/buyer-secret';
 import { type SellerCheckIssue, type SellerCheckResult, checkSellerBundle } from '../lib/seller-check';
-import { buildCounterTransferInput, yearsToSeconds } from '../lib/transfer-witness';
+import { yearsToSeconds } from '@/lib/term';
+import { buildCounterTransferInput } from '../lib/transfer-witness';
 
 type Strings = Dictionary['govTransfers'];
 
