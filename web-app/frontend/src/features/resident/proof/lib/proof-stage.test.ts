@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { type ProofStageFacts, isBundleStale, nextProofStage } from './proof-stage';
 
 const ROOT = '7777';
+const LEAF = '5555';
 
 /** Everything answered, everything agreeing: the stage is `ready`. */
 function facts(overrides: Partial<ProofStageFacts> = {}): ProofStageFacts {
@@ -10,6 +11,10 @@ function facts(overrides: Partial<ProofStageFacts> = {}): ProofStageFacts {
     bundleLoaded: true,
     bundleError: null,
     integrityIssues: [],
+    titleExpired: false,
+    refreshRejected: false,
+    bundleLeaf: LEAF,
+    registryLeaf: LEAF,
     refreshedRoot: ROOT,
     refreshedInSync: true,
     chainRoot: ROOT,
@@ -88,6 +93,116 @@ describe('nextProofStage (D64)', () => {
 
   it('does not let a result mask a chain that has moved on', () => {
     expect(nextProofStage(facts({ hasResult: true, chainRoot: '8888' }))).toBe('root-not-published');
+  });
+
+  /**
+   * D68 — the wall the old screen only hit inside the prover, eight seconds in
+   * and worded as `Assert Failed. Error in template Ownership_226 line: 76`.
+   */
+  describe('superseded (D68)', () => {
+    it('blocks when the registry records a different leaf for this plot', () => {
+      expect(nextProofStage(facts({ registryLeaf: '6666' }))).toBe('superseded');
+    });
+
+    /**
+     * Order matters more than the check does. When the registry is ahead of the
+     * chain, its leaf comes from a tree nobody published — telling an owner
+     * their certificate was replaced on that basis would be accusing them on
+     * evidence the blockchain has not accepted.
+     */
+    it('yields to root-not-published, whose evidence is the published one', () => {
+      expect(nextProofStage(facts({ registryLeaf: '6666', refreshedInSync: false }))).toBe(
+        'root-not-published',
+      );
+      expect(nextProofStage(facts({ registryLeaf: '6666', chainRoot: '8888' }))).toBe(
+        'root-not-published',
+      );
+    });
+
+    it('claims nothing before both leaves are known', () => {
+      expect(nextProofStage(facts({ registryLeaf: null }))).toBe('ready');
+      expect(nextProofStage(facts({ bundleLeaf: null }))).toBe('ready');
+    });
+
+    /** A stale receipt is the normal case and must still reach ready (D64). */
+    it('does not fire merely because the receipt path was behind', () => {
+      expect(nextProofStage(facts())).toBe('ready');
+      expect(isBundleStale('1234', ROOT)).toBe(true);
+    });
+  });
+
+  describe('no-proof-possible (D68)', () => {
+    /**
+     * The regression this exists for. A revoked plot answers 410, so the
+     * refresh throws, so `refreshedRoot` stays null — exactly the shape of a
+     * request still in flight. The old ordering read it as one and left the
+     * spinner turning under a record card the owner had just been told was
+     * unusable.
+     */
+    it('does not mistake a failed refresh for one still in flight', () => {
+      const rejected = facts({
+        refreshRejected: true,
+        refreshedRoot: null,
+        chainRoot: undefined,
+        chainReachable: false,
+      });
+      expect(nextProofStage(rejected)).toBe('no-proof-possible');
+    });
+
+    /** A retry cannot find a leaf that is not in the tree; say so instead. */
+    it('outranks chain-unavailable, which would offer a pointless retry', () => {
+      expect(nextProofStage(facts({ refreshRejected: true, chainReachable: false }))).toBe(
+        'no-proof-possible',
+      );
+    });
+
+    it('still reports the spinner while the request is genuinely running', () => {
+      expect(nextProofStage(facts({ busy: 'refreshing', refreshRejected: true }))).toBe(
+        'refreshing',
+      );
+    });
+
+    /**
+     * A plain failure — node down, 503, network — keeps its retry. Only the
+     * registry's definitive "this leaf is gone" becomes a dead end.
+     */
+    it('leaves an ordinary failure at chain-unavailable', () => {
+      expect(
+        nextProofStage(facts({ refreshedRoot: null, chainRoot: undefined, chainReachable: false })),
+      ).toBe('chain-unavailable');
+    });
+  });
+
+  describe('title-expired (D68)', () => {
+    it('blocks an expired title', () => {
+      expect(nextProofStage(facts({ titleExpired: true }))).toBe('title-expired');
+    });
+
+    /**
+     * Before the network, deliberately: nothing the registry could answer makes
+     * an expired term provable, so the round trip would buy only a slower no.
+     * These facts describe a screen that never made the call at all.
+     */
+    it('fires before anything is asked of the registry or the chain', () => {
+      expect(
+        nextProofStage(
+          facts({
+            titleExpired: true,
+            registryLeaf: null,
+            refreshedRoot: null,
+            chainRoot: undefined,
+            chainReachable: undefined,
+          }),
+        ),
+      ).toBe('title-expired');
+    });
+
+    /** A broken file is the more specific complaint, and it comes first. */
+    it('yields to a failed integrity check', () => {
+      expect(
+        nextProofStage(facts({ titleExpired: true, integrityIssues: ['secret-mismatch'] })),
+      ).toBe('integrity-failed');
+    });
   });
 });
 

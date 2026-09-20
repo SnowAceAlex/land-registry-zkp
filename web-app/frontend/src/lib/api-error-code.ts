@@ -1,9 +1,16 @@
 /**
  * lib/api-error-code.ts - classify a failed backend call.
  *
- * Screens show a translated headline chosen by this code and the backend's own
- * text as the detail line. They branch on the code — never on message text,
- * which is English, free-form and allowed to change.
+ * Screens show a translated message chosen by this code, and branch on the code
+ * — never on message text, which is English, free-form and allowed to change.
+ *
+ * ⚠️ NO BACKEND TEXT EVER REACHES THE SCREEN. Every string a user reads comes
+ *    from `i18n/dictionaries/{en,vi}.json`; the backend's own sentence goes to
+ *    the console through `logFailure()` and nowhere else. This app is bilingual
+ *    and the API is not: showing `error.detail` under a translated headline put
+ *    an English paragraph beneath a Vietnamese title on every failure screen.
+ *    If a message reads too thin without it, add a dictionary key — do not
+ *    borrow the backend's words to fill the space.
  *
  * Shared by both portals (D66). The status → code table has to agree with the
  * backend, and one such table must not exist twice; the WORDING stays
@@ -53,9 +60,25 @@ export function apiErrorCode(error: unknown): ApiErrorCode {
   return 'unknown';
 }
 
-/** The backend's own explanation, when there is one worth showing. */
-export function errorDetail(error: unknown): string | undefined {
+/**
+ * The backend's own explanation — **for the console, never for the screen.**
+ *
+ * Exported only so `logFailure` and a debugger can reach it. A call site that
+ * renders this is the bug this comment exists to prevent.
+ */
+function debugDetail(error: unknown): string | undefined {
   if (error instanceof ApiError) return error.detail;
   if (error instanceof Error) return error.message;
   return undefined;
+}
+
+/**
+ * Put a failure where a developer can find it.
+ *
+ * The counterpart to dropping the detail line: the information did not become
+ * worthless, it stopped being the user's problem. `scope` names the call site
+ * so a console with several failures in it can still be read.
+ */
+export function logFailure(scope: string, error: unknown): void {
+  console.error(`[${scope}] ${debugDetail(error) ?? 'failed'}`, error);
 }

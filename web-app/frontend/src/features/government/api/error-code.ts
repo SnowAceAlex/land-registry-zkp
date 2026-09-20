@@ -7,4 +7,4 @@
  * This file stays so no government screen or `error-message.ts` import changed.
  */
 
-export { apiErrorCode, errorDetail, type ApiErrorCode } from '@/lib/api-error-code';
+export { apiErrorCode, logFailure, type ApiErrorCode } from '@/lib/api-error-code';

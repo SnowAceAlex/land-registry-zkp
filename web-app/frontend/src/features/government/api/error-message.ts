@@ -1,19 +1,26 @@
 /**
  * features/government/api/error-message.ts - a failure, in the officer's language.
  *
- * Title: translated, chosen by code. Detail: the backend's or wallet's own text,
- * untranslated, because it names the exact draft, plot or root involved.
+ * Every word here is translated and chosen by CODE. Nothing the backend, viem
+ * or a wallet extension wrote reaches the screen: those are English, free-form,
+ * and were producing a Vietnamese headline over an English paragraph. They go
+ * to the console through `logFailure` instead, which is where the person who
+ * can act on them is looking.
+ *
+ * `detail` survives as a field, but it now carries a SECOND DICTIONARY STRING —
+ * never a captured message.
  */
 
 import type { Dictionary } from '@/i18n/dictionaries';
 
 import { type WalletErrorCode, walletErrorCode } from '../wallet/registry';
-import { type ApiErrorCode, apiErrorCode, errorDetail } from './error-code';
+import { type ApiErrorCode, apiErrorCode, logFailure } from './error-code';
 
 type ErrorStrings = Dictionary['govErrors'];
 
 export interface Failure {
   title: string;
+  /** Translated text only — see the header. */
   detail?: string;
 }
 
@@ -41,15 +48,17 @@ const WALLET_TITLES: Record<WalletErrorCode, keyof ErrorStrings> = {
 };
 
 export function apiFailure(error: unknown, t: ErrorStrings): Failure {
-  return { title: t[API_TITLES[apiErrorCode(error)]], detail: errorDetail(error) };
+  logFailure('government/api', error);
+  return { title: t[API_TITLES[apiErrorCode(error)]] };
 }
 
 export function walletFailure(error: unknown, t: ErrorStrings): Failure {
   const code = walletErrorCode(error);
-  // A cancelled signature needs no stack of wallet internals under it.
-  const detail =
-    code === 'rejected'
-      ? undefined
-      : ((error as { shortMessage?: string })?.shortMessage ?? errorDetail(error));
-  return { title: t[WALLET_TITLES[code]], detail };
+  // Not logged when the officer simply pressed Cancel: that is a decision, not
+  // a fault, and a console full of them hides the ones that matter.
+  if (code !== 'rejected') logFailure('government/wallet', error);
+  // viem's `shortMessage` used to be shown here. It is English prose like every
+  // other captured message, and the six WALLET_TITLES already name each case an
+  // officer can act on.
+  return { title: t[WALLET_TITLES[code]] };
 }

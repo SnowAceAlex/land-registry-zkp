@@ -154,8 +154,25 @@ liệu ra một trang không đăng nhập.
 | Nạp ZIP tổng của cả đợt | "Đây là ZIP tổng của cả đợt… hãy chọn thư mục của một thửa" |
 | Chỉ nạp `receipt.json` | Báo thiếu `secret.json`, **kèm gợi ý sang trang Kiểm tra proof** |
 | Thửa chưa cấp giấy | "Thửa đất này chưa được cấp giấy" (không phải lỗi chung chung) |
-| Thửa đã thu hồi | "Giấy chứng nhận này đã bị thu hồi" — nói rõ **không proof nào tồn tại được** |
+| Thửa đã thu hồi | "Giấy chứng nhận này đã bị thu hồi" — nói rõ **không proof nào tồn tại được**. Và kiểm đủ ba thứ đi kèm: **không** còn bảng thông tin giấy, **không** còn 4 dấu ✓, **không** còn dòng "Đang kiểm tra cơ quan đăng ký và blockchain…" quay mãi. Cũng **không** có nút Thử lại — lá đã rời khỏi cây thì thử lại bao nhiêu lần cũng vậy |
 | Đổi tên `public/circuits/ownership/` rồi Generate | Báo thiếu tệp tạo proof kèm tên lệnh `circuits:sync-frontend`; **không treo** |
+
+#### 3.4.1 D68 — các ngõ cụt phải chặn **trước** khi bấm Generate
+
+Đây là nhóm mà trước D68 chỉ vỡ bên trong prover, sau 8 giây, dưới dạng
+`Assert Failed. Error in template Ownership_226 line: 76`. Điểm cần soi không phải là
+"có báo lỗi không" mà là **báo ở đâu** và **còn hiện gì bên cạnh**.
+
+| Thao tác | Kỳ vọng |
+| --- | --- |
+| Chuyển nhượng thửa 4 qua quầy (§3.x của `PHASE_8_MANUAL_TEST.md`), publish change set, rồi nạp lại **bộ hồ sơ cũ** của thửa 4 | Ngay sau khi đọc file: "Giấy này không còn là bản ghi hiện hành của thửa đất". **Không** hiện bảng thông tin giấy, **không** hiện 4 dấu ✓, **không** hiện banner xanh "đã được làm mới", **không** hiện mục 3 lẫn nút Generate |
+| Cùng bộ hồ sơ cũ đó, nhưng change set mới **ký mà chưa confirm** | Phải ra "Cơ quan đăng ký còn thay đổi chưa đưa lên blockchain", **không** phải thông báo sổ bị thay thế — leaf lúc này thuộc cây chưa ai công bố |
+| Sửa `validityPeriod` trong DB về quá khứ cho một thửa FIXED_TERM, publish lại, nạp bộ hồ sơ | "Thời hạn sử dụng đất trên giấy này đã hết", hiện **ngay** — mở DevTools → Network xác nhận **không có** request `GET /api/proof/:id` nào |
+| Nạp bộ hồ sơ của một thửa PERPETUAL (ONT/ODT, `validityPeriod = 0`) | Vào thẳng mục 3 bình thường. ⚠️ Đây là ca bắt lỗi sentinel D5/D23 — nếu ra "đã hết hạn" thì bản sao TS đang so sánh ngây thơ |
+| Đặt `encumbranceStatus = MORTGAGED` cho thửa đang dùng, publish lại, nạp bộ hồ sơ | Lựa chọn "Sổ sạch và còn đủ thời hạn" **mờ và không bấm được**, kèm lý do; lựa chọn ownership vẫn chạy bình thường |
+| Chọn mortgage, nhập số năm lớn hơn thời hạn còn lại (ví dụ 99) | Dòng đỏ dưới ô nhập, nút Generate **khoá**. ⚠️ Thông báo **không được** in ra số năm thật còn lại — đó đúng là con số mortgage proof tồn tại để giấu |
+| Chọn mortgage, hạ số năm xuống dưới hạn | Dòng đỏ biến mất, nút Generate mở lại ngay, không cần nạp lại file |
+| Bất kỳ lỗi prover nào lọt lưới | Màn hình chỉ được hiện "Không tạo được proof" + câu giải thích. Chuỗi `Assert Failed…` phải nằm trong **console**, không nằm trên trang |
 
 ### 3.5 UC-6 — `/vi/resident/verify`, cả ba loại proof
 
