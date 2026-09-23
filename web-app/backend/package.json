@@ -17,6 +17,7 @@
     "cert:generate": "ts-node scripts/generate-issuer-cert.ts",
     "seed:admin-units": "ts-node scripts/seed-admin-units.ts",
     "tree:bootstrap": "ts-node scripts/tree-bootstrap.ts",
+    "bench:seed": "ts-node scripts/bench-seed-genesis.ts",
     "openapi:export": "node scripts/export-openapi.js"
   },
   "dependencies": {
