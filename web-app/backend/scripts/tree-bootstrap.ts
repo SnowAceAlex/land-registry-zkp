@@ -17,7 +17,16 @@
  *
  * Usage: pnpm --filter backend run tree:bootstrap
  */
+import * as path from 'path';
+
 import { NestFactory } from '@nestjs/core';
+import * as dotenv from 'dotenv';
+
+// Same two-step load as scripts/seed-admin-units.ts: the backend's own .env
+// first, then the monorepo root's. Resolved from __dirname, not cwd, so the
+// script works whichever directory it is invoked from.
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+dotenv.config({ path: path.resolve(__dirname, '..', '..', '..', '.env') });
 
 import { AppModule } from '../src/app.module';
 import { NodeStoreService } from '../src/tree/node-store.service';

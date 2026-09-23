@@ -33,8 +33,8 @@ export interface MerkleProofResponse {
   contractAddress: string;
   onChain: { root: string; version: number };
   inSync: boolean;
-  /** 'cache' when the stored proof was still valid for the chain's version (D40). */
-  source: 'cache' | 'rebuilt';
+  /** The tree is stored, so a proof always comes out of the node table (D72). */
+  source: 'nodes';
 }
 
 /**

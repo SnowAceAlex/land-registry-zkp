@@ -1,7 +1,10 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { nodeKey } from '@land-registry/blockchain/shared';
+import { TREE_DEPTH, hashRecord, nodeKey } from '@land-registry/blockchain/shared';
 
 import { NodeStoreService, WRITE_CHUNK_SIZE, chunk } from './node-store.service';
+import { makeProperty } from '../../test/factories';
+import { toLURRecord } from '../records/record.mapper';
 
 /**
  * Only the pure half is covered here — chunking and statement construction.
@@ -14,7 +17,7 @@ import { NodeStoreService, WRITE_CHUNK_SIZE, chunk } from './node-store.service'
  * and the quoting of `index`, which is a PostgreSQL keyword and fails only at
  * runtime.
  */
-function stubPrisma() {
+function stubPrisma(nodeRows: { height: number; index: number; hash: string }[] = []) {
   const calls: Prisma.Sql[] = [];
   return {
     calls,
@@ -23,6 +26,11 @@ function stubPrisma() {
         calls.push(sql);
         return sql as unknown as Prisma.PrismaPromise<number>;
       },
+      // Returns DATA, not behaviour: the rows a SELECT would have found. That
+      // keeps the assertions about what the service concludes, not about what a
+      // mock was told to do.
+      $queryRaw: async () => nodeRows,
+      merkleNode: { findUnique: async () => null },
     },
   };
 }
@@ -116,5 +124,45 @@ describe('NodeStoreService.applyStatements', () => {
     svc.applyStatements({ root: 1n, touched: new Map([[nodeKey(1, 2), 3n]]), removed: [] });
 
     expect(stub.calls[0].strings.join('')).toContain('ON CONFLICT');
+  });
+});
+
+describe('NodeStoreService.proofFor — divergence guard', () => {
+  it('refuses to serve a proof when the row and the tree disagree about the leaf', async () => {
+    const property = makeProperty({ propertyId: '5' });
+    const realLeaf = await hashRecord(toLURRecord(property));
+
+    // The node table holds a different leaf at slot 5 than the record hashes to.
+    // That means the row was written without the tree being updated (or the
+    // other way round), and every proof taken from this slot is for a leaf that
+    // is not this plot. Failing here is the difference between one loud 503 and
+    // an owner discovering it when their proof is rejected.
+    const stub = stubPrisma([{ height: 0, index: 5, hash: (realLeaf + 1n).toString() }]);
+    const svc = new NodeStoreService(stub.client as never, undefined as never);
+
+    await expect(svc.proofFor(property)).rejects.toThrow(ServiceUnavailableException);
+  });
+
+  it('serves the proof when the stored leaf matches the record', async () => {
+    const property = makeProperty({ propertyId: '5' });
+    const realLeaf = await hashRecord(toLURRecord(property));
+
+    const stub = stubPrisma([{ height: 0, index: 5, hash: realLeaf.toString() }]);
+    const svc = new NodeStoreService(stub.client as never, undefined as never);
+
+    const proof = await svc.proofFor(property);
+    expect(proof.leaf).toBe(realLeaf);
+    expect(proof.siblings).toHaveLength(TREE_DEPTH);
+  });
+
+  it('serves the proof when the slot is empty — an unwritten tree is not a divergence', async () => {
+    // Nothing stored yet (a fresh bootstrap, or a plot issued in a round whose
+    // nodes are still in the overlay). `proofFor` must not read that as a
+    // conflict; there is simply no stored leaf to conflict with.
+    const property = makeProperty({ propertyId: '5' });
+    const stub = stubPrisma([]);
+    const svc = new NodeStoreService(stub.client as never, undefined as never);
+
+    await expect(svc.proofFor(property)).resolves.toBeDefined();
   });
 });
