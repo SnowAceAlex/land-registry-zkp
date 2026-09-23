@@ -17,16 +17,28 @@ import { toLURRecord } from '../records/record.mapper';
 import { RootService } from './root.service';
 
 /**
- * Most revocations one change set may carry (D56).
+ * Most revocations one change set may carry (D56, re-measured at D73).
  *
- * `publishRootWithRevocations` has no length cap of its own, and a batch past
- * the block gas limit reverts wholesale — nothing publishes. Measured in
- * `blockchain/test/contracts/RootRegistry.revocation.test.ts`: 4,743,185 gas
- * for 50 (~95k each), a sixth of a 30M block. The cap lives here rather than in
- * the portal because createDraft() takes the WHOLE queue: there is no selection
- * step a UI could limit.
+ * `publishRootWithRevocations` caps nothing itself, and a batch past the block
+ * gas limit reverts WHOLESALE — nothing publishes at all. The cap lives here
+ * rather than in the portal because `createDraft()` takes the entire queue:
+ * there is no selection step a UI could limit.
+ *
+ * Measured in `blockchain/test/contracts/RootRegistry.revocation.test.ts`, on a
+ * linear ~93k gas per revocation:
+ *
+ *     50 → 4,743,185    100 → 9,369,525    150 → 13,996,021    180 → 16,771,994
+ *     190 and above → estimateGas itself fails on the dev network
+ *
+ * 150 is the largest rung still under half of a 30M block, which leaves room
+ * for a gas-price spike, for other transactions in the same block, and for a
+ * real mined call costing more than its estimate.
+ *
+ * Why 50 was too small: ~20,890 certificates are re-issued each month in HCMC
+ * (re-books, splits and merges = revoke + issue), which at 50 a round is ~418
+ * change sets a month — every one of them a publish and a wallet signature.
  */
-export const MAX_REVOCATIONS_PER_CHANGESET = 50;
+export const MAX_REVOCATIONS_PER_CHANGESET = 150;
 
 /** Arguments for `RootRegistry.publishRootWithRevocations`, index-aligned. */
 export interface RevocationCalldata {

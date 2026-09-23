@@ -450,6 +450,17 @@ describe('ChangeSetService (D44)', () => {
   });
 });
 
+describe('MAX_REVOCATIONS_PER_CHANGESET (D73)', () => {
+  it('matches the value whose gas was measured on-chain', () => {
+    // Double-entry ledger with BACKEND_CAP in
+    // blockchain/test/contracts/RootRegistry.revocation.test.ts. The two
+    // packages cannot import each other, so changing one side without the
+    // other has to fail HERE rather than at publish time, when the batch would
+    // revert wholesale and nothing would be written.
+    expect(MAX_REVOCATIONS_PER_CHANGESET).toBe(150);
+  });
+});
+
 describe('ChangeSetService — a transfer may not resurrect a revoked plot (D45/D72)', () => {
   /**
    * The regression this guards against is specific to D72. Before it, the root

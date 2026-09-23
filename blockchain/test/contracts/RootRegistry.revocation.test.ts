@@ -114,25 +114,76 @@ describe('RootRegistry — revocations (D45)', () => {
     ).to.be.revertedWithCustomError(registry, 'AccessControlUnauthorizedAccount');
   });
 
-  it('keeps a full change-set batch (D56: 50 revocations) far below the block gas limit', async () => {
-    // Mirrors MAX_REVOCATIONS_PER_CHANGESET in web-app/backend/src/government/
-    // changeset.service.ts. The contract itself has no length cap, so a batch
-    // past the block gas limit would revert wholesale — the backend cap exists
-    // to stop that, and this is the number that justifies its value.
-    const batch = 50;
-    const propertyIds = Array.from({ length: batch }, (_, i) => 2000n + BigInt(i));
+  /**
+   * The cap the backend actually applies (D56, re-measured at D73). MUST match
+   * `MAX_REVOCATIONS_PER_CHANGESET` in
+   * `web-app/backend/src/government/changeset.service.ts` — the two packages
+   * cannot import each other, so this is a double-entry ledger:
+   * `changeset.service.spec.ts` pins the value on the backend side, this test
+   * pins what that value costs in gas.
+   */
+  const BACKEND_CAP = 150;
 
-    const gas = await registry.publishRootWithRevocations.estimateGas(
-      ROOT_A,
-      propertyIds,
-      propertyIds.map(() => 1),
-      propertyIds.map(() => DETAIL),
-    );
+  /**
+   * Half of a 30M block. Leaves room for a gas-price spike, for other
+   * transactions in the same block, and for estimateGas coming in under a real
+   * mined call.
+   */
+  const HALF_BLOCK_GAS = 15_000_000n;
 
-    console.log(`      publishRootWithRevocations × ${batch}: ${gas} gas`);
-    // A third of a 30M block: leaves headroom for gas price spikes and for the
-    // estimate being lower than a real mined call.
-    expect(gas).to.be.lessThan(10_000_000n);
+  /**
+   * Rungs to print. Only the cap is asserted; the rest are Chapter 5 data.
+   *
+   * 180 and 190 bracket a measured ceiling: on this dev network `estimateGas`
+   * itself gives up somewhere between them ("Transaction ran out of gas"),
+   * while the block gas limit reports 60,000,000 and the sender's balance is
+   * nowhere near exhausted. The cause is not established here — what is
+   * established is that a batch that large cannot even be priced on the
+   * network the officer's wallet talks to in development, which is reason
+   * enough not to build one.
+   */
+  const LADDER = [50, 100, 150, 180, 190, 200];
+
+  it('measures the revocation gas ladder (D73 — the table goes in Chapter 5)', async () => {
+    // `registry` comes from the beforeEach above, with the default signer
+    // already granted STATE_AUTHORITY_ROLE. estimateGas only, so reusing ROOT_A
+    // across rungs is safe: nothing is ever mined, and the "no duplicate root"
+    // rule is never reached.
+    const estimateFor = async (batch: number): Promise<bigint> => {
+      const propertyIds = Array.from({ length: batch }, (_, i) => 2000n + BigInt(i));
+      return registry.publishRootWithRevocations.estimateGas(
+        ROOT_A,
+        propertyIds,
+        propertyIds.map(() => 1),
+        propertyIds.map(() => DETAIL),
+      );
+    };
+
+    const blockGasLimit = (await ethers.provider.getBlock('latest'))!.gasLimit;
+    console.log(`      network block gas limit: ${blockGasLimit}`);
+
+    for (const batch of LADDER) {
+      try {
+        const gas = await estimateFor(batch);
+        console.log(
+          `      publishRootWithRevocations × ${batch}: ${gas} gas ` +
+            `(${(Number(gas) / batch).toFixed(0)}/item)`,
+        );
+      } catch (error) {
+        // A rung that cannot be estimated at all. Reported rather than thrown:
+        // it is the most useful number on the ladder — the point past which a
+        // batch reverts wholesale and publishes nothing, which is the failure
+        // mode the backend cap exists to prevent.
+        console.log(
+          `      publishRootWithRevocations × ${batch}: NOT ESTIMABLE — ` +
+            `${(error as Error).message.split('\n')[0]}`,
+        );
+      }
+    }
+
+    // The only assertion: what the backend will actually send stays under half
+    // a block. The other rungs exist to be read, not to be contracts.
+    expect(await estimateFor(BACKEND_CAP)).to.be.lessThan(HALF_BLOCK_GAS);
   });
 
   it('still rejects a zero or duplicate root', async () => {
