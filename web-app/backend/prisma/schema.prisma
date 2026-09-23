@@ -139,12 +139,14 @@ model Property {
   issuingAuthority     String
   issueDate            DateTime      @db.Date
 
-  // Cache refreshed after every root publish (non-sensitive — safe to store)
+  // Written when this plot's leaf changes (non-sensitive — safe to store).
+  // The Merkle PROOF is no longer cached here: since D72 the tree itself lives
+  // in `merkle_nodes`, and a proof is TREE_DEPTH key lookups away.
   /// Poseidon leaf hash, decimal string
   leaf        String?
-  /// { siblings: string[24], pathIndices: number[24] }
-  merkleProof Json?
-  /// Root version the cached merkleProof corresponds to (staleness flag, §3.1)
+  /// Root version in which this leaf last changed (D72). No longer a staleness
+  /// flag for a cached proof — there is no cached proof. Written by confirm(),
+  /// and only for the plots that round actually changed.
   rootVersion Int?
   /// When the owner bundle was issued; NULL = not yet issued
   issuedAt    DateTime?
@@ -158,6 +160,10 @@ model Property {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// Tree membership is `status === ISSUED` (D45), so every tree load filters on
+  /// it. Without this index that filter is a sequential scan over the whole
+  /// cadastre.
+  @@index([status])
   @@map("properties")
 }
 
@@ -211,6 +217,29 @@ model MerkleRoot {
   publishedAt DateTime @default(now())
 
   @@map("merkle_roots")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MerkleNode — the sparse tree, stored (D72)
+// ─────────────────────────────────────────────────────────────────────────────
+// OCCUPIED nodes of the fixed-depth sparse tree (D20/D41). A missing row means
+// "empty subtree" and is answered from zeroHashes[height] — the same chain
+// buildTree() uses. height 0 = leaf (index = propertyId, D41),
+// height TREE_DEPTH = root.
+//
+// `index` tops out at 2^24 − 1 = 16,777,215, comfortably inside Int (2^31 − 1).
+//
+// Machine-only: no endpoint returns this table in any form. At 2.5M scattered
+// leaves it is roughly 10M rows / ~1.5 GB including the primary key.
+
+model MerkleNode {
+  height Int
+  index  Int
+  /// Poseidon hash, decimal string — same convention as every other hash column
+  hash   String
+
+  @@id([height, index])
+  @@map("merkle_nodes")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
