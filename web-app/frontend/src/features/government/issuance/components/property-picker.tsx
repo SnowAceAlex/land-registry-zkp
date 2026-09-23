@@ -21,7 +21,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { errorDetail } from '../../api/error-code';
 import { govKeys } from '../../api/hooks';
 import { ISSUANCE_PAGE_SIZE, listImportedProperties } from '../api';
 
@@ -56,9 +55,7 @@ export function PropertyPicker({
   }
   if (page.error) {
     return (
-      <Notice tone="danger" title={t.loadError}>
-        {errorDetail(page.error)}
-      </Notice>
+      <Notice tone="danger" title={t.loadError} />
     );
   }
 

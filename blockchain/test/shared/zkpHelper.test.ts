@@ -23,6 +23,7 @@ import {
   getCircuitPaths,
   toSolidityCalldata,
   verifyGroth16Proof,
+  verifyGroth16ProofWithKey,
 } from '../../shared/zkpHelper';
 import { BLOCKCHAIN_DIR } from '../../scripts/lib/paths';
 import { buildSampleInput } from '../../scripts/circuits/sampleWitness';
@@ -113,10 +114,17 @@ describe('shared/zkpHelper (Phase 3)', () => {
         expect(await verifyGroth16Proof(vkeyPath, pkg.publicSignals, pkg.proof)).to.equal(true);
         expect(() => assertProofFresh(circuit, pkg.publicSignals)).to.not.throw();
 
+        // D59: the browser verifies with a vkey it fetched and parsed itself,
+        // through verifyGroth16ProofWithKey. Both entry points must agree on a
+        // real proof — the path-taking one only reads the file and delegates.
+        const vkey = JSON.parse(fs.readFileSync(vkeyPath, 'utf8'));
+        expect(await verifyGroth16ProofWithKey(vkey, pkg.publicSignals, pkg.proof)).to.equal(true);
+
         // Tampering with a public signal must break cryptographic verification.
         const tampered = [...pkg.publicSignals];
         tampered[1] = (BigInt(tampered[1]) + 1n).toString();
         expect(await verifyGroth16Proof(vkeyPath, tampered, pkg.proof)).to.equal(false);
+        expect(await verifyGroth16ProofWithKey(vkey, tampered, pkg.proof)).to.equal(false);
       });
     }
   });

@@ -18,7 +18,6 @@ import { format } from '@/i18n/format';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { errorDetail } from '../../api/error-code';
 import { type Failure, apiFailure } from '../../api/error-message';
 import { govKeys, useOpenDraft, usePendingTransferCount } from '../../api/hooks';
 import { type DraftOutcome, DraftPanel } from '../../publishing/components/draft-panel';
@@ -108,9 +107,7 @@ export function IssuanceWorkbench({
         {openDraft.isPending ? (
           <Skeleton className="h-48 w-full" />
         ) : openDraft.error ? (
-          <Notice tone="danger" title={errors.unknown}>
-            {errorDetail(openDraft.error)}
-          </Notice>
+          <Notice tone="danger" title={apiFailure(openDraft.error, errors).title} />
         ) : draft?.kind === 'issuance' ? (
           <DraftPanel
             key={draft.id}

@@ -26,16 +26,18 @@
  */
 
 import { buildPoseidon, Poseidon } from 'circomlibjs';
+import { LEAF_FIELD_ORDER } from './leafFields';
+import { MAX_PROPERTY_ID, TREE_DEPTH } from './treeDimensions';
 import { LURRecord, MerkleProofData } from './types';
 
-export const TREE_DEPTH = 20;
-
 /**
- * Largest addressable propertyId (D41). A leaf's position IS its propertyId, so
- * the tree can hold ids 0..2^TREE_DEPTH-1. Depth 20 already capped the registry
- * at ~1.05M leaves (D20), so this adds no capacity limit that did not exist.
+ * Re-exported so every existing importer — and the shared barrel — keeps
+ * finding these here. They are DEFINED in `treeDimensions.ts` and
+ * `leafFields.ts`, neither of which has a runtime dependency, so a browser
+ * page can read the tree's shape without pulling circomlibjs in through this
+ * module. See those files for why.
  */
-export const MAX_PROPERTY_ID = (1n << BigInt(TREE_DEPTH)) - 1n;
+export { LEAF_FIELD_ORDER, MAX_PROPERTY_ID, TREE_DEPTH };
 
 /** Sentinel value for an empty leaf (level 0 of the zero-hash chain). */
 const EMPTY_LEAF = 0n;
@@ -72,18 +74,14 @@ export async function poseidonHash(inputs: bigint[]): Promise<bigint> {
  * Compute the Poseidon leaf hash for a LUR record.
  * leaf = Poseidon([propertyId, ownerCommitment, useType, validityPeriod,
  *                  encumbranceStatus, tenureType, offchainHash])
- * This exact field order must match the circom circuits (D4) — never reorder.
+ * This exact field order must match the circom circuits (D4) — it is
+ * {@link LEAF_FIELD_ORDER}, and nothing else here restates it.
+ *
+ * `BigInt()` covers both member types: four fields are already `bigint`, the
+ * other three are numeric enums (`useType`, `encumbranceStatus`, `tenureType`).
  */
 export async function hashRecord(record: LURRecord): Promise<bigint> {
-  return poseidonHash([
-    record.propertyId,
-    record.ownerCommitment,
-    BigInt(record.useType),
-    record.validityPeriod,
-    BigInt(record.encumbranceStatus),
-    BigInt(record.tenureType),
-    record.offchainHash,
-  ]);
+  return poseidonHash(LEAF_FIELD_ORDER.map((field) => BigInt(record[field])));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

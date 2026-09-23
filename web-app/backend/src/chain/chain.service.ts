@@ -105,6 +105,18 @@ export class ChainService implements OnModuleInit {
     return process.env.ROOT_REGISTRY_ADDRESS ?? this.deployment.contracts.RootRegistry;
   }
 
+  /**
+   * Address of the dispatcher the resident portal calls for its on-chain verify
+   * (D58). Resolved exactly as `onModuleInit` resolves it for `this.verifier`,
+   * env override included — a browser must never be told to read a different
+   * contract than this service reads.
+   */
+  get landRegistryVerifierAddress(): string {
+    return (
+      process.env.LAND_REGISTRY_VERIFIER_ADDRESS ?? this.deployment.contracts.LandRegistryVerifier
+    );
+  }
+
   get network(): ChainNetwork {
     return (process.env.CHAIN_NETWORK ?? 'localhost') as ChainNetwork;
   }

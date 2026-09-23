@@ -53,4 +53,32 @@ describe('blockchain/shared stays bundleable for the browser (Phase 8/9)', () =>
 
     expect(offenders).to.deep.equal([]);
   });
+
+  /**
+   * These three are imported DIRECTLY, by subpath, from browser pages that do
+   * no cryptography at all: `/resident/lookup` needs the id range,
+   * `/resident/verify` needs the leaf field list to say which fields a proof
+   * never revealed (D67) and the calldata formatter to make an `eth_call`.
+   *
+   * Each is split out of a module that imports something large at the top
+   * level — `merkleTree.ts` pulls circomlibjs, `zkpHelper.ts` pulls snarkjs.
+   * Measured: `/resident/lookup` was 3.7 MB before the first split and 0.6 MB
+   * after; `/resident/verify` was 4.1 MB before the calldata split.
+   *
+   * One runtime import added to either file would quietly put all of that
+   * back, and only a bundle measurement would notice. Type-only imports are
+   * fine: they are erased before the bundler ever sees them.
+   */
+  for (const file of ['treeDimensions.ts', 'leafFields.ts', 'solidityCalldata.ts']) {
+    it(`keeps ${file} free of runtime imports, so a page can read it cheaply`, () => {
+      const source = fs.readFileSync(path.join(SHARED_DIR, file), 'latin1');
+      const runtimeImports = [
+        ...source.matchAll(/^\s*import\b(?!\s+type\b)[^;]*;/gm),
+        ...source.matchAll(/^\s*export\s+(?!type\b)[^;]*\bfrom\b[^;]*;/gm),
+        ...source.matchAll(/\brequire\(/g),
+      ].map((match) => match[0].trim());
+
+      expect(runtimeImports).to.deep.equal([]);
+    });
+  }
 });

@@ -21,7 +21,6 @@ import { format } from '@/i18n/format';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { errorDetail } from '../../api/error-code';
 import { useOpenDraft, useRegistryStatus } from '../../api/hooks';
 
 export function RegistryStatusBar({ lang, t }: { lang: Locale; t: Dictionary['govShell'] }) {
@@ -63,9 +62,7 @@ export function RegistryStatusBar({ lang, t }: { lang: Locale; t: Dictionary['go
       </div>
 
       {status.error ? (
-        <Notice tone="danger" title={t.statusUnavailable}>
-          {errorDetail(status.error)}
-        </Notice>
+        <Notice tone="danger" title={t.statusUnavailable} />
       ) : null}
 
       {status.data && !status.data.inSync ? (

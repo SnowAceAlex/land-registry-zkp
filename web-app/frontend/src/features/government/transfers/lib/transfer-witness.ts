@@ -14,20 +14,6 @@ import { type LURRecord, type ProofInput, buildTransferInput } from '@land-regis
 
 import type { TransferPreview } from '../../api/types';
 
-const SECONDS_PER_YEAR = 365n * 24n * 60n * 60n;
-
-/**
- * Whole years → seconds, for the remaining-term threshold the buyer accepts
- * (D27). 365-day years: the threshold is a floor the parties agree on, and a
- * few days' drift over decades is not what it is for.
- */
-export function yearsToSeconds(years: number): bigint {
-  if (!Number.isInteger(years) || years < 0) {
-    throw new Error(`The remaining term must be a whole number of years, got ${years}`);
-  }
-  return BigInt(years) * SECONDS_PER_YEAR;
-}
-
 export interface CounterTransferParams {
   /** Rebuilt from the seller's receipt (seller-check.ts). */
   sellerRecord: LURRecord;

@@ -23,7 +23,6 @@ import { HashText } from '@/components/ui/hash-text';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { errorDetail } from '../../api/error-code';
 import { type Failure, apiFailure } from '../../api/error-message';
 import { govKeys, useOpenDraft, usePendingTransferCount } from '../../api/hooks';
 import type { ChangeSetDraftDetail, PendingChanges } from '../../api/types';
@@ -121,9 +120,7 @@ export function ChangesWorkbench({
         {openDraft.isPending ? (
           <Skeleton className="h-48 w-full" />
         ) : openDraft.error ? (
-          <Notice tone="danger" title={errors.unknown}>
-            {errorDetail(openDraft.error)}
-          </Notice>
+          <Notice tone="danger" title={apiFailure(openDraft.error, errors).title} />
         ) : draft?.kind === 'changeset' ? (
           <DraftPanel
             key={draft.id}
@@ -167,9 +164,7 @@ export function ChangesWorkbench({
         ) : pending.isPending ? (
           <Skeleton className="h-40 w-full" />
         ) : pending.error ? (
-          <Notice tone="danger" title={t.loadError}>
-            {errorDetail(pending.error)}
-          </Notice>
+          <Notice tone="danger" title={t.loadError} />
         ) : (
           <PendingQueue pending={pending.data} t={t} creating={creating} onCreate={create} />
         )}

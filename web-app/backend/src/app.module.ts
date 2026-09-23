@@ -9,6 +9,7 @@ import { IssuanceModule } from './issuance/issuance.module';
 import { LandLawModule } from './land-law/land-law.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProofModule } from './proof/proof.module';
+import { PublicConfigModule } from './public-config/public-config.module';
 import { RecordsModule } from './records/records.module';
 import { TransfersModule } from './transfers/transfers.module';
 import { TreeModule } from './tree/tree.module';
@@ -39,6 +40,11 @@ import { TreeModule } from './tree/tree.module';
  * issuance batch can easily exceed 60 requests/minute — throttling an
  * authenticated officer would only get in the way of the bulk operations
  * this system exists to support.
+ *
+ * `PublicConfigModule` adds the one other unguarded route, `GET
+ * /api/public/config` (D58): the chain id and contract addresses the
+ * logged-out resident portal needs to read the registry for itself. It keeps
+ * the global 60/minute bucket — one small read per page load.
  */
 @Module({
   imports: [
@@ -54,6 +60,7 @@ import { TreeModule } from './tree/tree.module';
     RecordsModule,
     ProofModule,
     HistoryModule,
+    PublicConfigModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

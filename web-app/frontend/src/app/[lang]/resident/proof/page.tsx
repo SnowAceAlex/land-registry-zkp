@@ -8,7 +8,16 @@ import { ProofView } from '@/features/resident/proof/components/proof-view';
 export default async function Page({ params }: PageProps<'/[lang]'>) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  const t = (await getDictionary(lang)).residentProof;
+  const dict = await getDictionary(lang);
 
-  return <ProofView t={t} />;
+  return (
+    <ProofView
+      t={dict.residentProof}
+      errors={dict.residentErrors}
+      // Sibling features share strings through the route, never through an
+      // import: `verify` renders the same signal labels (D66).
+      signals={dict.residentSignals}
+      shell={dict.residentShell}
+    />
+  );
 }

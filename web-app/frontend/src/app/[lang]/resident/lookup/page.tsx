@@ -8,7 +8,16 @@ import { LookupView } from '@/features/resident/lookup/components/lookup-view';
 export default async function Page({ params }: PageProps<'/[lang]'>) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  const t = (await getDictionary(lang)).residentLookup;
+  const dict = await getDictionary(lang);
 
-  return <LookupView t={t} />;
+  return (
+    <LookupView
+      lang={lang}
+      t={dict.residentLookup}
+      errors={dict.residentErrors}
+      // Sibling features share strings through the route, never through an
+      // import: `verify` uses this same slice (D66).
+      revocation={dict.residentRevocation}
+    />
+  );
 }

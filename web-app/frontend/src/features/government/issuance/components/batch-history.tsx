@@ -18,7 +18,7 @@ import { HashText } from '@/components/ui/hash-text';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { apiErrorCode, errorDetail } from '../../api/error-code';
+import { apiErrorCode } from '../../api/error-code';
 import { type Failure, apiFailure } from '../../api/error-message';
 import { govKeys } from '../../api/hooks';
 import type { IssuanceBatchSummary } from '../../api/types';
@@ -43,7 +43,7 @@ export function BatchHistory({
     } catch (error) {
       setFailure(
         apiErrorCode(error) === 'gone'
-          ? { title: t.archiveGoneTitle, detail: errorDetail(error) }
+          ? { title: t.archiveGoneTitle }
           : apiFailure(error, errors),
       );
       await batches.refetch();
@@ -65,9 +65,7 @@ export function BatchHistory({
       {batches.isPending ? (
         <Skeleton className="h-24 w-full" />
       ) : batches.error ? (
-        <Notice tone="danger" title={errors.unknown}>
-          {errorDetail(batches.error)}
-        </Notice>
+        <Notice tone="danger" title={apiFailure(batches.error, errors).title} />
       ) : batches.data.length === 0 ? (
         <p className="text-sm text-steel">{t.historyEmpty}</p>
       ) : (

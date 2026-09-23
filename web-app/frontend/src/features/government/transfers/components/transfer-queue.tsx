@@ -25,7 +25,7 @@ import { HashText } from '@/components/ui/hash-text';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { apiErrorCode, errorDetail } from '../../api/error-code';
+import { apiErrorCode } from '../../api/error-code';
 import { apiFailure } from '../../api/error-message';
 import { govKeys } from '../../api/hooks';
 import type { TransferRequest, TransferStatus } from '../../api/types';
@@ -96,7 +96,7 @@ export function TransferQueue({
     try {
       await downloadBuyerBundle(request.id);
     } catch (error) {
-      setMessage({ tone: 'danger', title: t.bundleTitle, detail: errorDetail(error) });
+      setMessage({ tone: 'danger', title: t.bundleTitle, detail: apiFailure(error, errors).title });
     } finally {
       setWorking(null);
     }
@@ -137,9 +137,7 @@ export function TransferQueue({
       {transfers.isPending ? (
         <Skeleton className="h-24 w-full" />
       ) : transfers.error ? (
-        <Notice tone="danger" title={errors.unknown}>
-          {errorDetail(transfers.error)}
-        </Notice>
+        <Notice tone="danger" title={apiFailure(transfers.error, errors).title} />
       ) : transfers.data.length === 0 ? (
         <p className="py-6 text-sm text-steel">{t.queueEmpty}</p>
       ) : (
