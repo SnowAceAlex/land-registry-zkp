@@ -107,9 +107,7 @@ describe('TreeService.streamIssuedProperties — paging rule (D72)', () => {
       // consume
     }
 
-    expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { status: 'ISSUED' } }),
-    );
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { status: 'ISSUED' } }));
   });
 
   it('stops at the first empty batch instead of looping forever', async () => {

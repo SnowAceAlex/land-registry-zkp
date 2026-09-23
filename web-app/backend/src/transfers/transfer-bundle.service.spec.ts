@@ -42,10 +42,10 @@ describe('TransferBundleService (D51)', () => {
           ),
       },
     };
-    const tree = {
-      buildCurrentTree: jest
-        .fn()
-        .mockResolvedValue({ tree: { root: over.treeRoot ?? 555n }, properties: [] }),
+    // One row for the stored root, one lookup for the proof (D72) — no tree is
+    // built here any more.
+    const nodes = {
+      rootNow: jest.fn().mockResolvedValue(over.treeRoot ?? 555n),
       proofFor: jest.fn().mockResolvedValue(merkleProof),
     };
     const chain = {
@@ -59,11 +59,11 @@ describe('TransferBundleService (D51)', () => {
     };
     const service = new TransferBundleService(
       prisma as never,
-      tree as never,
+      nodes as never,
       chain as never,
       issuance as never,
     );
-    return { service, prisma, tree, issuance, property, merkleProof };
+    return { service, prisma, nodes, issuance, property, merkleProof };
   }
 
   it('builds the buyer bundle against the current root and that root’s own transaction', async () => {
@@ -96,10 +96,12 @@ describe('TransferBundleService (D51)', () => {
   it.each(['PENDING', 'APPROVED', 'REJECTED'])(
     '409s while the transfer is %s — there is no published root to describe yet',
     async (status) => {
-      const { service, tree } = build({ transfer: { status } });
+      const { service, nodes } = build({ transfer: { status } });
 
       await expect(service.build(5)).rejects.toBeInstanceOf(ConflictException);
-      expect(tree.buildCurrentTree).not.toHaveBeenCalled();
+      // The status check comes first: no point reading the tree for a transfer
+      // that has no published root to describe yet.
+      expect(nodes.rootNow).not.toHaveBeenCalled();
     },
   );
 
