@@ -450,6 +450,74 @@ describe('ChangeSetService (D44)', () => {
   });
 });
 
+describe('ChangeSetService.createDraft — duplicate queue entries', () => {
+  /**
+   * Found by the bench harness, which writes transfer rows directly and so
+   * bypasses the guard in TransfersService.submit(). The draft was correctly
+   * refused, but the message said "a transfer and a revocation" for what was in
+   * fact two transfers — sending an officer to look for a revocation that does
+   * not exist.
+   */
+  function withQueue(
+    transfers: { id: number; propertyId: string; newOwnerCommitment: string }[],
+    revocations: { id: number; propertyId: string }[],
+  ) {
+    const prisma = {
+      transferRequest: { findMany: jest.fn().mockResolvedValue(transfers) },
+      revocation: {
+        findMany: jest.fn().mockResolvedValue(
+          revocations.map((r) => ({ ...r, reasonCode: 1, detailHash: '0xaa', detailText: 'x' })),
+        ),
+      },
+      changeSet: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+      property: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+      $transaction: jest.fn(),
+    } as never;
+
+    return new ChangeSetService(
+      prisma,
+      { projectRoot: jest.fn(), applyStatements: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      { assertNoOpenDraft: jest.fn() } as never,
+      {} as never,
+    );
+  }
+
+  it('names two transfers for one plot as exactly that', async () => {
+    const service = withQueue(
+      [
+        { id: 1, propertyId: '7', newOwnerCommitment: '111' },
+        { id: 2, propertyId: '7', newOwnerCommitment: '222' },
+      ],
+      [],
+    );
+
+    await expect(service.createDraft()).rejects.toThrow(/more than one approved transfer/);
+  });
+
+  it('names two revocations for one plot as exactly that', async () => {
+    const service = withQueue(
+      [],
+      [
+        { id: 1, propertyId: '7' },
+        { id: 2, propertyId: '7' },
+      ],
+    );
+
+    await expect(service.createDraft()).rejects.toThrow(/more than one pending revocation/);
+  });
+
+  it('still reports a genuine transfer-plus-revocation conflict as one', async () => {
+    const service = withQueue(
+      [{ id: 1, propertyId: '7', newOwnerCommitment: '111' }],
+      [{ id: 2, propertyId: '7' }],
+    );
+
+    await expect(service.createDraft()).rejects.toThrow(/both a transfer and a revocation pending/);
+  });
+});
+
 describe('MAX_REVOCATIONS_PER_CHANGESET (D73)', () => {
   it('matches the value whose gas was measured on-chain', () => {
     // Double-entry ledger with BACKEND_CAP in

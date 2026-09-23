@@ -60,6 +60,23 @@ async function main(): Promise<void> {
     console.log(`revoked   ${revocations.map((r) => r.propertyId).join(', ')}`);
   }
   console.log(`txHash    ${receipt?.hash ?? tx.hash}`);
+
+  // One machine-readable line for the bench harness (Chapter 5). Every human
+  // line above stays exactly as it was — this script is a tool for a person
+  // first, and a subprocess second.
+  //
+  // `receipt` is nullable in ethers v6 (a replaced transaction yields none).
+  // No receipt means no gas figure, and the harness has to be told that rather
+  // than handed a zero.
+  if (!receipt) throw new Error('sign:root: the transaction produced no receipt');
+  console.log(
+    `BENCH_RESULT ${JSON.stringify({
+      txHash: receipt.hash,
+      gasUsed: receipt.gasUsed.toString(),
+      blockNumber: receipt.blockNumber,
+      rootVersion: Number(await registry.rootVersion()),
+    })}`,
+  );
 }
 
 main()

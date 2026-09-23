@@ -146,15 +146,36 @@ export class ChangeSetService {
     // Checked against the WHOLE queue, deferred revocations included: a plot
     // transferred in this round and revoked in the next is the same conflict,
     // just spread over two publishes.
-    const seen = new Set<string>();
-    for (const item of [...transfers, ...pendingRevocations]) {
-      if (seen.has(item.propertyId)) {
+    // The message names what was actually found. The set used to be shared
+    // between both lists, so two queued transfers for one plot were reported as
+    // "a transfer and a revocation" — an officer sent looking for a revocation
+    // that does not exist. Keeping the two kinds apart costs one extra set and
+    // makes the error actionable.
+    const transferred = new Set<string>();
+    const revoked = new Set<string>();
+    for (const transfer of transfers) {
+      if (transferred.has(transfer.propertyId)) {
         throw new ConflictException(
-          `Property ${item.propertyId} has both a transfer and a revocation pending — ` +
+          `Property ${transfer.propertyId} has more than one approved transfer waiting — ` +
+            `reject all but one before publishing.`,
+        );
+      }
+      transferred.add(transfer.propertyId);
+    }
+    for (const revocation of pendingRevocations) {
+      if (revoked.has(revocation.propertyId)) {
+        throw new ConflictException(
+          `Property ${revocation.propertyId} has more than one pending revocation — ` +
+            `reject all but one before publishing.`,
+        );
+      }
+      if (transferred.has(revocation.propertyId)) {
+        throw new ConflictException(
+          `Property ${revocation.propertyId} has both a transfer and a revocation pending — ` +
             `resolve the conflict before publishing.`,
         );
       }
-      seen.add(item.propertyId);
+      revoked.add(revocation.propertyId);
     }
 
     // D56 — oldest first (pending() orders by createdAt), the rest wait.

@@ -47,14 +47,7 @@ dotenv.config({ path: path.resolve(__dirname, '..', '..', '..', '.env') });
 import { AppModule } from '../src/app.module';
 import { NodeStoreService } from '../src/tree/node-store.service';
 import { PrismaService } from '../src/prisma/prisma.service';
-
-/** Seed behind every bench secret. Public on purpose — see the file header. */
-export const BENCH_SECRET_SEED = 424_242n;
-
-/** The owner secret of a bench plot, recomputable from any script. */
-export async function benchOwnerSecret(propertyId: bigint): Promise<bigint> {
-  return poseidonHash([BENCH_SECRET_SEED, propertyId]);
-}
+import { benchOwnerSecret } from './bench-secret';
 
 const COUNT = Number(process.env.COUNT ?? 2_500_000);
 const LAYOUT = (process.env.LAYOUT ?? 'scattered') as 'scattered' | 'contiguous';
