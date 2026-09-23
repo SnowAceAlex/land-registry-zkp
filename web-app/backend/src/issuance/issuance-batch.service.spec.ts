@@ -459,7 +459,7 @@ describe('IssuanceBatchService (D43)', () => {
       nodes as never,
       issuance as never,
       chain as never,
-      { recordRootStatement: jest.fn(), proofCacheStatements: jest.fn() } as never,
+      { recordRootStatement: jest.fn() } as never,
       { assertNoOpenDraft: jest.fn() } as never,
       { issuedStatements: jest.fn() } as never,
       {} as never,
