@@ -91,7 +91,9 @@ describe('IssuanceBatchService (D43)', () => {
 
   it('refuses to confirm when the chain root does not match the draft', async () => {
     const { prisma } = build();
-    const chain = { getLatestRoot: jest.fn().mockResolvedValue(123n), getRootVersion: jest.fn() };
+    const chain = { getLatestRoot: jest.fn().mockResolvedValue(123n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(), getRootVersion: jest.fn() };
     const service = new IssuanceBatchService(
       prisma,
       {} as never,
@@ -266,6 +268,8 @@ describe('IssuanceBatchService (D43)', () => {
 
     const chain = {
       getLatestRoot: jest.fn().mockResolvedValue(999n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(),
       getRootVersion: jest.fn().mockResolvedValue(7),
     };
     const nodes = {
@@ -369,6 +373,8 @@ describe('IssuanceBatchService (D43)', () => {
 
     const chain = {
       getLatestRoot: jest.fn().mockResolvedValue(999n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(),
       getRootVersion: jest.fn().mockResolvedValue(7),
     };
 
@@ -445,6 +451,8 @@ describe('IssuanceBatchService (D43)', () => {
       // Matches draft.newRoot, so the FIRST paranoia check (against the chain)
       // passes — this test exercises the SECOND one, after the rebuild.
       getLatestRoot: jest.fn().mockResolvedValue(999n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(),
       getRootVersion: jest.fn().mockResolvedValue(7),
     };
     const nodes = {
@@ -488,6 +496,8 @@ describe('IssuanceBatchService (D43)', () => {
 
     const chain = {
       getLatestRoot: jest.fn().mockResolvedValue(999n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(),
       getRootVersion: jest.fn().mockResolvedValue(7),
     };
 
@@ -565,6 +575,8 @@ describe('IssuanceBatchService (D43)', () => {
 
     const chain = {
       getLatestRoot: jest.fn().mockResolvedValue(999n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(),
       getRootVersion: jest.fn().mockResolvedValue(7),
     };
     const nodes = {

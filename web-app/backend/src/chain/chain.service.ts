@@ -19,6 +19,7 @@ import {
 } from '@land-registry/blockchain/shared';
 
 import { blockchainDir } from '../common/paths';
+import { TtlCache } from '../common/ttl-cache';
 
 /**
  * ChainService
@@ -36,6 +37,16 @@ import { blockchainDir } from '../common/paths';
 // the loader — three copies of that record had already drifted apart. Still
 // re-exported here so callers importing them from ChainService keep working.
 export type { ChainNetwork, DeploymentRecord };
+
+/**
+ * How long a read of the current root stays good (D74).
+ *
+ * 2 seconds: short enough that correctness never has to be reasoned about —
+ * every write path calls `invalidateRootCache()` immediately before reading —
+ * and long enough that a 100 req/s burst costs at most one RPC call a second
+ * instead of two hundred.
+ */
+const ROOT_CACHE_TTL_MS = 2_000;
 
 /** A LandRegistryVerifier rejection, decoded from its typed revert (D33). */
 export class ProofRejectedError extends Error {
@@ -58,6 +69,7 @@ export class ChainService implements OnModuleInit {
   private registry!: RootRegistry;
   private verifier!: LandRegistryVerifier;
   private deployment!: DeploymentRecord;
+  private readonly rootCache = new TtlCache<{ root: bigint; version: number }>(ROOT_CACHE_TTL_MS);
 
   async onModuleInit(): Promise<void> {
     const network = (process.env.CHAIN_NETWORK ?? 'localhost') as ChainNetwork;
@@ -145,13 +157,40 @@ export class ChainService implements OnModuleInit {
     return this.registry.hasRole(role, account);
   }
 
+  /**
+   * The current root and its version, read in ONE pass and cached briefly (D74).
+   *
+   * Reading them together is not only about saving an RPC call: two separate
+   * reads can land either side of a publish, and the service would then pair an
+   * old root with a new version — a combination that never existed on-chain,
+   * and enough to put a wrong number into a refreshed receipt.
+   */
+  async getRoot(): Promise<{ root: bigint; version: number }> {
+    return this.rootCache.get(async () => ({
+      root: BigInt(await this.registry.latestRoot()),
+      version: Number(await this.registry.rootVersion()),
+    }));
+  }
+
   /** Current effective root, as the bigint the Merkle layer speaks in. */
   async getLatestRoot(): Promise<bigint> {
-    return BigInt(await this.registry.latestRoot());
+    return (await this.getRoot()).root;
   }
 
   async getRootVersion(): Promise<number> {
-    return Number(await this.registry.rootVersion());
+    return (await this.getRoot()).version;
+  }
+
+  /**
+   * Force the next root read to go to the chain.
+   *
+   * ⚠️ Must be called at the START of every confirm(), before reading
+   * `latestRoot`. Without it a draft whose root was just published can be
+   * rejected by its own confirm() for up to the TTL — the officer would be told
+   * "not mined yet" about a transaction that is mined.
+   */
+  invalidateRootCache(): void {
+    this.rootCache.invalidate();
   }
 
   /**

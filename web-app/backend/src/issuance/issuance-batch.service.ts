@@ -214,6 +214,9 @@ export class IssuanceBatchService {
       draft.txHash = txHash;
     }
 
+    // D74 — the root read is cached for 2 seconds; a confirm must always ask
+    // the chain itself, or a just-mined publish can be reported as unmined.
+    this.chain.invalidateRootCache();
     const latestRoot = await this.chain.getLatestRoot();
     if (latestRoot.toString() !== draft.newRoot) {
       throw new UnprocessableEntityException(

@@ -93,7 +93,9 @@ describe('ChangeSetService (D44)', () => {
       transfers: [],
       revocations: [],
     });
-    const chain = { getLatestRoot: jest.fn().mockResolvedValue(999n), getRootVersion: jest.fn() };
+    const chain = { getLatestRoot: jest.fn().mockResolvedValue(999n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(), getRootVersion: jest.fn() };
     const service = new ChangeSetService(
       prisma,
       {} as never,
@@ -159,6 +161,8 @@ describe('ChangeSetService (D44)', () => {
 
     const chain = {
       getLatestRoot: jest.fn().mockResolvedValue(555n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(),
       getRootVersion: jest.fn().mockResolvedValue(9),
     };
     const projectRoot = jest.fn().mockResolvedValue(overlayOf(rebuiltRoot));
@@ -495,6 +499,8 @@ describe('ChangeSetService — a transfer may not resurrect a revoked plot (D45/
       } as never,
       {
         getLatestRoot: jest.fn().mockResolvedValue(555n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(),
         getRootVersion: jest.fn().mockResolvedValue(9),
       } as never,
       { recordRootStatement: jest.fn() } as never,

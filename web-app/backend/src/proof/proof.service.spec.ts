@@ -218,6 +218,76 @@ describe('ProofService.getMerkleProof — read from the node table (D72)', () =>
   });
 });
 
+describe('ProofService.conditionalProof — the validator is guessable (D74)', () => {
+  it('serves the proof when the client has no validator', async () => {
+    const { root, rows } = await makeRegistry();
+    const { service } = await makeService(rows[0], root, rows);
+
+    const { etag, proof } = await service.conditionalProof('1', undefined);
+
+    expect(etag).toBe(`"v${CHAIN_VERSION}-p1"`);
+    expect(proof?.merkleRoot).toBe(root.toString());
+  });
+
+  it('answers not-modified when the validator matches', async () => {
+    const { root, rows } = await makeRegistry();
+    const { service, proofFor } = await makeService(rows[0], root, rows);
+
+    const { proof } = await service.conditionalProof('1', `"v${CHAIN_VERSION}-p1"`);
+
+    expect(proof).toBeUndefined();
+    // The saving that matters: no node lookups and no Poseidon hashing.
+    expect(proofFor).not.toHaveBeenCalled();
+  });
+
+  it('serves the proof again once the root version has moved', async () => {
+    const { root, rows } = await makeRegistry();
+    const { service } = await makeService(rows[0], root, rows);
+
+    const { proof } = await service.conditionalProof('1', `"v${CHAIN_VERSION - 1}-p1"`);
+
+    expect(proof).toBeDefined();
+  });
+
+  it('404s an unknown plot even when the client presents the CURRENT validator', async () => {
+    // The validator is `"v<version>-p<id>"` — public and deterministic, so
+    // anyone can write one down for a plot they have never been served. If the
+    // comparison came before the lookup, this would be a 304 about a resource
+    // that does not exist.
+    const { service } = await makeService(null, 1n);
+
+    await expect(
+      service.conditionalProof('999999', `"v${CHAIN_VERSION}-p999999"`),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('410s a revoked plot even with the current validator — the one that matters', async () => {
+    // A verifier polling with a guessed validator must still be told the
+    // certificate was reclaimed. A 304 here would hide a revocation for as long
+    // as the caller kept asking.
+    const revoked = makeProperty({ propertyId: '1', status: 'REVOKED', leaf: null });
+    const { service } = await makeService(revoked, 1n);
+
+    await expect(service.conditionalProof('1', `"v${CHAIN_VERSION}-p1"`)).rejects.toThrow(
+      GoneException,
+    );
+  });
+
+  it('400s an imported-but-not-issued plot even with the current validator', async () => {
+    const notIssued = makeProperty({
+      propertyId: '1',
+      ownerCommitment: null,
+      issuedAt: null,
+      status: 'IMPORTED',
+    });
+    const { service } = await makeService(notIssued, 1n);
+
+    await expect(service.conditionalProof('1', `"v${CHAIN_VERSION}-p1"`)).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+});
+
 describe('ProofService.verify', () => {
   const ROOT = 12345n;
 

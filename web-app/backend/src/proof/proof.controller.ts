@@ -1,5 +1,15 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Res,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiBadRequestResponse,
   ApiNotFoundResponse,
@@ -50,19 +60,37 @@ export class ProofController {
       'the record that changed — so a single transfer leaves all other owners holding a proof ' +
       'that no longer verifies. This re-issues the current one. No ownerSecret is involved: ' +
       'the response is public data, and the private witness stays in the owner browser. ' +
-      'Compare `rootVersion` with the value in your receipt.json to detect staleness (§3.1).',
+      'Compare `rootVersion` with the value in your receipt.json to detect staleness (§3.1). ' +
+      'Cacheable: the response changes only when a root is published, so it carries an ETag ' +
+      'keyed to the root version and answers 304 to a matching If-None-Match (D74).',
   })
   @ApiParam({ name: 'propertyId', example: '1', description: 'Decimal-string id' })
   @ApiOkResponse({ type: MerkleProofResponseDto })
   @ApiNotFoundResponse({ description: 'No property with that propertyId' })
   @ApiBadRequestResponse({ description: 'Property imported but not issued yet — it has no leaf' })
-  @ApiServiceUnavailableResponse({ description: 'Cached proof does not verify; republish needed' })
-  // Tighter than the 60/minute global default (AppModule): on a cache miss
-  // (D40) this rebuilds the entire Merkle tree, the most expensive operation
-  // any public route can trigger, so it gets its own smaller bucket.
-  @Throttle({ default: { limit: 12, ttl: 60_000 } })
-  getMerkleProof(@Param('propertyId') propertyId: string) {
-    return this.proofService.getMerkleProof(propertyId);
+  @ApiServiceUnavailableResponse({ description: 'Node table inconsistent; run tree:bootstrap' })
+  async getMerkleProof(
+    @Param('propertyId') propertyId: string,
+    @Headers('if-none-match') ifNoneMatch: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<MerkleProofResponseDto | undefined> {
+    // The service validates the plot BEFORE honouring `If-None-Match` — the
+    // validator is guessable, so a conditional request must not be able to skip
+    // the 404 / 400 / 410 answers. See ProofService.conditionalProof.
+    const { etag, proof } = await this.proofService.conditionalProof(propertyId, ifNoneMatch);
+
+    res.setHeader('ETag', etag);
+    // A short max-age because the next publish cannot be predicted; correctness
+    // rests on the ETag, and max-age only shaves off the revalidation round
+    // trips in between.
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=600');
+
+    if (!proof) {
+      res.status(HttpStatus.NOT_MODIFIED);
+      return undefined;
+    }
+
+    return proof;
   }
 
   @Post('verify')

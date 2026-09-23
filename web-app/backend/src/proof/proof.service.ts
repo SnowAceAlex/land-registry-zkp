@@ -25,6 +25,7 @@ import { ChainService, ProofRejectedError } from '../chain/chain.service';
 import { blockchainDir } from '../common/paths';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeStoreService } from '../tree/node-store.service';
+import { proofETag } from './proof-etag';
 import { VerifyProofDto } from './dto/proof.dto';
 import { MerkleProofResponseDto, VerifyProofResponseDto } from './dto/proof.response.dto';
 
@@ -68,7 +69,12 @@ export class ProofService {
    * from the propertyId (D41). The owner witness never comes near this service.
    */
   async getMerkleProof(propertyId: string): Promise<MerkleProofResponseDto> {
-    const property = await this.requireIssuedProperty(propertyId);
+    return this.buildProofResponse(await this.requireIssuedProperty(propertyId));
+  }
+
+  /** The proof response for a plot already known to be issued. */
+  private async buildProofResponse(property: Property): Promise<MerkleProofResponseDto> {
+    const propertyId = property.propertyId;
 
     const [latestRoot, onChainVersion, storedRoot] = await Promise.all([
       this.chain.getLatestRoot(),
@@ -112,6 +118,33 @@ export class ProofService {
       inSync,
       source: 'nodes',
     };
+  }
+
+  /**
+   * A conditional read of the current Merkle proof (D74).
+   *
+   * ⚠️ THE EXISTENCE CHECK COMES FIRST, AND THAT IS NOT NEGOTIABLE. The ETag is
+   * `"v<rootVersion>-p<propertyId>"` — deterministic and public, so anyone can
+   * write one down without ever having been served the plot. An implementation
+   * that compared `If-None-Match` before validating the plot would answer 304
+   * for a propertyId that does not exist (instead of 404), for one that is
+   * imported but not issued (instead of 400), and — the one that matters — for
+   * a REVOKED certificate instead of 410. A verifier polling with a guessed
+   * validator would never learn the certificate had been reclaimed.
+   *
+   * What the 304 still saves is the expensive half: TREE_DEPTH node lookups and
+   * TREE_DEPTH Poseidon hashes. What it costs is one primary-key read that the
+   * 200 path has to do anyway.
+   */
+  async conditionalProof(
+    propertyId: string,
+    ifNoneMatch: string | undefined,
+  ): Promise<{ etag: string; proof?: MerkleProofResponseDto }> {
+    const property = await this.requireIssuedProperty(propertyId);
+    const etag = proofETag(await this.chain.getRootVersion(), propertyId);
+
+    if (ifNoneMatch === etag) return { etag };
+    return { etag, proof: await this.buildProofResponse(property) };
   }
 
   /**
