@@ -36,7 +36,7 @@ import type { PropertyDetail } from '../../api/types';
 import { getPropertyDetail, previewTransfer, submitTransfer } from '../api';
 import { buyerSecretArchive, generateOwnerSecret } from '../lib/buyer-secret';
 import { type SellerCheckIssue, type SellerCheckResult, checkSellerBundle } from '../lib/seller-check';
-import { yearsToSeconds } from '@/lib/term';
+import { MAX_TERM_YEARS, parseTermYears, yearsToSeconds } from '@/lib/term';
 import { buildCounterTransferInput } from '../lib/transfer-witness';
 
 type Strings = Dictionary['govTransfers'];
@@ -119,12 +119,19 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
     setBuyer({ ...buyer, downloadedAs: filename });
   }
 
-  const yearsValue = Number(years);
-  const yearsValid = years.trim() !== '' && Number.isInteger(yearsValue) && yearsValue >= 0;
-  const canSubmit = Boolean(seller && buyer?.downloadedAs && buyer.acknowledged && yearsValid);
+  // Shared with the owner's mortgage screen (D70), which feeds the same public
+  // signal through the same circuit template. The ceiling matters less here —
+  // the buyer is standing at the counter holding the seller's certificate — but
+  // one threshold cannot be legal on one screen and refused on the other.
+  const parsedYears = parseTermYears(years);
+  const yearsError = 'error' in parsedYears ? parsedYears.error : null;
+  const yearsValue = 'years' in parsedYears ? parsedYears.years : null;
+  const canSubmit = Boolean(
+    seller && buyer?.downloadedAs && buyer.acknowledged && yearsValue !== null,
+  );
 
   async function proveAndSubmit() {
-    if (!seller || !buyer || !canSubmit) return;
+    if (!seller || !buyer || !canSubmit || yearsValue === null) return;
     const propertyId = seller.property.propertyId;
     setFailure(null);
     try {
@@ -312,21 +319,24 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
                 type="number"
                 inputMode="numeric"
                 min={0}
+                max={MAX_TERM_YEARS}
                 step={1}
                 value={years}
                 disabled={busy !== null}
                 onChange={(event) => setYears(event.target.value)}
-                aria-invalid={yearsValid ? undefined : true}
-                aria-describedby={yearsValid ? 'transfer-term-hint' : 'transfer-term-error'}
+                aria-invalid={yearsError === null ? undefined : true}
+                aria-describedby={yearsError === null ? 'transfer-term-hint' : 'transfer-term-error'}
                 className="mt-2 w-full rounded-lg border border-hairline bg-white px-3.5 py-2.5 font-mono text-sm ui-transition focus:border-authority"
               />
-              {yearsValid ? (
+              {yearsError === null ? (
                 <p id="transfer-term-hint" className="mt-2 text-sm text-steel">
                   {t.termHint}
                 </p>
               ) : (
                 <p id="transfer-term-error" role="alert" className="mt-2 text-sm text-red-700">
-                  {t.termInvalid}
+                  {yearsError === 'above-max'
+                    ? format(t.termAboveMax, { max: MAX_TERM_YEARS })
+                    : t.termInvalid}
                 </p>
               )}
             </div>

@@ -7,7 +7,7 @@ import {
   UseType,
 } from '@land-registry/blockchain/shared/types';
 
-import { SECONDS_PER_YEAR } from '@/lib/term';
+import { MAX_TERM_YEARS, SECONDS_PER_YEAR } from '@/lib/term';
 
 import { isTitleExpired, proofBlockers } from './proof-feasibility';
 
@@ -107,15 +107,17 @@ describe('proofBlockers — mortgage', () => {
     expect(proofBlockers('mortgage', record(), NOW, 10)).toEqual([]);
   });
 
-  it('lets a perpetual title clear any threshold', () => {
-    expect(
-      proofBlockers(
-        'mortgage',
-        record({ tenureType: TenureType.PERPETUAL, validityPeriod: 0n }),
-        NOW,
-        99,
-      ),
-    ).toEqual([]);
+  /**
+   * MAX_TERM_YEARS is the largest number the field accepts (D70), so this is
+   * the strongest claim a perpetual owner can make on screen — and the mirror
+   * must not stand in its way. The second case goes past the cap on purpose:
+   * the ceiling is an interface rule about what the public signal reveals, not
+   * a circuit constraint, and this function answers for the circuit.
+   */
+  it('lets a perpetual title clear every threshold the field allows', () => {
+    const perpetual = record({ tenureType: TenureType.PERPETUAL, validityPeriod: 0n });
+    expect(proofBlockers('mortgage', perpetual, NOW, MAX_TERM_YEARS)).toEqual([]);
+    expect(proofBlockers('mortgage', perpetual, NOW, 99)).toEqual([]);
   });
 
   /**

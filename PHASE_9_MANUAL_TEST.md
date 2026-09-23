@@ -115,7 +115,9 @@ liệu ra một trang không đăng nhập.
 
 1. Mở trang. Banner đầu trang phải nói mọi thứ chạy trên máy người dùng.
 2. Kéo thả ZIP bộ hồ sơ (hoặc chọn 2 tệp JSON).
-3. Bốn ô kiểm tra tệp đều xanh; bảng thông tin giấy chứng nhận hiện ra.
+3. Bốn ô kiểm tra tệp đều xanh; bảng thông tin giấy chứng nhận hiện ra. Bảng phải có dòng
+   **Hình thức sử dụng đất** (Lâu dài / Có thời hạn) và ⚠️ **không** có ngày hết hạn ở bất kỳ dòng
+   nào — D70 cố tình dừng ở đó, vì đây là màn hình hay bị người khác đứng cạnh nhìn.
 4. Nếu receipt cũ hơn gốc hiện tại → banner **xanh dương** (info) nói proof trong tệp đã được làm
    mới tự động. ⚠️ Đây là trạng thái **bình thường**; nếu nó hiện màu đỏ hoặc chặn nút Generate thì
    sai (D64).
@@ -137,8 +139,8 @@ liệu ra một trang không đăng nhập.
 ### 3.3 UC-5 — mortgage
 
 1. Cùng bộ hồ sơ, chọn "Sổ sạch và còn đủ thời hạn".
-2. Nhập số năm (D16 — con số ngân hàng yêu cầu, không phải thời hạn thật). Thử nhập `1.5` và `-1` →
-   báo lỗi, nút bị khoá.
+2. Nhập số năm (D16 — con số ngân hàng yêu cầu, không phải thời hạn thật). Thử nhập `1.5`, `-1` và
+   `5e1` → báo lỗi, nút bị khoá. Thử `71` → dòng đỏ "Tối đa 70 năm…" (D70), `70` → nhận.
 3. Nhập `5` → Generate → **ghi thời gian** vào §5.
 4. Panel kết quả phải liệt kê `minRequiredRemainingTerm` ở cột **đã tiết lộ**, và
    `Ngày hết hạn sử dụng đất` + `Tình trạng thế chấp` ở cột **không bao giờ tiết lộ**. Đây là điểm
@@ -168,9 +170,11 @@ liệu ra một trang không đăng nhập.
 | Chuyển nhượng thửa 4 qua quầy (§3.x của `PHASE_8_MANUAL_TEST.md`), publish change set, rồi nạp lại **bộ hồ sơ cũ** của thửa 4 | Ngay sau khi đọc file: "Giấy này không còn là bản ghi hiện hành của thửa đất". **Không** hiện bảng thông tin giấy, **không** hiện 4 dấu ✓, **không** hiện banner xanh "đã được làm mới", **không** hiện mục 3 lẫn nút Generate |
 | Cùng bộ hồ sơ cũ đó, nhưng change set mới **ký mà chưa confirm** | Phải ra "Cơ quan đăng ký còn thay đổi chưa đưa lên blockchain", **không** phải thông báo sổ bị thay thế — leaf lúc này thuộc cây chưa ai công bố |
 | Sửa `validityPeriod` trong DB về quá khứ cho một thửa FIXED_TERM, publish lại, nạp bộ hồ sơ | "Thời hạn sử dụng đất trên giấy này đã hết", hiện **ngay** — mở DevTools → Network xác nhận **không có** request `GET /api/proof/:id` nào |
-| Nạp bộ hồ sơ của một thửa PERPETUAL (ONT/ODT, `validityPeriod = 0`) | Vào thẳng mục 3 bình thường. ⚠️ Đây là ca bắt lỗi sentinel D5/D23 — nếu ra "đã hết hạn" thì bản sao TS đang so sánh ngây thơ |
+| Nạp bộ hồ sơ của một thửa PERPETUAL (ONT/ODT, `validityPeriod = 0`) | Vào thẳng mục 3 bình thường. ⚠️ Đây là ca bắt lỗi sentinel D5/D23 — nếu ra "đã hết hạn" thì bản sao TS đang so sánh ngây thơ. Bảng thông tin ghi **Hình thức sử dụng đất: Lâu dài** |
+| Cùng thửa PERPETUAL đó, chọn mortgage | Ô nhập năm **vẫn hiện, vẫn bắt nhập, nhãn y hệt** thửa có thời hạn (D70 — ẩn ô hay tự điền sẽ khiến public signal tố cáo `tenureType`). Dưới ô là câu màu **xám** giải thích thửa lâu dài đạt mọi ngưỡng và vẫn nên nhập đúng con số ngân hàng yêu cầu — **không** phải dòng đỏ |
+| Cùng thửa PERPETUAL, nhập `70` → Generate | Tạo được proof. Đây là ca mà so sánh ngây thơ `validityPeriod >= now + 70 năm` sẽ chặn nhầm, vì `validityPeriod = 0` |
 | Đặt `encumbranceStatus = MORTGAGED` cho thửa đang dùng, publish lại, nạp bộ hồ sơ | Lựa chọn "Sổ sạch và còn đủ thời hạn" **mờ và không bấm được**, kèm lý do; lựa chọn ownership vẫn chạy bình thường |
-| Chọn mortgage, nhập số năm lớn hơn thời hạn còn lại (ví dụ 99) | Dòng đỏ dưới ô nhập, nút Generate **khoá**. ⚠️ Thông báo **không được** in ra số năm thật còn lại — đó đúng là con số mortgage proof tồn tại để giấu |
+| Chọn mortgage (thửa **có thời hạn**), nhập số năm lớn hơn thời hạn còn lại nhưng **vẫn dưới trần 70** — ví dụ thửa còn 10 năm thì nhập `60` | Dòng đỏ dưới ô nhập, nút Generate **khoá**. ⚠️ Thông báo **không được** in ra số năm thật còn lại — đó đúng là con số mortgage proof tồn tại để giấu. ⚠️ Đừng dùng `99` để thử ca này: từ D70, `99` dừng ở trần trước khi chạm tới phép so thời hạn, nên sẽ ra thông báo khác |
 | Chọn mortgage, hạ số năm xuống dưới hạn | Dòng đỏ biến mất, nút Generate mở lại ngay, không cần nạp lại file |
 | Bất kỳ lỗi prover nào lọt lưới | Màn hình chỉ được hiện "Không tạo được proof" + câu giải thích. Chuỗi `Assert Failed…` phải nằm trong **console**, không nằm trên trang |
 
@@ -242,6 +246,7 @@ liệu ra một trang không đăng nhập.
 | --- | --- |
 | Sinh được ownership proof trong browser | 3.2 |
 | Sinh được mortgage proof với ngưỡng năm tự nhập (D16) | 3.3 |
+| Thửa lâu dài: ô nhập năm **không đổi hình dạng**, trần 70 năm áp cho cả hai màn (D70) | 3.3, 3.4.1 |
 | Verify được cả 3 loại proof | 3.5 |
 | 4 bước kiểm đúng tên và đúng thứ tự của contract (D33), freshness trước (D26) | 3.5, 3.8 |
 | Chuỗi danh tính D30 đủ 4 mắt xích, mắt xích CA khai báo trung thực | 3.6 |

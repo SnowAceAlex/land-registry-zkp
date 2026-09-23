@@ -19,13 +19,14 @@ import { LoaderCircle } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import type { Dictionary } from '@/i18n/dictionaries';
-import type { ProofPackage } from '@land-registry/blockchain/shared/types';
+import { type ProofPackage, TenureType } from '@land-registry/blockchain/shared/types';
 import { nowUnixTimestamp } from '@land-registry/blockchain/shared/datetime';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { buttonStyles } from '@/components/ui/button';
 import { BundleError, type BundleErrorCode, type OwnerBundle, readBundleFiles } from '@/lib/bundle';
 import { readChainRoot } from '@/lib/registry-reads';
+import { parseTermYears } from '@/lib/term';
 import { generateProof } from '@/lib/zkp';
 
 import { type MerkleProofResponse, refreshMerkleProof } from '../api';
@@ -72,7 +73,15 @@ export function ProofWorkbench({
   const [years, setYears] = useState('5');
   const [result, setResult] = useState<{ pkg: ProofPackage; durationMs: number } | null>(null);
 
-  const yearsInvalid = !/^\d+$/.test(years.trim());
+  // One parser for both screens that ask for this number (D70): the counter
+  // and this page used to disagree about which strings count as a year.
+  const parsedYears = parseTermYears(years);
+  const yearsError = 'error' in parsedYears ? parsedYears.error : null;
+  const yearsValue = 'years' in parsedYears ? parsedYears.years : null;
+
+  // Its own line rather than a lookup inside the picker: the record card names
+  // this fact too, and both have to say the same thing (D70).
+  const perpetualTenure = record?.record.tenureType === TenureType.PERPETUAL;
 
   /**
    * The walls the chosen circuit would hit, named before the owner waits for
@@ -89,13 +98,13 @@ export function ProofWorkbench({
         type,
         record.record,
         now,
-        type === 'mortgage' && !yearsInvalid ? Number(years.trim()) : null,
+        type === 'mortgage' ? yearsValue : null,
       ),
       // Asked of the mortgage circuit whichever option is selected: the option
       // has to be able to say why it cannot be picked in the first place.
       mortgage: proofBlockers('mortgage', record.record, now, null),
     };
-  }, [record, type, years, yearsInvalid]);
+  }, [record, type, yearsValue]);
 
   const mortgageEncumbered = blockers.mortgage.includes('encumbered');
   const termTooLong = blockers.active.includes('term-too-long');
@@ -200,7 +209,8 @@ export function ProofWorkbench({
         ownerSecret: BigInt(bundle.secret.ownerSecret),
         refreshed,
         currentTimestamp: nowUnixTimestamp(),
-        minRemainingTermYears: type === 'mortgage' ? Number(years.trim()) : undefined,
+        minRemainingTermYears:
+          type === 'mortgage' && yearsValue !== null ? yearsValue : undefined,
       });
       setResult(await generateProof(type, input));
     } catch (error) {
@@ -356,7 +366,8 @@ export function ProofWorkbench({
             onChange={setType}
             years={years}
             onYears={setYears}
-            yearsInvalid={type === 'mortgage' && yearsInvalid}
+            yearsError={type === 'mortgage' ? yearsError : null}
+            perpetualTenure={perpetualTenure}
             mortgageEncumbered={mortgageEncumbered}
             termTooLong={termTooLong}
             disabled={busy !== null}
@@ -369,7 +380,7 @@ export function ProofWorkbench({
               className={buttonStyles.primary}
               disabled={
                 busy !== null ||
-                (type === 'mortgage' && yearsInvalid) ||
+                (type === 'mortgage' && yearsValue === null) ||
                 blockers.active.length > 0
               }
               onClick={prove}

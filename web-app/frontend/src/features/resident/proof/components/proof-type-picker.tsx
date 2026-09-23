@@ -21,9 +21,17 @@
  * whatever number is typed — while `termTooLong` sits under the field, because
  * it is the number itself that is wrong and the owner can simply lower it.
  * Neither is a security control; the circuit still decides.
+ *
+ * D70: the field does NOT change shape for a perpetual plot. Hiding it, or
+ * filling it in, would put a distinctive value into public signal [4] and hand
+ * the verifier the `tenureType` this proof exists to withhold — so a perpetual
+ * title gets one extra sentence and the identical input. The same reasoning
+ * gives the field a ceiling: see MAX_TERM_YEARS.
  */
 
+import { format } from '@/i18n/format';
 import type { Dictionary } from '@/i18n/dictionaries';
+import { MAX_TERM_YEARS, type TermYearsError } from '@/lib/term';
 
 import type { OwnerProofType } from '../lib/owner-witness';
 
@@ -34,7 +42,8 @@ export function ProofTypePicker({
   onChange,
   years,
   onYears,
-  yearsInvalid,
+  yearsError,
+  perpetualTenure,
   mortgageEncumbered,
   termTooLong,
   disabled,
@@ -44,7 +53,10 @@ export function ProofTypePicker({
   onChange: (type: OwnerProofType) => void;
   years: string;
   onYears: (years: string) => void;
-  yearsInvalid: boolean;
+  /** Which rule the typed number broke, or null while it is usable. */
+  yearsError: TermYearsError | null;
+  /** The title has no term at all, so every threshold is already met (D5). */
+  perpetualTenure: boolean;
   /** The record carries a mortgage or dispute, so mortgage.circom cannot pass. */
   mortgageEncumbered: boolean;
   /** More years were asked for than the title has left. */
@@ -61,6 +73,26 @@ export function ProofTypePicker({
       blocked: mortgageEncumbered ? t.mortgageEncumbered : null,
     },
   ];
+
+  /**
+   * What the line under the field says, worst first. The three refusals are red
+   * and carry `role="alert"`; the perpetual note is neither, because nothing is
+   * wrong — it is the ordinary hint, with one plot's fact added.
+   */
+  const fieldNote: { text: string; problem: boolean } =
+    yearsError === 'not-whole'
+      ? { text: t.termInvalid, problem: true }
+      : yearsError === 'above-max'
+        ? { text: format(t.termAboveMax, { max: MAX_TERM_YEARS }), problem: true }
+        : termTooLong
+          ? // Deliberately does not say how many years ARE left: that figure is
+            // the private one the mortgage proof exists to withhold, and
+            // printing it here would put it on screen for whoever is standing
+            // next to the owner.
+            { text: t.termTooLong, problem: true }
+          : perpetualTenure
+            ? { text: t.termPerpetual, problem: false }
+            : { text: t.termHint, problem: false };
 
   return (
     <section className="space-y-3">
@@ -117,24 +149,19 @@ export function ProofTypePicker({
                     value={years}
                     onChange={(event) => onYears(event.target.value)}
                     aria-describedby="min-years-hint"
-                    aria-invalid={yearsInvalid || termTooLong || undefined}
+                    aria-invalid={yearsError !== null || termTooLong || undefined}
                     className="mt-1.5 w-32 rounded-lg border border-hairline bg-white px-3 py-2 font-mono text-sm text-ink ui-transition focus:border-authority aria-invalid:border-red-400"
                   />
-                  <span id="min-years-hint" className="mt-1.5 block text-xs text-steel">
-                    {yearsInvalid ? (
+                  <span
+                    id="min-years-hint"
+                    className="mt-1.5 block max-w-xl text-xs leading-relaxed text-steel"
+                  >
+                    {fieldNote.problem ? (
                       <span role="alert" className="text-red-700">
-                        {t.termInvalid}
-                      </span>
-                    ) : termTooLong ? (
-                      // Deliberately does not say how many years ARE left: that
-                      // figure is the private one the mortgage proof exists to
-                      // withhold, and printing it here would put it on screen
-                      // for whoever is standing next to the owner.
-                      <span role="alert" className="text-red-700">
-                        {t.termTooLong}
+                        {fieldNote.text}
                       </span>
                     ) : (
-                      t.termHint
+                      fieldNote.text
                     )}
                   </span>
                 </span>
