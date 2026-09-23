@@ -16,6 +16,7 @@
     "test": "jest",
     "cert:generate": "ts-node scripts/generate-issuer-cert.ts",
     "seed:admin-units": "ts-node scripts/seed-admin-units.ts",
+    "tree:bootstrap": "ts-node scripts/tree-bootstrap.ts",
     "openapi:export": "node scripts/export-openapi.js"
   },
   "dependencies": {

@@ -34,12 +34,46 @@ export class TreeService {
    * it. Dropping the leaf is what makes revocation enforced rather than merely
    * recorded — with no leaf there is no Merkle path, so the circuit cannot
    * produce a proof at all.
+   *
+   * ⚠️ LOADS EVERYTHING INTO MEMORY. Only for tests and small registries — at
+   * 2.5 million parcels this is 5–7 GB of Node heap (blocker S5 of D72). Every
+   * real path uses {@link streamIssuedProperties} instead.
    */
   async loadIssuedProperties(): Promise<Property[]> {
     const properties = await this.prisma.property.findMany({
       where: { status: 'ISSUED' },
     });
     return sortByPropertyId(properties);
+  }
+
+  /**
+   * Every property in the tree, in batches, through a cursor.
+   *
+   * ⚠️ Use this, not `loadIssuedProperties()`. The load-everything version is
+   * 5–7 GB of Node heap at 2.5 million parcels (blocker S5 of D72); a cursor
+   * keeps memory constant however large the registry grows.
+   *
+   * ⚠️ Ordered by `id` (the autoincrement key), NEVER by `propertyId`. That
+   * column is a `String`, so Postgres orders it lexicographically ("10" before
+   * "2") and a cursor over it would silently skip plots. Batch order does not
+   * matter: both `buildTree()` and `applyLeafUpdates()` are independent of
+   * input order (D41), which is what makes paging by an unrelated key safe.
+   */
+  async *streamIssuedProperties(batchSize = 5_000): AsyncGenerator<Property[]> {
+    let cursor: number | undefined;
+
+    for (;;) {
+      const batch = await this.prisma.property.findMany({
+        where: { status: 'ISSUED' },
+        orderBy: { id: 'asc' },
+        take: batchSize,
+        ...(cursor === undefined ? {} : { cursor: { id: cursor }, skip: 1 }),
+      });
+      if (batch.length === 0) return;
+
+      yield batch;
+      cursor = batch[batch.length - 1].id;
+    }
   }
 
   /** Build the tree that matches the current DB state. */

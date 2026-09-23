@@ -10,6 +10,7 @@ import {
   nodeKey,
   overlayReader,
   parseNodeKey,
+  poseidonHash,
   proofFrom,
   siblingCoordsFor,
   zeroHashes,
@@ -18,6 +19,7 @@ import { TREE_DEPTH } from '@land-registry/blockchain/shared/treeDimensions';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { toLURRecord } from '../records/record.mapper';
+import { TreeService } from './tree.service';
 
 /**
  * Largest number of rows in one read or write statement.
@@ -58,7 +60,10 @@ export function chunk<T>(items: T[], size: number): T[][] {
 export class NodeStoreService {
   private readonly logger = new Logger(NodeStoreService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tree: TreeService,
+  ) {}
 
   /** The stored root. An empty table means an empty tree, which is not an error. */
   async rootNow(): Promise<bigint> {
@@ -146,6 +151,117 @@ export class NodeStoreService {
   async projectRoot(updates: Map<number, bigint | null>): Promise<TreeOverlay> {
     const read = await this.prefetchReader([...updates.keys()]);
     return applyLeafUpdates(updates, read);
+  }
+
+  /**
+   * Rebuild the whole of `merkle_nodes` from the ISSUED plots. Constant memory.
+   *
+   * Deliberately NOT `buildTree()`: that version holds the entire tree in Maps
+   * (~1 GB of nodes at 2.5M leaves) plus every Property row. Here the work goes
+   * level by level, and the trick that makes it constant-memory is
+   * `ORDER BY "index"` — two siblings are always adjacent in the stream, so one
+   * linear pass pairs them all without ever holding the level below.
+   *
+   * Run it when: TREE_DEPTH changed (D71), a genesis was seeded, or the rows and
+   * the tree have diverged (`proofFor()` says so in as many words).
+   *
+   * ⚠️ TRUNCATEs first and rebuilds. While it runs, the tree cannot answer
+   * correctly — do not run it against a serving deployment.
+   */
+  async bootstrap(
+    onProgress: (stage: string, count: number) => void = () => {},
+  ): Promise<{ leaves: number; nodes: number; root: bigint }> {
+    const zeros = await zeroHashes();
+    await this.prisma.$executeRaw(Prisma.sql`TRUNCATE TABLE merkle_nodes`);
+
+    let leaves = 0;
+    let nodes = 0;
+
+    for await (const batch of this.tree.streamIssuedProperties(WRITE_CHUNK_SIZE)) {
+      const values: Prisma.Sql[] = [];
+      for (const property of batch) {
+        const leaf = await hashRecord(toLURRecord(property));
+        values.push(Prisma.sql`(0, ${Number(property.propertyId)}, ${leaf.toString()})`);
+      }
+      await this.prisma.$executeRaw(
+        Prisma.sql`INSERT INTO merkle_nodes (height, "index", hash) VALUES ${Prisma.join(values)}`,
+      );
+      leaves += batch.length;
+      nodes += batch.length;
+      onProgress('leaves', leaves);
+    }
+
+    for (let height = 0; height < TREE_DEPTH; height++) {
+      const written = await this.buildParentLevel(height, zeros);
+      nodes += written;
+      onProgress(`height ${height + 1}`, written);
+    }
+
+    return { leaves, nodes, root: await this.rootNow() };
+  }
+
+  /**
+   * One parent level, scanning the child level by ascending `"index"`.
+   *
+   * A pair split across a batch boundary (the left child is the last row of a
+   * full batch) is handled by leaving that row for the next batch rather than
+   * spending one extra query per boundary. Guessing instead — treating it as
+   * having no sibling — would hash it against a zero and produce a wrong parent.
+   */
+  private async buildParentLevel(height: number, zeros: bigint[]): Promise<number> {
+    let written = 0;
+    let cursor = -1;
+    let pending: Prisma.Sql[] = [];
+
+    const flush = async (): Promise<void> => {
+      if (pending.length === 0) return;
+      await this.prisma.$executeRaw(
+        Prisma.sql`INSERT INTO merkle_nodes (height, "index", hash) VALUES ${Prisma.join(pending)}`,
+      );
+      pending = [];
+    };
+
+    for (;;) {
+      const rows = await this.prisma.$queryRaw<{ index: number; hash: string }[]>(
+        Prisma.sql`SELECT "index", hash FROM merkle_nodes WHERE height = ${height} AND "index" > ${cursor} ORDER BY "index" ASC LIMIT ${WRITE_CHUNK_SIZE}`,
+      );
+      if (rows.length === 0) break;
+
+      const full = rows.length === WRITE_CHUNK_SIZE;
+      // Full batch ending on a LEFT child ⇒ its sibling is in the next batch.
+      // Leave it behind instead of assuming it has none.
+      const usable =
+        full && (rows[rows.length - 1].index & 1) === 0 ? rows.length - 1 : rows.length;
+      if (usable === 0) break;
+      cursor = rows[usable - 1].index;
+
+      for (let i = 0; i < usable; i++) {
+        const isLeft = (rows[i].index & 1) === 0;
+        const partner = i + 1 < usable ? rows[i + 1] : undefined;
+        const paired = isLeft && partner !== undefined && partner.index === rows[i].index + 1;
+
+        const left = isLeft ? BigInt(rows[i].hash) : zeros[height];
+        const right = paired
+          ? BigInt(partner!.hash)
+          : isLeft
+            ? zeros[height]
+            : BigInt(rows[i].hash);
+
+        const hash = await poseidonHash([left, right]);
+        // Keeps the "missing row means empty subtree" invariant (D72).
+        if (hash !== zeros[height + 1]) {
+          pending.push(Prisma.sql`(${height + 1}, ${rows[i].index >> 1}, ${hash.toString()})`);
+          written++;
+        }
+        if (paired) i++;
+      }
+
+      if (pending.length >= WRITE_CHUNK_SIZE) await flush();
+      if (!full) break;
+    }
+
+    await flush();
+    return written;
   }
 
   /**

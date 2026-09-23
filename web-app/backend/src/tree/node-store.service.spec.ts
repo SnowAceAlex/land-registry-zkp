@@ -29,8 +29,9 @@ function stubPrisma() {
 
 function service() {
   const stub = stubPrisma();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return { stub, svc: new NodeStoreService(stub.client as any) };
+  // TreeService is only reached by `bootstrap()`, which this spec never calls —
+  // it needs a live database, so it is covered by the runbook and the harness.
+  return { stub, svc: new NodeStoreService(stub.client as never, undefined as never) };
 }
 
 describe('chunk', () => {
