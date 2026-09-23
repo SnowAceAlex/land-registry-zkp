@@ -21,6 +21,7 @@ jest.mock('@land-registry/blockchain/shared', () => ({
 import {
   MerkleProofData,
   PUBLIC_SIGNAL_ORDER,
+  TREE_DEPTH,
   buildTree,
   generateMerkleProof,
   nowUnixTimestamp,
@@ -127,8 +128,8 @@ describe('ProofService.getMerkleProof — cache-first, self-healing (D40)', () =
     expect(result.inSync).toBe(true);
     expect(result.rootVersion).toBe(CHAIN_VERSION);
     expect(result.merkleRoot).toBe(root.toString());
-    expect(result.siblings).toHaveLength(20);
-    expect(result.pathIndices).toHaveLength(20);
+    expect(result.siblings).toHaveLength(TREE_DEPTH);
+    expect(result.pathIndices).toHaveLength(TREE_DEPTH);
     expect(result.contractAddress).toBe(REGISTRY_ADDRESS);
     // The whole point of the cache: no tree is rebuilt on the hot path.
     expect(buildCurrentTree).not.toHaveBeenCalled();

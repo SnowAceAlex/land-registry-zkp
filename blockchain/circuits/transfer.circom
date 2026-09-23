@@ -21,7 +21,7 @@ pragma circom 2.0.0;
  *
  * Private: useType, validityPeriod, encumbranceStatus, tenureType,
  *          oldOwnerSecret, newOwnerSecret,
- *          oldSiblings[20], oldPathIndices[20], newSiblings[20], newPathIndices[20]
+ *          oldSiblings[24], oldPathIndices[24], newSiblings[24], newPathIndices[24]
  *
  * Constraints (CODING_ROADMAP §2.4):
  *   1. oldOwnerCommitment === Poseidon([oldOwnerSecret])
@@ -166,4 +166,4 @@ component main {public [
     newOwnerCommitment,
     currentTimestamp,
     minRequiredRemainingTerm
-]} = Transfer(20);
+]} = Transfer(24);

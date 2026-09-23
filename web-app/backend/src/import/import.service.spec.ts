@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { MAX_PROPERTY_ID } from '@land-registry/blockchain/shared';
 
 import { ImportService, parseVietnameseDate } from './import.service';
 import { AdministrativeUnitsService } from '../land-law/administrative-units.service';
@@ -218,7 +219,13 @@ describe('ImportService', () => {
     const { service } = makeService();
 
     const result = await service.importCsv(
-      [HEADER, row({ propertyId: '1' }), row({ propertyId: '1048576' })].join('\n'), // 2^20
+      // MAX_PROPERTY_ID + 1, derived — a literal here silently stops testing
+      // anything the moment TREE_DEPTH moves (it did, at D71).
+      [
+        HEADER,
+        row({ propertyId: '1' }),
+        row({ propertyId: (MAX_PROPERTY_ID + 1n).toString() }),
+      ].join('\n'),
     );
 
     expect(result.imported).toBe(1);

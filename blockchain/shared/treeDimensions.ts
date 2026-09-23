@@ -25,11 +25,22 @@
  */
 
 /**
- * Fixed depth of the sparse tree (D20). Not derived from the record count: a
- * fixed depth is what lets the circuit have a fixed number of constraints, and
- * what keeps every proof the same size no matter how full the registry is.
+ * Fixed depth of the sparse tree (D20, raised to 24 by D71). Not derived from
+ * the record count: a fixed depth is what lets the circuit have a fixed number
+ * of constraints, and what keeps every proof the same size no matter how full
+ * the registry is.
+ *
+ * 24 is chosen from real numbers, not from taste: HCMC is synchronising ~2.5
+ * million parcels, and 2^24 = 16,777,216 slots leaves 6.7x headroom for
+ * subdivision. 26 (~67 million, a national frame) was declined to keep a wider
+ * `.ptau` margin — see D71 in CODING_ROADMAP.md.
+ *
+ * ⚠️ Changing this is a migration, not a constant edit. It invalidates every
+ * `.zkey`, every issued `receipt.json` (siblings are depth-long) and every row
+ * of `merkle_nodes`: re-run `circuits:setup`, then `tree:bootstrap`, then
+ * re-issue the bundles.
  */
-export const TREE_DEPTH = 20;
+export const TREE_DEPTH = 24;
 
 /**
  * Highest usable `propertyId` (D41).

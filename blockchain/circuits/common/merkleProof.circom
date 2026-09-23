@@ -28,7 +28,7 @@ pragma circom 2.0.0;
  *     If the two ever disagree, proofs still generate but never verify.
  *
  * Tree depth is fixed at 20 across the project (D20) — instantiate as
- * MerkleProof(20). shared/merkleTree.ts pads every proof to exactly 20 levels
+ * MerkleProof(24). shared/merkleTree.ts pads every proof to exactly 24 levels
  * with the zero-hash chain, so a short tree still produces a full-depth path.
  */
 
