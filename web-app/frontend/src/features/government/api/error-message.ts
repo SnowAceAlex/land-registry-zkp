@@ -31,6 +31,7 @@ const API_TITLES: Record<ApiErrorCode, keyof ErrorStrings> = {
   conflict: 'conflict',
   gone: 'gone',
   unprocessable: 'unprocessable',
+  'service-unavailable': 'serviceUnavailable',
   'root-mismatch': 'rootMismatch',
   'stale-timestamp': 'staleTimestamp',
   'invalid-proof': 'invalidProof',

@@ -46,7 +46,15 @@ export interface MerkleProofResponse {
  * that path. So a receipt goes stale when a stranger transfers their plot, and
  * proving from the receipt's own path would produce a proof every verifier
  * rejects with RootMismatch.
+ *
+ * `cache: 'no-cache'` lets the browser keep the last answer and ask the
+ * registry whether it still holds (If-None-Match → 304, D74): measured at
+ * ~690 req/s against ~200 for a full answer, and the 304 needs no RPC call.
+ * Never `'default'` — that would serve a cached proof for up to 60 s without
+ * asking, and after a publish this page would compare a superseded root with
+ * the chain's and report the registry as behind. The backend sends no ETag on
+ * an out-of-sync answer, so that one is never kept at all.
  */
 export async function refreshMerkleProof(propertyId: string): Promise<MerkleProofResponse> {
-  return apiFetch<MerkleProofResponse>(`/proof/${propertyId}`);
+  return apiFetch<MerkleProofResponse>(`/proof/${propertyId}`, { cache: 'no-cache' });
 }

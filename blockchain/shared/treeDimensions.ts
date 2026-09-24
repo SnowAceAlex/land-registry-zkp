@@ -43,10 +43,24 @@
 export const TREE_DEPTH = 24;
 
 /**
+ * Depths this registry used to issue at, oldest first (D75).
+ *
+ * A receipt carries a depth-long path, so every bundle issued before a depth
+ * migration still has the old length. Telling that apart from a length this
+ * registry never used is the difference between "ask for a fresh copy" and
+ * "this file is damaged or not ours" — and saying the second to the holder of
+ * a genuine certificate sends them looking for a forger instead of an office.
+ *
+ * Append the old value here whenever TREE_DEPTH changes. Never remove one:
+ * bundles at that depth are still in people's hands.
+ */
+export const RETIRED_TREE_DEPTHS: readonly number[] = [20];
+
+/**
  * Highest usable `propertyId` (D41).
  *
  * A leaf's index IS its `propertyId`, so the depth is also the registry's hard
- * id range: 0 … 2^20 − 1 = 1 048 575. `buildTree()` enforces it, and a lookup
+ * id range: 0 … 2^24 − 1 = 16 777 215. `buildTree()` enforces it, and a lookup
  * form should refuse an out-of-range id before spending a request on it.
  */
 export const MAX_PROPERTY_ID = (1n << BigInt(TREE_DEPTH)) - 1n;

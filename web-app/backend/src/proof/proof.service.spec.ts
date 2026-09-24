@@ -240,6 +240,22 @@ describe('ProofService.conditionalProof — the validator is guessable (D74)', (
     expect(proofFor).not.toHaveBeenCalled();
   });
 
+  /**
+   * The window between the wallet publishing and confirm() writing the nodes:
+   * the chain is a version ahead of the table. A validator on that answer would
+   * let every later revalidation 304 an `inSync: false` body — past confirm(),
+   * until the next publish.
+   */
+  it('gives no validator to an answer that is out of sync with the chain', async () => {
+    const { rows } = await makeRegistry();
+    const { service } = await makeService(rows[0], 999n, rows);
+
+    const { etag, proof } = await service.conditionalProof('1', undefined);
+
+    expect(proof?.inSync).toBe(false);
+    expect(etag).toBeUndefined();
+  });
+
   it('serves the proof again once the root version has moved', async () => {
     const { root, rows } = await makeRegistry();
     const { service } = await makeService(rows[0], root, rows);

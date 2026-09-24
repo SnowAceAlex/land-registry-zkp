@@ -32,6 +32,7 @@ import {
   receiptToLURRecordAsync,
   verifyMerkleProof,
 } from '@land-registry/blockchain/shared';
+import { RETIRED_TREE_DEPTHS } from '@land-registry/blockchain/shared/treeDimensions';
 
 import type { OwnerBundle } from '@/lib/bundle';
 
@@ -42,7 +43,13 @@ export type IntegrityIssue =
   | 'secret-mismatch'
   /** The receipt's own Merkle proof does not reach its own root. */
   | 'merkle-mismatch'
-  /** The proof is not depth-20, so it was not issued by this registry. */
+  /**
+   * The path has a depth this registry USED to issue at (D75): a genuine
+   * bundle from before a depth migration. The fix is a fresh copy, not
+   * suspicion.
+   */
+  | 'depth-retired'
+  /** The path has a length this registry never issued: damaged, or not ours. */
   | 'depth-mismatch'
   /** The receipt header and its record disagree about which plot this is. */
   | 'property-mismatch';
@@ -74,7 +81,12 @@ export async function checkBundleIntegrity(bundle: OwnerBundle): Promise<Integri
 
   const { siblings, pathIndices } = receipt.merkleProof;
   if (siblings.length !== TREE_DEPTH || pathIndices.length !== TREE_DEPTH) {
-    issues.push('depth-mismatch');
+    // Every bundle issued before D71 lands here, including ones this registry
+    // issued itself. Calling those "not issued by this registry" told the
+    // holder of a real certificate that it was forged (D75).
+    const retired =
+      siblings.length === pathIndices.length && RETIRED_TREE_DEPTHS.includes(siblings.length);
+    issues.push(retired ? 'depth-retired' : 'depth-mismatch');
   } else {
     // Checked against the receipt's OWN root, not the chain's: this asks
     // whether the file is internally consistent. Whether that root is still

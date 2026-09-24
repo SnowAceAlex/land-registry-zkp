@@ -1,9 +1,10 @@
 /**
- * features/government/changes/api.ts - UC-4 backend calls (D44–D46, D56).
+ * features/government/changes/api.ts - UC-4 backend calls (D44–D46, D56 + D73).
  *
- * A change set batches every approved transfer and up to 50 pending
- * revocations into ONE new root. Same draft → sign → confirm shape as
- * issuance; the draft carries the revocation calldata to sign.
+ * A change set batches every approved transfer and up to `revocationCap`
+ * pending revocations (150 since D73; the backend reports it with the queue)
+ * into ONE new root. Same draft → sign → confirm shape as issuance; the draft
+ * carries the revocation calldata to sign.
  */
 
 import { govDelete, govGet, govPost } from '../api/gov-client';

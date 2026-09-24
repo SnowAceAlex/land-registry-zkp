@@ -1,6 +1,38 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, filenameFromDisposition, parseApiError } from './api-client';
+import { ApiError, apiFetch, filenameFromDisposition, parseApiError } from './api-client';
+
+describe('apiFetch cache mode', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stubFetch() {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  // Status, pending changes and open drafts move under the officer's feet and
+  // carry no validator: they must never come out of the HTTP cache.
+  it('bypasses the HTTP cache by default', async () => {
+    const fetchMock = stubFetch();
+    await apiFetch('/government/status');
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/government/status'),
+      expect.objectContaining({ cache: 'no-store' }),
+    );
+  });
+
+  it('lets a call site choose its own mode', async () => {
+    const fetchMock = stubFetch();
+    await apiFetch('/proof/1', { cache: 'no-cache' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ cache: 'no-cache' }),
+    );
+  });
+});
 
 describe('parseApiError', () => {
   it('reads the message of a Nest exception body', () => {

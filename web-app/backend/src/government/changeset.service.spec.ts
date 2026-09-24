@@ -43,6 +43,25 @@ describe('ChangeSetService (D44)', () => {
     revocationFindMany.mockResolvedValue([]);
   });
 
+  // The portal reads the cap from here rather than keeping a copy (D54's rule):
+  // its hardcoded 50 outlived D73 and warned about a cap that had moved.
+  it('reports the revocation cap alongside the queue', async () => {
+    const service = new ChangeSetService(
+      prisma,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.pending()).resolves.toEqual({
+      transfers: [],
+      revocations: [],
+      revocationCap: MAX_REVOCATIONS_PER_CHANGESET,
+    });
+  });
+
   it('refuses to draft when there is nothing pending', async () => {
     const service = new ChangeSetService(
       prisma,

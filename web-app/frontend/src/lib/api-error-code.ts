@@ -29,6 +29,7 @@ export type ApiErrorCode =
   | 'conflict'
   | 'gone'
   | 'unprocessable'
+  | 'service-unavailable'
   | 'root-mismatch'
   | 'stale-timestamp'
   | 'invalid-proof'
@@ -48,6 +49,10 @@ const STATUS_CODES: Record<number, ApiErrorCode> = {
   409: 'conflict',
   410: 'gone',
   422: 'unprocessable',
+  // D74: every failed chain read in the backend becomes a 503, and on Sepolia
+  // about 1 request in 400 hits an RPC timeout. Its whole value to the reader
+  // is "temporary — try again", which 'unknown' threw away.
+  503: 'service-unavailable',
 };
 
 export function apiErrorCode(error: unknown): ApiErrorCode {

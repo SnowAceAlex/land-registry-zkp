@@ -79,6 +79,13 @@ export class ProofController {
     // the 404 / 400 / 410 answers. See ProofService.conditionalProof.
     const { etag, proof } = await this.proofService.conditionalProof(propertyId, ifNoneMatch);
 
+    // No validator means the body describes a tree the chain has already moved
+    // past (inSync: false) — never let anything cache that. See conditionalProof.
+    if (etag === undefined) {
+      res.setHeader('Cache-Control', 'no-store');
+      return proof;
+    }
+
     res.setHeader('ETag', etag);
     // A short max-age because the next publish cannot be predicted; correctness
     // rests on the ETag, and max-age only shaves off the revalidation round

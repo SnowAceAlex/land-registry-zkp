@@ -13,7 +13,7 @@ describe('residentErrorCode', () => {
     expect(residentErrorCode(new ApiError(404, 'x'))).toBe('not-found');
     expect(residentErrorCode(new ApiError(410, 'x'))).toBe('gone');
     expect(residentErrorCode(new ApiError(400, 'x'))).toBe('bad-request');
-    expect(residentErrorCode(new ApiError(503, 'x'))).toBe('unknown');
+    expect(residentErrorCode(new ApiError(503, 'x'))).toBe('service-unavailable');
     expect(residentErrorCode(new TypeError('fetch failed'))).toBe('unreachable');
     expect(residentErrorCode(new Error('?'))).toBe('unknown');
   });
@@ -23,7 +23,14 @@ describe('residentErrorCode', () => {
   it('refines the proof route statuses an owner reads differently', () => {
     expect(residentErrorCode(new ApiError(410, 'revoked'), true)).toBe('revoked');
     expect(residentErrorCode(new ApiError(400, 'not issued'), true)).toBe('not-issued');
-    expect(residentErrorCode(new ApiError(503, 'no vkey'), true)).toBe('vkey-missing');
+  });
+
+  // D74: a 503 on the proof route is a failed chain read — transient. It used
+  // to be read as a missing verification key, which that route never loads.
+  it('keeps a 503 on the proof route as the retryable shared code', () => {
+    expect(residentErrorCode(new ApiError(503, 'chain read failed'), true)).toBe(
+      'service-unavailable',
+    );
   });
 
   it('leaves the other proof route statuses alone', () => {

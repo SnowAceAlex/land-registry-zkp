@@ -151,6 +151,7 @@ export interface RevocationRow {
 export interface PendingChanges {
   transfers: TransferRequest[];
   revocations: RevocationRow[];
+  revocationCap: number;
 }
 
 /** POST /government/import — ImportResult (D52). */

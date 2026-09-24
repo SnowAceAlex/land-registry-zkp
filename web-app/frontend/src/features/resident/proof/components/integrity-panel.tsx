@@ -24,13 +24,14 @@ const CHECKS: { label: keyof Strings; issues: IntegrityIssue[] }[] = [
   { label: 'check_leaf', issues: ['leaf-mismatch'] },
   { label: 'check_secret', issues: ['secret-mismatch'] },
   { label: 'check_merkle', issues: ['merkle-mismatch'] },
-  { label: 'check_depth', issues: ['depth-mismatch', 'property-mismatch'] },
+  { label: 'check_depth', issues: ['depth-retired', 'depth-mismatch', 'property-mismatch'] },
 ];
 
 const ISSUE_KEYS = {
   'leaf-mismatch': 'issue_leaf-mismatch',
   'secret-mismatch': 'issue_secret-mismatch',
   'merkle-mismatch': 'issue_merkle-mismatch',
+  'depth-retired': 'issue_depth-retired',
   'depth-mismatch': 'issue_depth-mismatch',
   'property-mismatch': 'issue_property-mismatch',
 } as const satisfies Record<IntegrityIssue, keyof Strings>;

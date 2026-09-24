@@ -135,16 +135,26 @@ export class ProofService {
    * What the 304 still saves is the expensive half: TREE_DEPTH node lookups and
    * TREE_DEPTH Poseidon hashes. What it costs is one primary-key read that the
    * 200 path has to do anyway.
+   *
+   * ⚠️ AN OUT-OF-SYNC ANSWER GETS NO ETAG. The validator names only the chain's
+   * root version, but the body also carries the DATABASE's tree. Between the
+   * wallet publishing a root and `confirm()` writing its nodes, the chain is at
+   * version N while the node table is still at N−1: that 200 says
+   * `inSync: false`, and stamped `"vN-…"` it would be confirmed by 304 on every
+   * later revalidation — long after confirm() had caught the table up — until
+   * the NEXT publish. `etag` is therefore absent exactly when the response must
+   * not be cached.
    */
   async conditionalProof(
     propertyId: string,
     ifNoneMatch: string | undefined,
-  ): Promise<{ etag: string; proof?: MerkleProofResponseDto }> {
+  ): Promise<{ etag?: string; proof?: MerkleProofResponseDto }> {
     const property = await this.requireIssuedProperty(propertyId);
     const etag = proofETag(await this.chain.getRootVersion(), propertyId);
 
     if (ifNoneMatch === etag) return { etag };
-    return { etag, proof: await this.buildProofResponse(property) };
+    const proof = await this.buildProofResponse(property);
+    return proof.inSync ? { etag, proof } : { proof };
   }
 
   /**
