@@ -25,6 +25,9 @@ export * from './deployments';
 // Merkle Tree utilities (Poseidon-based)
 export * from './merkleTree';
 
+// Incremental sparse-tree engine: proofs and projections over a node reader (D72)
+export * from './sparseTree';
+
 // Circuit witness input builders (single source of circuit signal names — D25)
 export * from './circuitInputs';
 

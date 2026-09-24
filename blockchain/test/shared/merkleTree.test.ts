@@ -191,3 +191,22 @@ describe('merkleTree (Phase 1)', () => {
     expect(threw).to.equal(true);
   });
 });
+
+describe('addressable range (D71)', () => {
+  /**
+   * TPHCM đang đồng bộ ~2,5 triệu thửa. Depth 20 cho 1.048.575 ô — không đủ.
+   * Test này neo con số nghiệp vụ vào một hằng số kỹ thuật: ai hạ TREE_DEPTH
+   * xuống sẽ thấy đúng lý do vì sao không được.
+   */
+  const HCMC_PARCEL_COUNT = 2_500_000n;
+
+  it('covers the HCMC parcel count with headroom for subdivision', () => {
+    expect(MAX_PROPERTY_ID).to.be.greaterThan(HCMC_PARCEL_COUNT);
+    // Dư ≥ 2× để tách thửa không làm hết dải trong vòng đời hệ thống.
+    expect(MAX_PROPERTY_ID).to.be.greaterThan(HCMC_PARCEL_COUNT * 2n);
+  });
+
+  it('is exactly 2^TREE_DEPTH − 1', () => {
+    expect(MAX_PROPERTY_ID).to.equal((1n << BigInt(TREE_DEPTH)) - 1n);
+  });
+});

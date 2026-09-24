@@ -13,8 +13,11 @@ import { Property } from '@prisma/client';
 
 const DEFAULT_PAGE_SIZE = 50;
 
-/** Hard ceiling: a property row carries a full Merkle proof, so an unbounded
- *  page is a multi-megabyte response and a slow query for nobody's benefit. */
+/** Hard ceiling. The original reason — a row carried a full Merkle proof, so a
+ *  big page was a multi-megabyte response — died with the proof cache (D72).
+ *  The cap stays for the reason that outlived it: `GET /api/records*` is
+ *  unauthenticated (D39/D50), and an unbounded page hands out the whole
+ *  cadastre's propertyId → ownerCommitment map in one request. */
 const MAX_PAGE_SIZE = 200;
 
 export interface PaginationParams {
@@ -69,9 +72,10 @@ export function parsePageQuery(skip?: string, take?: string): PaginationParams {
  *  is already public by another route: `propertyId`/`ownerCommitment` are
  *  public circuit signals, `leaf` is the Poseidon leaf hash the Merkle proof
  *  endpoint (`GET /api/proof/:propertyId`) already discloses, `status` mirrors
- *  the on-chain `revocations` mapping, and `rootVersion` is just a cache-
- *  freshness counter. Deliberately excluded: every descriptive certificate
- *  field, `merkleProof` (belongs to the proof endpoint), and internal columns
+ *  the on-chain `revocations` mapping, and `rootVersion` says which published
+ *  root this plot's leaf last changed in (D72). Deliberately excluded: every descriptive certificate
+ *  field, the Merkle path itself (it belongs to the proof endpoint, which
+ *  computes it from `merkle_nodes` — D72), and internal columns
  *  (`id`, `createdAt`, `updatedAt`, `issuedAt`, `issuanceBatchId`) —
  *  `updatedAt` in particular would tell an observer which plot last changed
  *  hands, which the anonymised history endpoint is designed not to reveal. */
@@ -137,8 +141,8 @@ export function serializePropertySummary<
  * added to the schema silently joins an API response nobody re-reviewed.
  *
  * Deliberately still absent: `id`, `createdAt`, `updatedAt`, `issuanceBatchId`,
- * `leaf`, `merkleProof`. Those are internal bookkeeping or belong to the proof
- * endpoint; an officer who needs them can query the database.
+ * `leaf`. Those are internal bookkeeping; the Merkle path belongs to the proof
+ * endpoint, and an officer who needs the rest can query the database.
  */
 export function serializePropertyFull<
   T extends Parameters<typeof serializePropertySummary>[0] &

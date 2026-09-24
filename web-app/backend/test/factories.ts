@@ -30,7 +30,6 @@ export function makeProperty(overrides: Partial<Property> = {}): Property {
     issuingAuthority: 'Sở Nông nghiệp và Môi trường TP.HCM',
     issueDate: new Date('2026-01-15T00:00:00.000Z'),
     leaf: null,
-    merkleProof: null,
     rootVersion: null,
     issuedAt: new Date('2026-01-15T00:00:00.000Z'),
     // Default factory output represents an already-issued property (it also

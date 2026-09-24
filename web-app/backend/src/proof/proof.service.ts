@@ -11,7 +11,6 @@ import { Property } from '@prisma/client';
 import {
   CircuitType,
   Groth16Proof,
-  MerkleProofData,
   PublicSignals,
   assertProofFresh,
   circuitTypeForSignalCount,
@@ -20,13 +19,13 @@ import {
   publicSignalIndex,
   rootSignalName,
   verifyGroth16Proof,
-  verifyMerkleProof,
 } from '@land-registry/blockchain/shared';
 
 import { ChainService, ProofRejectedError } from '../chain/chain.service';
 import { blockchainDir } from '../common/paths';
 import { PrismaService } from '../prisma/prisma.service';
-import { TreeService } from '../tree/tree.service';
+import { NodeStoreService } from '../tree/node-store.service';
+import { proofETag } from './proof-etag';
 import { VerifyProofDto } from './dto/proof.dto';
 import { MerkleProofResponseDto, VerifyProofResponseDto } from './dto/proof.response.dto';
 
@@ -53,74 +52,62 @@ export class ProofService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tree: TreeService,
+    private readonly nodes: NodeStoreService,
     private readonly chain: ChainService,
   ) {}
 
   /**
-   * The current Merkle proof for one property (D40 — cache-first, self-healing).
+   * The current Merkle proof for one property (D72 — supersedes D40).
    *
-   * The cached proof is trusted only while its `rootVersion` matches the chain.
-   * That check matters because the cache genuinely can lag: issuance publishes
-   * the root BEFORE writing to the database on purpose (a DB write that lands
-   * without a publish would leave an owner holding a commitment whose secret
-   * exists nowhere), so a window exists where the chain has moved and the rows
-   * have not. Serving a stale cached proof would hand the owner something that
-   * silently fails to verify.
+   * There is no cache left to go stale, and no rebuild path to fall into: the
+   * tree lives in `merkle_nodes`, so a proof is exactly TREE_DEPTH key lookups.
+   * That is what let this route drop its own throttle bucket (D74), and it is
+   * the "server load" number Chapter 5 reports.
+   *
+   * WHAT IT STILL DELIBERATELY DOES NOT NEED. No `ownerSecret` and no private
+   * field: siblings and leaves are Poseidon hashes, and the position follows
+   * from the propertyId (D41). The owner witness never comes near this service.
    */
   async getMerkleProof(propertyId: string): Promise<MerkleProofResponseDto> {
-    const property = await this.requireIssuedProperty(propertyId);
+    return this.buildProofResponse(await this.requireIssuedProperty(propertyId));
+  }
 
-    const [latestRoot, onChainVersion] = await Promise.all([
+  /** The proof response for a plot already known to be issued. */
+  private async buildProofResponse(property: Property): Promise<MerkleProofResponseDto> {
+    const propertyId = property.propertyId;
+
+    const [latestRoot, onChainVersion, storedRoot] = await Promise.all([
       this.chain.getLatestRoot(),
       this.chain.getRootVersion(),
+      this.nodes.rootNow(),
     ]);
 
-    // The cache is only accepted when its rootVersion is the chain's, so the
-    // tree it belongs to is by definition the published one — hence latestRoot
-    // as its root. That makes verifying it a real check of cache-against-chain
-    // rather than a check of the cache against itself.
-    let cached = this.readCachedProof(property, onChainVersion, latestRoot);
+    const proof = await this.nodes.proofFor(property);
 
-    // A row can carry the right version and still be wrong about its contents
-    // (a partial write, a hand-edited row). Rebuilding is the self-healing half
-    // of D40: the tree can answer this correctly in milliseconds, so blocking
-    // the owner until an officer republishes would be a self-inflicted outage.
-    if (cached && !(await verifyMerkleProof(cached, latestRoot))) {
-      this.logger.warn(
-        `cached Merkle proof for property ${propertyId} claims root version ${onChainVersion} ` +
-          `but does not verify against it — rebuilding.`,
-      );
-      cached = undefined;
-    }
-
-    const source = cached ? ('cache' as const) : ('rebuilt' as const);
-    const proof = cached ?? (await this.rebuild(property));
-    const root = proof.root;
-
-    // Reaching here means a freshly built proof does not verify against the
-    // tree it was just built from, so the fault is deeper than the cache.
-    // Never hand out a proof this service can already tell is broken — the
-    // owner would find out only when proving failed, with no explanation.
-    if (!cached && !(await verifyMerkleProof(proof, root))) {
+    // A real check, not a ritual: `proof.root` is climbed UP from the leaf
+    // through the stored siblings, while `storedRoot` is the stored root node —
+    // two independent paths through the same table. A mismatch means the table
+    // was written partially, and handing out a proof this service can already
+    // tell is broken would surface only when the owner fails to prove.
+    if (proof.root !== storedRoot) {
       throw new ServiceUnavailableException(
-        `The Merkle proof rebuilt for property ${propertyId} does not verify against the ` +
-          `registry tree. Check the server logs.`,
+        `The Merkle path for property ${propertyId} climbs to ${proof.root}, but the stored ` +
+          `root is ${storedRoot}. The node table is inconsistent — run tree:bootstrap.`,
       );
     }
 
-    const inSync = root === latestRoot;
+    const inSync = proof.root === latestRoot;
     if (!inSync) {
       this.logger.warn(
-        `proof for property ${propertyId} was built against root ${root}, but the chain holds ` +
-          `${latestRoot} (version ${onChainVersion}) — the database has unpublished changes`,
+        `proof for property ${propertyId} was built against root ${proof.root}, but the chain ` +
+          `holds ${latestRoot} (version ${onChainVersion}) — the database has unpublished changes`,
       );
     }
 
     return {
       propertyId: property.propertyId,
       leaf: proof.leaf.toString(),
-      merkleRoot: root.toString(),
+      merkleRoot: proof.root.toString(),
       // A root that is not the chain's has no version yet, and inventing one
       // would put a number in a refreshed receipt that means nothing on-chain.
       rootVersion: inSync ? onChainVersion : null,
@@ -129,8 +116,45 @@ export class ProofService {
       contractAddress: this.chain.rootRegistryAddress,
       onChain: { root: latestRoot.toString(), version: onChainVersion },
       inSync,
-      source,
+      source: 'nodes',
     };
+  }
+
+  /**
+   * A conditional read of the current Merkle proof (D74).
+   *
+   * ⚠️ THE EXISTENCE CHECK COMES FIRST, AND THAT IS NOT NEGOTIABLE. The ETag is
+   * `"v<rootVersion>-p<propertyId>"` — deterministic and public, so anyone can
+   * write one down without ever having been served the plot. An implementation
+   * that compared `If-None-Match` before validating the plot would answer 304
+   * for a propertyId that does not exist (instead of 404), for one that is
+   * imported but not issued (instead of 400), and — the one that matters — for
+   * a REVOKED certificate instead of 410. A verifier polling with a guessed
+   * validator would never learn the certificate had been reclaimed.
+   *
+   * What the 304 still saves is the expensive half: TREE_DEPTH node lookups and
+   * TREE_DEPTH Poseidon hashes. What it costs is one primary-key read that the
+   * 200 path has to do anyway.
+   *
+   * ⚠️ AN OUT-OF-SYNC ANSWER GETS NO ETAG. The validator names only the chain's
+   * root version, but the body also carries the DATABASE's tree. Between the
+   * wallet publishing a root and `confirm()` writing its nodes, the chain is at
+   * version N while the node table is still at N−1: that 200 says
+   * `inSync: false`, and stamped `"vN-…"` it would be confirmed by 304 on every
+   * later revalidation — long after confirm() had caught the table up — until
+   * the NEXT publish. `etag` is therefore absent exactly when the response must
+   * not be cached.
+   */
+  async conditionalProof(
+    propertyId: string,
+    ifNoneMatch: string | undefined,
+  ): Promise<{ etag?: string; proof?: MerkleProofResponseDto }> {
+    const property = await this.requireIssuedProperty(propertyId);
+    const etag = proofETag(await this.chain.getRootVersion(), propertyId);
+
+    if (ifNoneMatch === etag) return { etag };
+    const proof = await this.buildProofResponse(property);
+    return proof.inSync ? { etag, proof } : { proof };
   }
 
   /**
@@ -222,44 +246,6 @@ export class ProofService {
       );
     }
     return property;
-  }
-
-  /**
-   * The cached proof, if it is usable. Returns undefined — rather than throwing
-   * — whenever anything is missing or belongs to an older root, because that is
-   * a normal state that the rebuild path handles.
-   */
-  private readCachedProof(
-    property: Property,
-    onChainVersion: number,
-    latestRoot: bigint,
-  ): MerkleProofData | undefined {
-    if (
-      property.leaf === null ||
-      property.merkleProof === null ||
-      property.rootVersion === null ||
-      property.rootVersion !== onChainVersion
-    ) {
-      return undefined;
-    }
-
-    const cached = property.merkleProof as { siblings?: unknown; pathIndices?: unknown };
-    if (!Array.isArray(cached.siblings) || !Array.isArray(cached.pathIndices)) {
-      return undefined;
-    }
-
-    return {
-      leaf: BigInt(property.leaf),
-      siblings: (cached.siblings as string[]).map((sibling) => BigInt(sibling)),
-      pathIndices: cached.pathIndices as number[],
-      root: latestRoot,
-    };
-  }
-
-  /** Rebuild the whole tree from current rows and take this property's proof. */
-  private async rebuild(property: Property): Promise<MerkleProofData> {
-    const { tree } = await this.tree.buildCurrentTree();
-    return this.tree.proofFor(tree, property);
   }
 
   /**

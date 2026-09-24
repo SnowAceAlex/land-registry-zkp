@@ -78,12 +78,13 @@ export class MerkleProofResponseDto {
   inSync!: boolean;
 
   /**
-   * Where the proof came from. `cache` is the ordinary path (refreshed on every
-   * publish); `rebuilt` means the cached proof was missing or belonged to an
-   * older root version, so the tree was rebuilt from current rows (D40).
+   * Where the proof came from. Since D72 the tree is stored in `merkle_nodes`,
+   * so there is exactly one source: the proof is read out of the node table.
+   * The field stays so an existing client keeps parsing, and so a second source
+   * would have somewhere to declare itself.
    */
-  @ApiProperty({ example: 'cache', enum: ['cache', 'rebuilt'] })
-  source!: 'cache' | 'rebuilt';
+  @ApiProperty({ example: 'nodes', enum: ['nodes'] })
+  source!: 'nodes';
 }
 
 export class ProofChecksDto {

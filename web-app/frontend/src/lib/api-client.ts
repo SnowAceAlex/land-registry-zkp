@@ -97,6 +97,18 @@ function withJsonBody(init: RequestInit = {}): RequestInit {
   return { ...init, headers: { 'Content-Type': 'application/json', ...init.headers } };
 }
 
+/**
+ * `cache: 'no-store'` is the DEFAULT, and a call site may override it through
+ * `init.cache`. The default is right for nearly every route: `status`,
+ * `pending-changes`, `drafts/open` are state that moves under the officer's
+ * feet, and none of them sends a validator.
+ *
+ * The one exception is `GET /api/proof/:propertyId` (D74), which carries an
+ * ETag keyed to the root version — see `refreshMerkleProof`. It must use
+ * `'no-cache'`, NOT `'default'`: `'no-cache'` always revalidates, so a 304
+ * confirms what the browser holds; `'default'` would honour the route's
+ * `max-age=60` and hand back a pre-publish proof without asking anyone.
+ */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BACKEND_URL}/api${path}`, { cache: 'no-store', ...withJsonBody(init) });
   await throwIfNotOk(res);

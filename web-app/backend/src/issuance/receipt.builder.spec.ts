@@ -88,7 +88,7 @@ describe('receipt.json (D31 / §3.1)', () => {
         issuer: ISSUER,
         issuedOn: '2026-07-24T10:12:33+07:00',
       }),
-    ).toThrow(/depth-20 Merkle proof/);
+    ).toThrow(new RegExp(`depth-${TREE_DEPTH} Merkle proof`));
   });
 
   it('serializes bigints as strings and enums as numbers', () => {

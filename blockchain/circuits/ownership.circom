@@ -14,7 +14,7 @@ pragma circom 2.0.0;
  *   [3] currentTimestamp   checked on-chain against block.timestamp ±tolerance (D9)
  *
  * Private: useType, validityPeriod, encumbranceStatus, tenureType, ownerSecret,
- *          siblings[20], pathIndices[20]
+ *          siblings[24], pathIndices[24]
  *
  * Constraints (CODING_ROADMAP §2.2):
  *   1. ownerCommitment == Poseidon([ownerSecret])          — owner binding
@@ -85,4 +85,4 @@ template Ownership(levels) {
     term.minRequiredRemainingTerm <== 1;
 }
 
-component main {public [merkleRoot, propertyId, ownerCommitment, currentTimestamp]} = Ownership(20);
+component main {public [merkleRoot, propertyId, ownerCommitment, currentTimestamp]} = Ownership(24);

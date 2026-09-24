@@ -20,6 +20,25 @@ import { Pool } from 'pg';
  * into any feature service (RecordsService, ChainService, ProofService, etc.)
  * without importing PrismaModule in each feature module.
  */
+/**
+ * How long a transaction may run before Prisma aborts it.
+ *
+ * Prisma's default is 5 seconds, and the array form of `$transaction` takes no
+ * per-call override — only `isolationLevel` — so this has to be set on the
+ * client.
+ *
+ * 5s is far too short for the one transaction in this system that is genuinely
+ * large: confirming a change set writes one row per plot in the round, plus its
+ * transfer row, plus its history event, plus the Merkle nodes. A day of HCMC
+ * volume (~3,000 transfers) is roughly 9,000 statements, which took just over
+ * 5s and was cut off mid-way — found by the bench harness, not in production.
+ *
+ * Two things bound how long that can get, so this is not an open-ended licence:
+ * a change set carries at most `MAX_REVOCATIONS_PER_CHANGESET` revocations
+ * (D73), and the officer decides how often to publish.
+ */
+const PUBLISH_TRANSACTION_TIMEOUT_MS = 120_000;
+
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor() {
@@ -29,7 +48,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     }
     const pool = new Pool({ connectionString });
     const adapter = new PrismaPg(pool);
-    super({ adapter });
+    super({ adapter, transactionOptions: { timeout: PUBLISH_TRANSACTION_TIMEOUT_MS } });
   }
 
   async onModuleInit() {

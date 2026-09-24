@@ -20,7 +20,7 @@ pragma circom 2.0.0;
  *   [4] minRequiredRemainingTerm     seconds of term the owner claims to have left
  *
  * Private: useType, validityPeriod, encumbranceStatus, tenureType, ownerSecret,
- *          siblings[20], pathIndices[20]
+ *          siblings[24], pathIndices[24]
  *
  * Constraints (CODING_ROADMAP §2.3):
  *   1–3. owner binding + leaf + Merkle inclusion (same as ownership)
@@ -99,4 +99,4 @@ component main {public [
     ownerCommitment,
     currentTimestamp,
     minRequiredRemainingTerm
-]} = Mortgage(20);
+]} = Mortgage(24);

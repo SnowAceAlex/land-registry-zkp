@@ -8,16 +8,22 @@
  *   Both backend (chain.service.ts) and frontend (lib/zkp.ts) must import
  *   from '@land-registry/blockchain/shared' — NEVER copy this logic elsewhere.
  *
- * Fixed-depth-20 sparse tree (D20):
- *   The circuits' MerkleProof(levels) template always processes exactly 20
- *   levels — there's no variable-depth mechanism. So every proof must look
- *   as if it came from a full 2^20-leaf tree, even when the real record
- *   count is small. Building a literal 2^20-leaf tree would take ~2M
+ * Fixed-depth sparse tree (D20; depth is TREE_DEPTH = 24 since D71):
+ *   The circuits' MerkleProof(levels) template always processes exactly
+ *   TREE_DEPTH levels — there's no variable-depth mechanism. So every proof
+ *   must look as if it came from a full 2^24-leaf tree, even when the real
+ *   record count is small. Building a literal 2^24-leaf tree would take ~33M
  *   Poseidon calls per rebuild, so instead we only store the real leaves and
  *   fall back to precomputed "empty subtree hash per level" (zeroHashes) for
  *   missing siblings — the standard Tornado-Cash/Semaphore technique. This
- *   is O(N) instead of O(2^20) and produces identical roots/proofs to what a
- *   literal 2^20-leaf tree (padded with the same empty-leaf sentinel) would.
+ *   is O(N) instead of O(2^24) and produces identical roots/proofs to what a
+ *   literal 2^24-leaf tree (padded with the same empty-leaf sentinel) would.
+ *
+ *   ⚠️ O(N) per rebuild is still O(N). At 2.5 million parcels a full rebuild is
+ *   ~20 minutes, which is why `sparseTree.ts` (D72) exists: the registry tree
+ *   lives in Postgres and is updated incrementally. `buildTree()` stays as the
+ *   reference implementation both sides are tested against, and as the builder
+ *   for small trees and for bootstrap.
  *
  *   Leaf position is keyed by `propertyId` (D41): a record's slot IS its
  *   propertyId, not its position in the input array. That makes the build
@@ -90,16 +96,24 @@ export async function hashRecord(record: LURRecord): Promise<bigint> {
 
 let zeroHashesCache: bigint[] | undefined;
 
-/** zeroHashes[i] = the root of an empty subtree of height i. zeroHashes[0] = EMPTY_LEAF. */
-async function getZeroHashes(): Promise<bigint[]> {
+/**
+ * zeroHashes[i] = the root of an empty subtree of height i. zeroHashes[0] = EMPTY_LEAF.
+ *
+ * Exported because `sparseTree.ts` (D72) needs exactly this chain: the tree kept
+ * in Postgres stores occupied nodes only, so every missing sibling must be
+ * answered from the same chain `buildTree()` uses. Two chains that disagree
+ * produce two roots that disagree, and nothing but the equivalence test in
+ * `sparseTree.test.ts` would notice.
+ */
+export async function zeroHashes(): Promise<bigint[]> {
   if (zeroHashesCache) return zeroHashesCache;
-  const zeroHashes: bigint[] = [EMPTY_LEAF];
+  const chain: bigint[] = [EMPTY_LEAF];
   for (let i = 1; i <= TREE_DEPTH; i++) {
-    const prev = zeroHashes[i - 1];
-    zeroHashes.push(await poseidonHash([prev, prev]));
+    const prev = chain[i - 1];
+    chain.push(await poseidonHash([prev, prev]));
   }
-  zeroHashesCache = zeroHashes;
-  return zeroHashes;
+  zeroHashesCache = chain;
+  return chain;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -107,7 +121,7 @@ async function getZeroHashes(): Promise<bigint[]> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * A fixed-depth-20 sparse Merkle tree, keyed by propertyId (D41).
+ * A fixed-depth sparse Merkle tree, keyed by propertyId (D41).
  *
  * Only occupied nodes are stored. `levels[h]` maps a node index at height h to
  * its hash; a missing entry means "empty subtree", answered by zeroHashes[h].
@@ -135,7 +149,7 @@ export interface LURMerkleTree {
  * unreachable: one slot holds one value.
  */
 export async function buildTree(records: LURRecord[]): Promise<LURMerkleTree> {
-  const zeroHashes = await getZeroHashes();
+  const zeros = await zeroHashes();
 
   const levels: Map<number, bigint>[] = [new Map<number, bigint>()];
   const indexByPropertyId = new Map<string, number>();
@@ -172,17 +186,17 @@ export async function buildTree(records: LURRecord[]): Promise<LURMerkleTree> {
     }
 
     for (const parentIndex of parentIndices) {
-      const left = current.get(parentIndex * 2) ?? zeroHashes[height];
-      const right = current.get(parentIndex * 2 + 1) ?? zeroHashes[height];
+      const left = current.get(parentIndex * 2) ?? zeros[height];
+      const right = current.get(parentIndex * 2 + 1) ?? zeros[height];
       parents.set(parentIndex, await poseidonHash([left, right]));
     }
 
     levels.push(parents);
   }
 
-  const root = levels[TREE_DEPTH].get(0) ?? zeroHashes[TREE_DEPTH];
+  const root = levels[TREE_DEPTH].get(0) ?? zeros[TREE_DEPTH];
 
-  return { depth: TREE_DEPTH, levels, zeroHashes, root, indexByPropertyId };
+  return { depth: TREE_DEPTH, levels, zeroHashes: zeros, root, indexByPropertyId };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

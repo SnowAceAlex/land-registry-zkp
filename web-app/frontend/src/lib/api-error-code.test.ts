@@ -12,7 +12,8 @@ describe('apiErrorCode', () => {
     expect(apiErrorCode(new ApiError(409, 'x'))).toBe('conflict');
     expect(apiErrorCode(new ApiError(410, 'x'))).toBe('gone');
     expect(apiErrorCode(new ApiError(422, 'x'))).toBe('unprocessable');
-    expect(apiErrorCode(new ApiError(503, 'x'))).toBe('unknown');
+    expect(apiErrorCode(new ApiError(503, 'x'))).toBe('service-unavailable');
+    expect(apiErrorCode(new ApiError(500, 'x'))).toBe('unknown');
   });
 
   it('prefers the D33 reason over the bare status', () => {

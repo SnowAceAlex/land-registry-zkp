@@ -63,10 +63,10 @@ describe('off-chain metadata is bound to the leaf (R2-01)', () => {
   it('does not depend on fields that change without re-issuing the certificate', async () => {
     const baseline = await leafFor({});
 
-    // A cached Merkle proof and root version are refreshed on every publish;
-    // including them would make each publish invalidate the bundles it just
-    // issued.
-    expect(await leafFor({ rootVersion: 99, merkleProof: { siblings: [] } })).toBe(baseline);
+    // `leaf` and `rootVersion` are written on every publish that touches the
+    // plot; including either in the digest would make a publish invalidate the
+    // bundles it had just issued.
+    expect(await leafFor({ rootVersion: 99, leaf: '12345' })).toBe(baseline);
   });
 
   it('distinguishes an absent optional field from an empty one', async () => {

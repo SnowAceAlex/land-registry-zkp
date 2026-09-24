@@ -119,3 +119,7 @@ blockchain/bundles/
 
 #Docs
 docs/
+
+# Bench harness output (D72 / Chapter 5) — raw numbers; the written-up table
+# lives in docs/bench/
+blockchain/bench/results/

@@ -13,9 +13,9 @@
  * Lives here, not in `lib/`, because it binds codes to the `residentErrors`
  * dictionary slice, which is portal-specific. The status → code table itself is
  * shared with the government portal (`lib/api-error-code.ts`, D66); what this
- * adds is the three codes whose MEANING is resident-specific on the proof
- * route, where the same HTTP status says something quite different to an owner
- * than it would to an officer.
+ * adds is the two codes whose MEANING is resident-specific on the proof route,
+ * where the same HTTP status says something quite different to an owner than
+ * it would to an officer.
  */
 
 import type { Dictionary } from '@/i18n/dictionaries';
@@ -33,18 +33,23 @@ export interface Failure {
 }
 
 /**
- * `ApiErrorCode` plus the four cases a resident screen must word differently.
+ * `ApiErrorCode` plus the three cases a resident screen must word differently.
  *
  *  - `revoked` (410 on the proof route) is not "gone, try again": the leaf has
  *    been removed from the tree, so NO proof can exist for that plot, ever.
  *  - `not-issued` (400) means the plot was imported but never issued, so it has
  *    no commitment and no leaf yet (D14) — nothing is wrong with the request.
- *  - `vkey-missing` (503) is the registry unable to serve a proof, which is not
- *    the owner's problem and should not read like their file is bad.
  *  - `artifacts-missing` is a 404 on `/circuits/*` inside the worker — this
  *    deployment was never synced (D55). An owner cannot fix it; say so.
+ *
+ * A 503 is deliberately NOT refined here any more. It used to become
+ * `vkey-missing` on the proof route, but a missing verification key is a
+ * `POST /api/proof/verify` failure, and this portal stopped calling that route
+ * (D62). What `GET /api/proof/:propertyId` answers with 503 since D74 is a
+ * failed chain read — transient, and exactly what the shared
+ * `service-unavailable` says.
  */
-export type ResidentErrorCode = ApiErrorCode | 'revoked' | 'not-issued' | 'vkey-missing' | 'artifacts-missing';
+export type ResidentErrorCode = ApiErrorCode | 'revoked' | 'not-issued' | 'artifacts-missing';
 
 const TITLES: Record<ResidentErrorCode, keyof ErrorStrings> = {
   'bad-request': 'badRequest',
@@ -53,6 +58,7 @@ const TITLES: Record<ResidentErrorCode, keyof ErrorStrings> = {
   conflict: 'conflict',
   gone: 'gone',
   unprocessable: 'unprocessable',
+  'service-unavailable': 'serviceUnavailable',
   'root-mismatch': 'rootMismatch',
   'stale-timestamp': 'staleTimestamp',
   'invalid-proof': 'invalidProof',
@@ -60,7 +66,6 @@ const TITLES: Record<ResidentErrorCode, keyof ErrorStrings> = {
   unknown: 'unknown',
   revoked: 'revoked',
   'not-issued': 'notIssued',
-  'vkey-missing': 'vkeyMissing',
   'artifacts-missing': 'artifactsMissing',
 };
 
@@ -81,9 +86,9 @@ const BODIES: Partial<Record<ResidentErrorCode, keyof ErrorStrings>> = {
 /**
  * Classify a failure for a resident screen.
  *
- * `onProofRoute` refines the three statuses whose meaning depends on which
- * route answered. Only `GET /api/proof/:propertyId` returns 410 for a revoked
- * plot and 400 for an unissued one; a 410 from anywhere else is just gone.
+ * `onProofRoute` refines the two statuses whose meaning depends on which route
+ * answered. Only `GET /api/proof/:propertyId` returns 410 for a revoked plot
+ * and 400 for an unissued one; a 410 from anywhere else is just gone.
  */
 export function residentErrorCode(error: unknown, onProofRoute = false): ResidentErrorCode {
   if (error instanceof ArtifactMissingError) return 'artifacts-missing';
@@ -96,8 +101,6 @@ export function residentErrorCode(error: unknown, onProofRoute = false): Residen
       return 'revoked';
     case 400:
       return 'not-issued';
-    case 503:
-      return 'vkey-missing';
     default:
       return code;
   }

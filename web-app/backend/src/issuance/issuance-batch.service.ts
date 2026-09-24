@@ -7,6 +7,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { DraftStatus, IssuanceBatch, Property } from '@prisma/client';
+import { hashRecord } from '@land-registry/blockchain/shared';
 
 import { ArchiveEntry, ArchiveService } from './archive.service';
 import { ChainService } from '../chain/chain.service';
@@ -14,7 +15,9 @@ import { DraftLockService } from '../common/draft-lock.service';
 import { RootService } from '../government/root.service';
 import { PropertyEventService } from '../history/property-event.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { TreeService, sortByPropertyId } from '../tree/tree.service';
+import { NodeStoreService } from '../tree/node-store.service';
+import { sortByPropertyId } from '../tree/tree.service';
+import { toLURRecord } from '../records/record.mapper';
 import { IssuanceService } from './issuance.service';
 
 /** How long the batch archive — and therefore the only copy of the secrets — survives. */
@@ -72,7 +75,7 @@ export class IssuanceBatchService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tree: TreeService,
+    private readonly nodes: NodeStoreService,
     private readonly issuance: IssuanceService,
     private readonly chain: ChainService,
     private readonly roots: RootService,
@@ -129,21 +132,23 @@ export class IssuanceBatchService {
       withCommitments.push({ ...property, ownerCommitment: ownerCommitment.toString() });
     }
 
-    const alreadyIssued = await this.tree.loadIssuedProperties();
-    const { tree } = await this.tree.buildFrom([...alreadyIssued, ...withCommitments]);
+    // Project the new leaves onto the stored tree (D72). Only this batch is
+    // hashed: the plots already in the registry are untouched, and their nodes
+    // are read on the way up rather than rebuilt.
+    const overlay = await this.nodes.projectRoot(await this.leafUpdatesFor(withCommitments));
 
     // No relation `connect` here on purpose — see the class doc. `draftSecrets`
     // is the only place this round's membership is recorded until confirm().
     const draft = await this.prisma.issuanceBatch.create({
       data: {
         status: 'DRAFT',
-        newRoot: tree.root.toString(),
+        newRoot: overlay.root.toString(),
         draftSecrets: secrets,
       },
     });
 
     this.logger.log(
-      `issuance draft #${draft.id}: ${batch.length} propert(ies), projected root ${tree.root}`,
+      `issuance draft #${draft.id}: ${batch.length} propert(ies), projected root ${overlay.root}`,
     );
 
     return this.toDraftDetail(draft);
@@ -209,6 +214,9 @@ export class IssuanceBatchService {
       draft.txHash = txHash;
     }
 
+    // D74 — the root read is cached for 2 seconds; a confirm must always ask
+    // the chain itself, or a just-mined publish can be reported as unmined.
+    this.chain.invalidateRootCache();
     const latestRoot = await this.chain.getLatestRoot();
     if (latestRoot.toString() !== draft.newRoot) {
       throw new UnprocessableEntityException(
@@ -243,18 +251,15 @@ export class IssuanceBatchService {
       withCommitments.push({ ...property, ownerCommitment: ownerCommitment.toString() });
     }
 
-    const alreadyIssued = await this.tree.loadIssuedProperties();
-    const { tree, properties: allIssued } = await this.tree.buildFrom([
-      ...alreadyIssued,
-      ...withCommitments,
-    ]);
+    const updates = await this.leafUpdatesFor(withCommitments);
+    const overlay = await this.nodes.projectRoot(updates);
 
-    // Paranoia that has already paid for itself once: if the rebuilt tree no
-    // longer matches the signed root, something changed underneath the draft
+    // Paranoia that has already paid for itself once: if the re-projected root
+    // no longer matches the signed one, something changed underneath the draft
     // and applying it would corrupt the registry.
-    if (tree.root.toString() !== draft.newRoot) {
+    if (overlay.root.toString() !== draft.newRoot) {
       throw new UnprocessableEntityException(
-        `Rebuilt root ${tree.root} no longer matches the signed root ${draft.newRoot}. ` +
+        `Reprojected root ${overlay.root} no longer matches the signed root ${draft.newRoot}. ` +
           `Discard this draft and start again.`,
       );
     }
@@ -265,7 +270,7 @@ export class IssuanceBatchService {
     const { issuer, issuedOn } = this.issuance.batchContext();
     const context = {
       rootVersion,
-      merkleRoot: tree.root,
+      merkleRoot: overlay.root,
       transactionHash: draft.txHash ?? '',
       contractAddress: this.chain.rootRegistryAddress,
       explorerTxUrlPrefix: this.chain.explorerTxUrlPrefix,
@@ -273,7 +278,15 @@ export class IssuanceBatchService {
 
     const archiveEntries: ArchiveEntry[] = [];
     for (const property of withCommitments) {
-      const merkleProof = await this.tree.proofFor(tree, property);
+      // The proof MUST come from the projected tree: `applyStatements` below
+      // has not run yet, so reading the node table directly would hand back the
+      // path of the tree as it stood BEFORE this batch — and the bundle would
+      // not verify against the root that was just signed.
+      const merkleProof = await this.nodes.proofInOverlay(
+        property,
+        updates.get(Number(property.propertyId))!,
+        overlay,
+      );
       const built = await this.issuance.buildBundleFiles(
         { property, ownerSecret: BigInt(secrets[property.propertyId]), merkleProof },
         context,
@@ -310,17 +323,22 @@ export class IssuanceBatchService {
             data: {
               ownerCommitment: property.ownerCommitment,
               status: 'ISSUED',
+              leaf: updates.get(Number(property.propertyId))!.toString(),
+              rootVersion,
               issuedAt,
               issuanceBatchId: draft.id,
             },
           }),
         ),
         this.roots.recordRootStatement({
-          root: tree.root,
+          root: overlay.root,
           version: rootVersion,
           txHash: draft.txHash ?? '',
         }),
-        ...(await this.roots.proofCacheStatements(tree, allIssued, rootVersion)),
+        // O(k·TREE_DEPTH) nodes, not the whole registry (D72). Every owner
+        // outside this batch needs no write: their proof is read from this same
+        // table the moment they ask for it.
+        ...this.nodes.applyStatements(overlay),
         ...this.events.issuedStatements(
           archiveEntries.map((entry) => ({
             propertyId: entry.propertyId,
@@ -407,6 +425,22 @@ export class IssuanceBatchService {
       where: { id },
       data: { status: 'DISCARDED', draftSecrets: null },
     });
+  }
+
+  /**
+   * The leaf each plot in this batch will occupy, keyed by its slot (D41).
+   *
+   * Issuance only ever ADDS leaves, so there is no `null` here — unlike a change
+   * set, which removes one per revocation. The records carry the commitments
+   * generated for this round, so the hash is of the plot as it will be once the
+   * round is confirmed.
+   */
+  private async leafUpdatesFor(properties: Property[]): Promise<Map<number, bigint | null>> {
+    const updates = new Map<number, bigint | null>();
+    for (const property of properties) {
+      updates.set(Number(property.propertyId), await hashRecord(toLURRecord(property)));
+    }
+    return updates;
   }
 
   private async loadIssuable(propertyIds: string[]): Promise<Property[]> {

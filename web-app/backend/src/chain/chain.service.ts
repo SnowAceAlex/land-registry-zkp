@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ethers } from 'ethers';
 import {
   LandRegistryVerifier,
@@ -19,6 +19,7 @@ import {
 } from '@land-registry/blockchain/shared';
 
 import { blockchainDir } from '../common/paths';
+import { TtlCache } from '../common/ttl-cache';
 
 /**
  * ChainService
@@ -36,6 +37,36 @@ import { blockchainDir } from '../common/paths';
 // the loader — three copies of that record had already drifted apart. Still
 // re-exported here so callers importing them from ChainService keep working.
 export type { ChainNetwork, DeploymentRecord };
+
+/**
+ * How long a read of the current root stays FRESH (D74).
+ *
+ * 10 seconds. The root changes about six times a working day (D73), so ten
+ * seconds is far inside what is actually true — the number is not chosen for
+ * accuracy but to bound how often the RPC is touched at all.
+ */
+const ROOT_CACHE_TTL_MS = 10_000;
+
+/**
+ * How long a root may still be SERVED while it is refreshed in the background.
+ *
+ * ⚠️ This, not the TTL, is what fixes the tail. Measured against Sepolia, one
+ * read of the chain root costs p50 2,883 ms. With a plain expiry, whoever
+ * arrives on the expiry pays that in full and blocks the queue behind them —
+ * `GET /api/proof/:id` measured p99 1,003 ms and a worst case of 17,476 ms.
+ * Raising the TTL alone only makes that rarer; the stale band removes it, since
+ * past the TTL the cached root is returned at once and refreshed behind the
+ * caller.
+ *
+ * 60 seconds is the point past which a caller is made to wait rather than be
+ * handed something that old. It is safe for a different reason than the TTL:
+ * every `confirm()` calls `invalidateRootCache()` before reading, so a round
+ * this backend publishes is never decided on a cached value. The window where a
+ * stale root could mislead is the gap between the officer's wallet publishing
+ * and `confirm()` running — which already exists, is measured in tens of
+ * seconds, and is not made materially worse by this.
+ */
+const ROOT_CACHE_STALE_MS = 60_000;
 
 /** A LandRegistryVerifier rejection, decoded from its typed revert (D33). */
 export class ProofRejectedError extends Error {
@@ -58,6 +89,10 @@ export class ChainService implements OnModuleInit {
   private registry!: RootRegistry;
   private verifier!: LandRegistryVerifier;
   private deployment!: DeploymentRecord;
+  private readonly rootCache = new TtlCache<{ root: bigint; version: number }>(
+    ROOT_CACHE_TTL_MS,
+    { staleMs: ROOT_CACHE_STALE_MS },
+  );
 
   async onModuleInit(): Promise<void> {
     const network = (process.env.CHAIN_NETWORK ?? 'localhost') as ChainNetwork;
@@ -145,13 +180,70 @@ export class ChainService implements OnModuleInit {
     return this.registry.hasRole(role, account);
   }
 
+  /**
+   * The current root and its version, read in ONE pass and cached briefly (D74).
+   *
+   * Reading them together is not only about saving an RPC call: two separate
+   * reads can land either side of a publish, and the service would then pair an
+   * old root with a new version — a combination that never existed on-chain,
+   * and enough to put a wrong number into a refreshed receipt.
+   */
+  async getRoot(): Promise<{ root: bigint; version: number }> {
+    return this.rootCache.get(async () =>
+      this.asServiceUnavailable(async () => ({
+        root: BigInt(await this.registry.latestRoot()),
+        version: Number(await this.registry.rootVersion()),
+      })),
+    );
+  }
+
+  /**
+   * Turn an unreachable or slow RPC into a 503, never a 500.
+   *
+   * ⚠️ Found on Sepolia, and unreachable on a local node: a read that times out
+   * upstream used to propagate as an unhandled error, so the UNAUTHENTICATED
+   * `GET /api/proof/:propertyId` answered a citizen with "Internal server
+   * error". That is wrong twice over — the server is not broken, and the caller
+   * is told nothing they can act on. A 503 says "the registry could not reach
+   * the chain, try again", which is both true and actionable.
+   *
+   * Measured cost of the underlying call on Sepolia: p50 2,883 ms, up to
+   * 4,560 ms, versus 6 ms when the 2-second cache answers (D74). The cache is
+   * what keeps that latency off the hot path; this is what keeps a failure from
+   * looking like a defect.
+   */
+  private async asServiceUnavailable<T>(read: () => Promise<T>): Promise<T> {
+    try {
+      return await read();
+    } catch (error) {
+      const message = (error as Error)?.message ?? 'unknown error';
+      this.logger.error(`chain read failed against ${this.network}: ${message}`);
+      throw new ServiceUnavailableException(
+        `The registry could not reach the blockchain (${this.network}). This is usually ` +
+          `transient — retry in a few seconds.`,
+      );
+    }
+  }
+
   /** Current effective root, as the bigint the Merkle layer speaks in. */
   async getLatestRoot(): Promise<bigint> {
-    return BigInt(await this.registry.latestRoot());
+    return (await this.getRoot()).root;
   }
 
   async getRootVersion(): Promise<number> {
-    return Number(await this.registry.rootVersion());
+    return (await this.getRoot()).version;
+  }
+
+  /**
+   * Force the next root read to go to the chain.
+   *
+   * ⚠️ Must be called at the START of every confirm(), before reading
+   * `latestRoot`. Without it a draft whose root was just published can be
+   * rejected by its own confirm() for up to the TTL — the officer would be told
+   * "not mined yet" about a transaction that is mined.
+   */
+  invalidateRootCache(): void {
+    this.rootCache.invalidate();
   }
 
   /**

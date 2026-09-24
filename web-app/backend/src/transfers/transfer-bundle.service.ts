@@ -3,7 +3,7 @@ import { ConflictException, GoneException, Injectable, NotFoundException } from 
 import { ChainService } from '../chain/chain.service';
 import { IssuanceService } from '../issuance/issuance.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { TreeService } from '../tree/tree.service';
+import { NodeStoreService } from '../tree/node-store.service';
 
 /**
  * TransferBundleService — the new owner's receipt after a published transfer (D51).
@@ -30,7 +30,7 @@ import { TreeService } from '../tree/tree.service';
 export class TransferBundleService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tree: TreeService,
+    private readonly nodes: NodeStoreService,
     private readonly chain: ChainService,
     private readonly issuance: IssuanceService,
   ) {}
@@ -62,12 +62,15 @@ export class TransferBundleService {
       );
     }
 
-    const [{ tree }, latestRoot, rootVersion] = await Promise.all([
-      this.tree.buildCurrentTree(),
+    // One row for the stored root instead of a whole-tree rebuild (D72). The
+    // check itself is unchanged and load-bearing: a receipt built against a root
+    // the chain has not published would not verify for the buyer.
+    const [storedRoot, latestRoot, rootVersion] = await Promise.all([
+      this.nodes.rootNow(),
       this.chain.getLatestRoot(),
       this.chain.getRootVersion(),
     ]);
-    if (tree.root !== latestRoot) {
+    if (storedRoot !== latestRoot) {
       throw new ConflictException(
         `The registry database does not match the published root (version ${rootVersion}), so ` +
           `a receipt built now would not verify. Confirm or discard the open draft, or check ` +
@@ -75,7 +78,7 @@ export class TransferBundleService {
       );
     }
 
-    const merkleProof = await this.tree.proofFor(tree, property);
+    const merkleProof = await this.nodes.proofFor(property);
     const rootRecord = await this.prisma.merkleRoot.findUnique({ where: { version: rootVersion } });
 
     const { zip } = await this.issuance.buildBuyerBundle(

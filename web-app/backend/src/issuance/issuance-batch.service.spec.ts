@@ -1,6 +1,10 @@
 import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 
 import { IssuanceBatchService } from './issuance-batch.service';
+import { makeProperty } from '../../test/factories';
+
+/** The shape `NodeStoreService.projectRoot` returns. */
+const overlayOf = (root: bigint) => ({ root, touched: new Map<string, bigint>(), removed: [] });
 
 const draftRow = (over: Record<string, unknown> = {}) => ({
   id: 1,
@@ -11,13 +15,18 @@ const draftRow = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const propertyRow = (over: Record<string, unknown> = {}) => ({
-  propertyId: '1001',
-  status: 'IMPORTED',
-  ownerCommitment: null,
-  certificateSerial: 'CERT-2026-001',
-  ...over,
-});
+/**
+ * A full Property row: `leafUpdatesFor` hashes it through `toLURRecord`, so a
+ * minimal stub would throw before reaching the behaviour under test.
+ */
+const propertyRow = (over: Record<string, unknown> = {}) =>
+  makeProperty({
+    propertyId: '1001',
+    status: 'IMPORTED',
+    ownerCommitment: null,
+    certificateSerial: 'CERT-2026-001',
+    ...over,
+  } as never);
 
 describe('IssuanceBatchService (D43)', () => {
   const build = (over: Record<string, unknown> = {}) => {
@@ -82,7 +91,9 @@ describe('IssuanceBatchService (D43)', () => {
 
   it('refuses to confirm when the chain root does not match the draft', async () => {
     const { prisma } = build();
-    const chain = { getLatestRoot: jest.fn().mockResolvedValue(123n), getRootVersion: jest.fn() };
+    const chain = { getLatestRoot: jest.fn().mockResolvedValue(123n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(), getRootVersion: jest.fn() };
     const service = new IssuanceBatchService(
       prisma,
       {} as never,
@@ -195,9 +206,9 @@ describe('IssuanceBatchService (D43)', () => {
       $transaction: jest.fn(),
     } as never;
 
-    const tree = {
-      loadIssuedProperties: jest.fn().mockResolvedValue([]),
-      buildFrom: jest.fn().mockResolvedValue({ tree: { root: 555n }, properties: [] }),
+    const nodes = {
+      projectRoot: jest.fn().mockResolvedValue(overlayOf(555n)),
+      applyStatements: jest.fn().mockReturnValue(['APPLY_NODES_STMT']),
     };
     const issuance = {
       generateOwnerSecret: jest.fn().mockReturnValueOnce(111n).mockReturnValueOnce(222n),
@@ -206,7 +217,7 @@ describe('IssuanceBatchService (D43)', () => {
 
     const service = new IssuanceBatchService(
       prisma,
-      tree as never,
+      nodes as never,
       issuance as never,
       {} as never,
       {} as never,
@@ -257,15 +268,14 @@ describe('IssuanceBatchService (D43)', () => {
 
     const chain = {
       getLatestRoot: jest.fn().mockResolvedValue(999n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(),
       getRootVersion: jest.fn().mockResolvedValue(7),
     };
-    const tree = {
-      loadIssuedProperties: jest.fn().mockResolvedValue([]),
-      buildFrom: jest.fn().mockResolvedValue({
-        tree: { root: 999n },
-        properties: [propertyRow({ propertyId: '1001', ownerCommitment: '777' })],
-      }),
-      proofFor: jest.fn().mockResolvedValue({ leaf: 123n }),
+    const nodes = {
+      projectRoot: jest.fn().mockResolvedValue(overlayOf(999n)),
+      proofInOverlay: jest.fn().mockResolvedValue({ leaf: 123n }),
+      applyStatements: jest.fn().mockReturnValue(['APPLY_NODES_STMT']),
     };
     const issuance = {
       commitmentFor: jest.fn().mockResolvedValue(777n),
@@ -281,12 +291,11 @@ describe('IssuanceBatchService (D43)', () => {
 
     const service = new IssuanceBatchService(
       prisma,
-      tree as never,
+      nodes as never,
       issuance as never,
       chain as never,
       {
         recordRootStatement: jest.fn().mockReturnValue('RECORD_ROOT_STMT'),
-        proofCacheStatements: jest.fn().mockResolvedValue(['PROOF_CACHE_STMT']),
       } as never,
       { assertNoOpenDraft: jest.fn() } as never,
       { issuedStatements } as never,
@@ -302,6 +311,11 @@ describe('IssuanceBatchService (D43)', () => {
       data: {
         ownerCommitment: '777',
         status: 'ISSUED',
+        // D72 repurposed these two: `leaf` is the plot's new leaf, `rootVersion`
+        // the root it first appeared in. Asserting the exact shape is the point
+        // — a column added here later must be a decision, not an accident.
+        leaf: expect.any(String),
+        rootVersion: 7,
         issuedAt: expect.any(Date),
         issuanceBatchId: 1,
       },
@@ -341,7 +355,8 @@ describe('IssuanceBatchService (D43)', () => {
     );
   });
 
-  it('confirm refreshes the proof cache for every issued property, not just the batch', async () => {
+  it('confirm writes only the batch — a plot issued in an earlier round is left alone', async () => {
+    const propertyUpdate = jest.fn();
     const prisma = {
       issuanceBatch: {
         findUnique: jest.fn().mockResolvedValue(draftRow()),
@@ -350,7 +365,7 @@ describe('IssuanceBatchService (D43)', () => {
       },
       property: {
         findMany: jest.fn().mockResolvedValue([propertyRow({ propertyId: '1001' })]),
-        update: jest.fn(),
+        update: propertyUpdate,
         updateMany: jest.fn(),
       },
       $transaction: jest.fn().mockResolvedValue([]),
@@ -358,6 +373,8 @@ describe('IssuanceBatchService (D43)', () => {
 
     const chain = {
       getLatestRoot: jest.fn().mockResolvedValue(999n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(),
       getRootVersion: jest.fn().mockResolvedValue(7),
     };
 
@@ -369,19 +386,10 @@ describe('IssuanceBatchService (D43)', () => {
       status: 'ISSUED',
       ownerCommitment: 'existing-commitment',
     });
-    const wholeTreeAfterRebuild = [
-      preExisting,
-      propertyRow({ propertyId: '1001', ownerCommitment: '777' }),
-    ];
-
-    const buildFrom = jest.fn().mockResolvedValue({
-      tree: { root: 999n },
-      properties: wholeTreeAfterRebuild,
-    });
-    const tree = {
-      loadIssuedProperties: jest.fn().mockResolvedValue([preExisting]),
-      buildFrom,
-      proofFor: jest.fn().mockResolvedValue({ leaf: 123n }),
+    const nodes = {
+      projectRoot: jest.fn().mockResolvedValue(overlayOf(999n)),
+      proofInOverlay: jest.fn().mockResolvedValue({ leaf: 123n }),
+      applyStatements: jest.fn().mockReturnValue(['APPLY_NODES_STMT']),
     };
     const issuance = {
       commitmentFor: jest.fn().mockResolvedValue(777n),
@@ -392,16 +400,13 @@ describe('IssuanceBatchService (D43)', () => {
         .fn()
         .mockResolvedValue({ propertyId: '1001', receipt: {}, files: ['FILE'] }),
     };
-    const proofCacheStatements = jest.fn().mockResolvedValue([]);
-
     const service = new IssuanceBatchService(
       prisma,
-      tree as never,
+      nodes as never,
       issuance as never,
       chain as never,
       {
         recordRootStatement: jest.fn().mockReturnValue('RECORD_ROOT_STMT'),
-        proofCacheStatements,
       } as never,
       { assertNoOpenDraft: jest.fn() } as never,
       { issuedStatements: jest.fn().mockReturnValue([]) } as never,
@@ -410,17 +415,19 @@ describe('IssuanceBatchService (D43)', () => {
 
     await service.confirm(1);
 
-    // buildFrom must see BOTH the pre-existing issued property and the batch —
-    // dropping either would silently shrink the published tree.
-    expect(buildFrom).toHaveBeenCalledWith([
-      preExisting,
-      expect.objectContaining({ propertyId: '1001', ownerCommitment: '777' }),
-    ]);
+    // The inversion of the pre-D72 invariant. This used to assert that the
+    // cache refresh covered the WHOLE tree — the plot issued in an earlier
+    // round included — because publishing a root invalidated every cached
+    // proof. That is still true of the tree; what changed is that the tree is
+    // the stored thing now, so '2002' is never written and picks up its new
+    // path the moment it asks for a proof.
+    const updates = nodes.projectRoot.mock.calls[0][0] as Map<number, bigint | null>;
+    expect([...updates.keys()]).toEqual([1001]);
+    expect(updates.has(Number(preExisting.propertyId))).toBe(false);
 
-    // The cache refresh must cover the WHOLE rebuilt tree (both properties),
-    // not just the batch (one property) — every published root invalidates
-    // every previously cached proof, not only the ones that changed.
-    expect(proofCacheStatements).toHaveBeenCalledWith({ root: 999n }, wholeTreeAfterRebuild, 7);
+    const written = propertyUpdate.mock.calls.map((call) => call[0].where.propertyId);
+    expect(written).toEqual(['1001']);
+    expect(nodes.applyStatements).toHaveBeenCalledTimes(1);
   });
 
   it('confirm aborts before writing anything if the rebuilt root no longer matches the signed root', async () => {
@@ -444,23 +451,23 @@ describe('IssuanceBatchService (D43)', () => {
       // Matches draft.newRoot, so the FIRST paranoia check (against the chain)
       // passes — this test exercises the SECOND one, after the rebuild.
       getLatestRoot: jest.fn().mockResolvedValue(999n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(),
       getRootVersion: jest.fn().mockResolvedValue(7),
     };
-    const tree = {
-      loadIssuedProperties: jest.fn().mockResolvedValue([]),
-      // Something changed underneath the draft: the rebuilt root disagrees
-      // with the root that was actually signed.
-      buildFrom: jest.fn().mockResolvedValue({ tree: { root: 111n }, properties: [] }),
-      proofFor: jest.fn(),
+    const nodes = {
+      projectRoot: jest.fn().mockResolvedValue(overlayOf(111n)),
+      proofInOverlay: jest.fn().mockResolvedValue({ leaf: 123n }),
+      applyStatements: jest.fn().mockReturnValue(['APPLY_NODES_STMT']),
     };
     const issuance = { commitmentFor: jest.fn().mockResolvedValue(777n) };
 
     const service = new IssuanceBatchService(
       prisma,
-      tree as never,
+      nodes as never,
       issuance as never,
       chain as never,
-      { recordRootStatement: jest.fn(), proofCacheStatements: jest.fn() } as never,
+      { recordRootStatement: jest.fn() } as never,
       { assertNoOpenDraft: jest.fn() } as never,
       { issuedStatements: jest.fn() } as never,
       {} as never,
@@ -489,16 +496,15 @@ describe('IssuanceBatchService (D43)', () => {
 
     const chain = {
       getLatestRoot: jest.fn().mockResolvedValue(999n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(),
       getRootVersion: jest.fn().mockResolvedValue(7),
     };
 
-    const tree = {
-      loadIssuedProperties: jest.fn().mockResolvedValue([]),
-      buildFrom: jest.fn().mockResolvedValue({
-        tree: { root: 999n },
-        properties: [propertyRow({ propertyId: '1001', ownerCommitment: '777' })],
-      }),
-      proofFor: jest.fn().mockResolvedValue({ leaf: 123n }),
+    const nodes = {
+      projectRoot: jest.fn().mockResolvedValue(overlayOf(999n)),
+      proofInOverlay: jest.fn().mockResolvedValue({ leaf: 123n }),
+      applyStatements: jest.fn().mockReturnValue(['APPLY_NODES_STMT']),
     };
 
     const issuance = {
@@ -515,12 +521,11 @@ describe('IssuanceBatchService (D43)', () => {
 
     const service = new IssuanceBatchService(
       prisma,
-      tree as never,
+      nodes as never,
       issuance as never,
       chain as never,
       {
         recordRootStatement: jest.fn().mockReturnValue('RECORD_ROOT_STMT'),
-        proofCacheStatements: jest.fn().mockResolvedValue(['PROOF_CACHE_STMT']),
       } as never,
       { assertNoOpenDraft: jest.fn() } as never,
       { issuedStatements: jest.fn().mockReturnValue(['EVENT_STMT']) } as never,
@@ -570,15 +575,14 @@ describe('IssuanceBatchService (D43)', () => {
 
     const chain = {
       getLatestRoot: jest.fn().mockResolvedValue(999n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(),
       getRootVersion: jest.fn().mockResolvedValue(7),
     };
-    const tree = {
-      loadIssuedProperties: jest.fn().mockResolvedValue([]),
-      buildFrom: jest.fn().mockResolvedValue({
-        tree: { root: 999n },
-        properties: [propertyRow({ propertyId: '1001', ownerCommitment: '777' })],
-      }),
-      proofFor: jest.fn().mockResolvedValue({ leaf: 123n }),
+    const nodes = {
+      projectRoot: jest.fn().mockResolvedValue(overlayOf(999n)),
+      proofInOverlay: jest.fn().mockResolvedValue({ leaf: 123n }),
+      applyStatements: jest.fn().mockReturnValue(['APPLY_NODES_STMT']),
     };
     const issuance = {
       commitmentFor: jest.fn().mockResolvedValue(777n),
@@ -593,12 +597,11 @@ describe('IssuanceBatchService (D43)', () => {
 
     const service = new IssuanceBatchService(
       prisma,
-      tree as never,
+      nodes as never,
       issuance as never,
       chain as never,
       {
         recordRootStatement: jest.fn().mockReturnValue('RECORD_ROOT_STMT'),
-        proofCacheStatements: jest.fn().mockResolvedValue(['PROOF_CACHE_STMT']),
       } as never,
       { assertNoOpenDraft: jest.fn() } as never,
       { issuedStatements } as never,

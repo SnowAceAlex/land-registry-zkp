@@ -13,13 +13,15 @@ import {
   PublicSignals,
   assertProofFresh,
   getCircuitPaths,
+  hashRecord,
   verifyGroth16Proof,
 } from '@land-registry/blockchain/shared';
 
 import { ChainService, ProofRejectedError } from '../chain/chain.service';
 import { blockchainDir } from '../common/paths';
 import { PrismaService } from '../prisma/prisma.service';
-import { TreeService } from '../tree/tree.service';
+import { NodeStoreService } from '../tree/node-store.service';
+import { toLURRecord } from '../records/record.mapper';
 import { SubmitTransferDto, TransferPreviewDto } from './dto/transfer.dto';
 import {
   TransferApprovalResponseDto,
@@ -53,33 +55,37 @@ export class TransfersService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tree: TreeService,
+    private readonly nodes: NodeStoreService,
     private readonly chain: ChainService,
   ) {}
 
   /**
-   * D28 step 2 — compute the projected tree and hand back both Merkle paths.
+   * D28 step 2 — both Merkle paths the transfer.circom witness needs.
    * Read-only: nothing is persisted and no root is published.
+   *
+   * ⚠️ This is the hottest path in the system — one call per transaction at the
+   * counter, ~65,000 a month at HCMC volumes. Before D72 it rebuilt the WHOLE
+   * tree twice per call. It is now ~2·TREE_DEPTH key lookups: the old path read
+   * from the node table, the new one from an overlay of the single changed leaf.
    */
   async preview(dto: TransferPreviewDto): Promise<TransferPreviewResult> {
     const property = await this.requireTransferableProperty(dto.propertyId);
 
-    const { tree: currentTree } = await this.tree.buildCurrentTree();
-    const oldProof = await this.tree.proofFor(currentTree, property);
+    const oldProof = await this.nodes.proofFor(property);
 
-    const { tree: projectedTree } = await this.tree.buildProjectedTree(
-      new Map([[dto.propertyId, dto.newOwnerCommitment]]),
-    );
-    const newProof = await this.tree.proofFor(projectedTree, {
-      ...property,
-      ownerCommitment: dto.newOwnerCommitment,
-    });
+    // Only `ownerCommitment` may differ — transfer.circom derives both leaves
+    // from one set of record-field signals (D41/§2.4), so the projection swaps
+    // that single field and leaves the leaf in its propertyId slot.
+    const moved = { ...property, ownerCommitment: dto.newOwnerCommitment };
+    const newLeaf = await hashRecord(toLURRecord(moved));
+    const overlay = await this.nodes.projectRoot(new Map([[Number(dto.propertyId), newLeaf]]));
+    const newProof = await this.nodes.proofInOverlay(property, newLeaf, overlay);
 
     return {
       propertyId: dto.propertyId,
       rootVersion: await this.chain.getRootVersion(),
-      oldMerkleRoot: currentTree.root.toString(),
-      newMerkleRoot: projectedTree.root.toString(),
+      oldMerkleRoot: oldProof.root.toString(),
+      newMerkleRoot: overlay.root.toString(),
       oldSiblings: oldProof.siblings.map((s) => s.toString()),
       oldPathIndices: oldProof.pathIndices,
       newSiblings: newProof.siblings.map((s) => s.toString()),

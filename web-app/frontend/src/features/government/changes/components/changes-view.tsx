@@ -15,10 +15,11 @@
  *     on-chain list exists for public auditability, which is why the reason is
  *     a uint8 code plus an off-chain detail hash and not free text.
  *  4. Warn before publishing: every root publish invalidates EVERY issued
- *     Merkle proof, not only the changed ones. RootService rewrites the whole
- *     proof cache in the same transaction.
- *  5. A change set carries at most 50 revocations (D56); the rest wait and the
- *     draft reports them as deferredRevocations.
+ *     Merkle proof, not only the changed ones. Since D72 the backend stores the
+ *     tree itself, so owners pick up their new path when they next ask.
+ *  5. A change set carries at most 150 revocations (D56 + D73); the rest wait
+ *     and the draft reports them as deferredRevocations. The portal reads the
+ *     number from `revocationCap` on pending-changes, never from a copy.
  */
 import type { Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';

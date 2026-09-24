@@ -1,15 +1,19 @@
 import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 
 import { ChangeSetService, MAX_REVOCATIONS_PER_CHANGESET } from './changeset.service';
+import { makeProperty } from '../../test/factories';
 
-const propertyRow = (over: Record<string, unknown> = {}) => ({
-  propertyId: '1001',
-  status: 'ISSUED',
-  ownerCommitment: null,
-  leaf: null,
-  ...over,
-});
+/**
+ * A full Property row — `leafUpdatesFor` hashes it through `toLURRecord`, so a
+ * minimal stub would throw long before reaching the behaviour under test.
+ * `ownerCommitment` stays null by default: a transfer supplies the new one, and
+ * a revocation never needs it.
+ */
+const propertyRow = (over: Record<string, unknown> = {}) =>
+  makeProperty({ propertyId: '1001', ownerCommitment: null, leaf: null, ...over } as never);
+
+/** The shape `NodeStoreService.projectRoot` returns. */
+const overlayOf = (root: bigint) => ({ root, touched: new Map<string, bigint>(), removed: [] });
 
 describe('ChangeSetService (D44)', () => {
   const transferFindMany = jest.fn();
@@ -26,7 +30,10 @@ describe('ChangeSetService (D44)', () => {
       create: changeSetCreate,
       update: changeSetUpdate,
     },
-    property: { update: jest.fn() },
+    // `leafUpdatesFor` reads the plots in the round. These two describes only
+    // queue revocations, which need no row (a revocation is `null` at the leaf,
+    // not a re-hash), so an empty result is the honest fixture.
+    property: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
     $transaction: jest.fn().mockResolvedValue([]),
   } as never;
 
@@ -36,10 +43,29 @@ describe('ChangeSetService (D44)', () => {
     revocationFindMany.mockResolvedValue([]);
   });
 
+  // The portal reads the cap from here rather than keeping a copy (D54's rule):
+  // its hardcoded 50 outlived D73 and warned about a cap that had moved.
+  it('reports the revocation cap alongside the queue', async () => {
+    const service = new ChangeSetService(
+      prisma,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.pending()).resolves.toEqual({
+      transfers: [],
+      revocations: [],
+      revocationCap: MAX_REVOCATIONS_PER_CHANGESET,
+    });
+  });
+
   it('refuses to draft when there is nothing pending', async () => {
     const service = new ChangeSetService(
       prisma,
-      { loadIssuedProperties: jest.fn(), buildFrom: jest.fn() } as never,
+      { projectRoot: jest.fn(), applyStatements: jest.fn() } as never,
       {} as never,
       {} as never,
       { assertNoOpenDraft: jest.fn() } as never,
@@ -56,13 +82,13 @@ describe('ChangeSetService (D44)', () => {
     ]);
     changeSetCreate.mockResolvedValue({ id: 4, newRoot: '777' });
 
-    const tree = {
-      loadIssuedProperties: jest.fn().mockResolvedValue([]),
-      buildFrom: jest.fn().mockResolvedValue({ tree: { root: 777n }, properties: [] }),
+    const nodes = {
+      projectRoot: jest.fn().mockResolvedValue(overlayOf(777n)),
+      applyStatements: jest.fn().mockReturnValue([]),
     };
     const service = new ChangeSetService(
       prisma,
-      tree as never,
+      nodes as never,
       {} as never,
       {} as never,
       { assertNoOpenDraft: jest.fn() } as never,
@@ -86,7 +112,9 @@ describe('ChangeSetService (D44)', () => {
       transfers: [],
       revocations: [],
     });
-    const chain = { getLatestRoot: jest.fn().mockResolvedValue(999n), getRootVersion: jest.fn() };
+    const chain = { getLatestRoot: jest.fn().mockResolvedValue(999n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(), getRootVersion: jest.fn() };
     const service = new ChangeSetService(
       prisma,
       {} as never,
@@ -113,7 +141,6 @@ describe('ChangeSetService (D44)', () => {
   function buildConfirmScenario(options: { rebuiltRoot?: bigint } = {}) {
     const { rebuiltRoot = 555n } = options;
     const propertyUpdate = jest.fn();
-    const proofCacheStatements = jest.fn().mockResolvedValue([]);
     const changeSetUpdate = jest.fn().mockResolvedValue(undefined);
     const transaction = jest.fn().mockResolvedValue([]);
 
@@ -128,11 +155,6 @@ describe('ChangeSetService (D44)', () => {
       ],
     };
 
-    const untouched = propertyRow({ propertyId: '3003', ownerCommitment: 'c-3003' });
-    const transferred = propertyRow({ propertyId: '1001', ownerCommitment: '999' });
-    // '2002' is deliberately absent — revoked, and therefore dropped from the
-    // rebuilt tree entirely.
-    const wholeTreeAfterRebuild = [transferred, untouched];
 
     const prisma = {
       changeSet: {
@@ -158,27 +180,14 @@ describe('ChangeSetService (D44)', () => {
 
     const chain = {
       getLatestRoot: jest.fn().mockResolvedValue(555n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(),
       getRootVersion: jest.fn().mockResolvedValue(9),
     };
-    const tree = {
-      // The plot being revoked is still ISSUED right up until confirm() writes
-      // it — that write is what this round is for.
-      loadIssuedProperties: jest
-        .fn()
-        .mockResolvedValue([
-          propertyRow({ propertyId: '1001', ownerCommitment: 'old-1001' }),
-          propertyRow({ propertyId: '2002', ownerCommitment: 'commit-2002' }),
-          untouched,
-        ]),
-      buildFrom: jest
-        .fn()
-        .mockResolvedValue({ tree: { root: rebuiltRoot }, properties: wholeTreeAfterRebuild }),
-      proofFor: jest.fn().mockResolvedValue({ leaf: 123n }),
-    };
-    const roots = {
-      recordRootStatement: jest.fn().mockReturnValue('RECORD_ROOT_STMT'),
-      proofCacheStatements,
-    };
+    const projectRoot = jest.fn().mockResolvedValue(overlayOf(rebuiltRoot));
+    const applyStatements = jest.fn().mockReturnValue(['APPLY_NODES_STMT']);
+    const nodes = { projectRoot, applyStatements };
+    const roots = { recordRootStatement: jest.fn().mockReturnValue('RECORD_ROOT_STMT') };
     const events = {
       transferredStatements: jest.fn().mockReturnValue([]),
       revokedStatements: jest.fn().mockReturnValue([]),
@@ -186,7 +195,7 @@ describe('ChangeSetService (D44)', () => {
 
     const service = new ChangeSetService(
       prisma,
-      tree as never,
+      nodes as never,
       chain as never,
       roots as never,
       { assertNoOpenDraft: jest.fn() } as never,
@@ -196,40 +205,77 @@ describe('ChangeSetService (D44)', () => {
     return {
       service,
       propertyUpdate,
-      proofCacheStatements,
-      wholeTreeAfterRebuild,
+      projectRoot,
+      applyStatements,
       changeSetUpdate,
       transaction,
       events,
     };
   }
 
-  it("confirm refreshes the proof cache for the whole rebuilt tree, not just this round's batch", async () => {
-    const { service, proofCacheStatements, wholeTreeAfterRebuild } = buildConfirmScenario();
+  it("confirm writes only the plots this round touched — nobody else needs a write", async () => {
+    const { service, propertyUpdate, applyStatements } = buildConfirmScenario();
 
     await service.confirm(9);
 
-    // '3003' is neither transferred nor revoked in this round, yet it must
-    // still appear — every published root invalidates every previously cached
-    // proof, not only the ones for plots that changed.
-    expect(proofCacheStatements).toHaveBeenCalledWith({ root: 555n }, wholeTreeAfterRebuild, 9);
+    const written = propertyUpdate.mock.calls.map((call) => call[0].where.propertyId).sort();
+    expect(written).toEqual(['1001', '2002']);
+    // This is the exact inversion of the pre-D72 invariant. It used to be that
+    // every published root had to rewrite the cached proof of EVERY issued
+    // plot — one leaf changing alters every node on its path, and each other
+    // leaf has one sibling on that path. That is still true of the tree; what
+    // changed is that the tree is now the stored thing, so '3003' picks up its
+    // new proof when it asks, and 2.5 million rows stay untouched.
+    expect(written).not.toContain('3003');
+    expect(applyStatements).toHaveBeenCalledTimes(1);
   });
 
-  it("confirm clears a revoked plot's cached leaf, Merkle proof and rootVersion", async () => {
+  it('confirm projects a removed leaf for a revocation and a new leaf for a transfer', async () => {
+    const { service, projectRoot } = buildConfirmScenario();
+
+    await service.confirm(9);
+
+    const updates = projectRoot.mock.calls[0][0] as Map<number, bigint | null>;
+    // `null` at the revoked plot IS the enforcement (D45): the node is deleted,
+    // so afterwards no Merkle path exists and no circuit can produce a proof
+    // for it. The on-chain reason list is auditability, not enforcement.
+    expect(updates.get(2002)).toBeNull();
+    expect(typeof updates.get(1001)).toBe('bigint');
+    expect([...updates.keys()].sort()).toEqual([1001, 2002]);
+  });
+
+  it("confirm clears a revoked plot's leaf and root version", async () => {
     const { service, propertyUpdate } = buildConfirmScenario();
 
     await service.confirm(9);
 
-    // A cached path into a tree that no longer contains the leaf is worse than
-    // no cache, because it still looks answerable. merkleProof is JSON, so
-    // clearing it needs Prisma.DbNull rather than a plain `null`.
+    // The row must stop claiming a leaf, because `applyStatements` deletes that
+    // node in the same transaction. A row asserting a leaf the tree no longer
+    // holds is what `NodeStoreService.proofFor` reports as divergence.
     expect(propertyUpdate).toHaveBeenCalledWith({
       where: { propertyId: '2002' },
-      data: { status: 'REVOKED', leaf: null, merkleProof: Prisma.DbNull, rootVersion: null },
+      data: { status: 'REVOKED', leaf: null, rootVersion: null },
     });
   });
 
-  it('confirm aborts before writing anything if the rebuilt root no longer matches the signed root', async () => {
+  it('confirm stamps the transferred plot with its new leaf and the published root version', async () => {
+    const { service, propertyUpdate } = buildConfirmScenario();
+
+    await service.confirm(9);
+
+    expect(propertyUpdate).toHaveBeenCalledWith({
+      where: { propertyId: '1001' },
+      data: {
+        ownerCommitment: '999',
+        leaf: expect.any(String),
+        // D72 repurposed this column: it now records the root version in which
+        // this leaf last changed, which is what D48's history reads.
+        rootVersion: 9,
+      },
+    });
+  });
+
+  it('confirm aborts before writing anything if the reprojected root no longer matches the signed root', async () => {
     // The chain still agrees with what was signed (555) — this is the SECOND
     // paranoia check, after the DB-driven rebuild disagrees with it (999).
     const { service, transaction } = buildConfirmScenario({ rebuiltRoot: 999n });
@@ -304,22 +350,24 @@ describe('ChangeSetService (D44)', () => {
         transferRequest: { findMany: jest.fn().mockResolvedValue([transfer]) },
         revocation: { findMany: jest.fn().mockResolvedValue(pendingRevocations), count },
         changeSet: { create, findUnique },
+        // The transferred plot has to exist as a full row: its leaf is
+        // re-hashed from it, with only ownerCommitment replaced.
+        property: {
+          findMany: jest
+            .fn()
+            .mockResolvedValue([propertyRow({ propertyId: transfer.propertyId })]),
+        },
       } as never;
-      const loadIssuedProperties = jest
-        .fn()
-        .mockResolvedValue(
-          pendingRevocations.map((r) => propertyRow({ propertyId: r.propertyId })),
-        );
-      const buildFrom = jest.fn().mockResolvedValue({ tree: { root: 777n }, properties: [] });
+      const projectRoot = jest.fn().mockResolvedValue(overlayOf(777n));
       const service = new ChangeSetService(
         prisma,
-        { loadIssuedProperties, buildFrom } as never,
+        { projectRoot, applyStatements: jest.fn().mockReturnValue([]) } as never,
         {} as never,
         {} as never,
         { assertNoOpenDraft: jest.fn() } as never,
         {} as never,
       );
-      return { service, create, findUnique, count, buildFrom };
+      return { service, create, findUnique, count, projectRoot };
     }
 
     it('rebuilds exactly what createDraft returned, calldata included', async () => {
@@ -369,7 +417,7 @@ describe('ChangeSetService (D44)', () => {
       const pending = Array.from({ length: MAX_REVOCATIONS_PER_CHANGESET + 2 }, (_, i) =>
         revocation(i + 1, String(2000 + i)),
       );
-      const { service, create, buildFrom } = scenario(pending);
+      const { service, create, projectRoot } = scenario(pending);
 
       const draft = await service.createDraft();
 
@@ -384,12 +432,16 @@ describe('ChangeSetService (D44)', () => {
           }),
         }),
       );
-      // The projected root drops ONLY this round's plots: the two deferred
-      // ones stay in the tree until their own round publishes.
-      const projected = buildFrom.mock.calls[0][0] as { propertyId: string }[];
-      expect(projected.map((p) => p.propertyId)).toEqual(
-        pending.slice(MAX_REVOCATIONS_PER_CHANGESET).map((r) => r.propertyId),
-      );
+      // The projection drops ONLY this round's plots: the two deferred ones
+      // stay in the tree until their own round publishes. Before D72 this was
+      // read off the list handed to buildFrom; now it is read off the update
+      // map, which says the same thing in one place instead of by omission.
+      const updates = projectRoot.mock.calls[0][0] as Map<number, bigint | null>;
+      expect(updates.size).toBe(MAX_REVOCATIONS_PER_CHANGESET + 1); // + the transfer
+      for (const r of inRound) expect(updates.get(Number(r.propertyId))).toBeNull();
+      for (const r of pending.slice(MAX_REVOCATIONS_PER_CHANGESET)) {
+        expect(updates.has(Number(r.propertyId))).toBe(false);
+      }
     });
 
     it('still refuses a transfer and a revocation for the same plot, even a deferred one', async () => {
@@ -414,5 +466,159 @@ describe('ChangeSetService (D44)', () => {
       findUnique.mockResolvedValue({ id: 8, status: 'PUBLISHED', transfers: [], revocations: [] });
       await expect(service.draftDetail(8)).rejects.toBeInstanceOf(ConflictException);
     });
+  });
+});
+
+describe('ChangeSetService.createDraft — duplicate queue entries', () => {
+  /**
+   * Found by the bench harness, which writes transfer rows directly and so
+   * bypasses the guard in TransfersService.submit(). The draft was correctly
+   * refused, but the message said "a transfer and a revocation" for what was in
+   * fact two transfers — sending an officer to look for a revocation that does
+   * not exist.
+   */
+  function withQueue(
+    transfers: { id: number; propertyId: string; newOwnerCommitment: string }[],
+    revocations: { id: number; propertyId: string }[],
+  ) {
+    const prisma = {
+      transferRequest: { findMany: jest.fn().mockResolvedValue(transfers) },
+      revocation: {
+        findMany: jest.fn().mockResolvedValue(
+          revocations.map((r) => ({ ...r, reasonCode: 1, detailHash: '0xaa', detailText: 'x' })),
+        ),
+      },
+      changeSet: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+      property: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+      $transaction: jest.fn(),
+    } as never;
+
+    return new ChangeSetService(
+      prisma,
+      { projectRoot: jest.fn(), applyStatements: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      { assertNoOpenDraft: jest.fn() } as never,
+      {} as never,
+    );
+  }
+
+  it('names two transfers for one plot as exactly that', async () => {
+    const service = withQueue(
+      [
+        { id: 1, propertyId: '7', newOwnerCommitment: '111' },
+        { id: 2, propertyId: '7', newOwnerCommitment: '222' },
+      ],
+      [],
+    );
+
+    await expect(service.createDraft()).rejects.toThrow(/more than one approved transfer/);
+  });
+
+  it('names two revocations for one plot as exactly that', async () => {
+    const service = withQueue(
+      [],
+      [
+        { id: 1, propertyId: '7' },
+        { id: 2, propertyId: '7' },
+      ],
+    );
+
+    await expect(service.createDraft()).rejects.toThrow(/more than one pending revocation/);
+  });
+
+  it('still reports a genuine transfer-plus-revocation conflict as one', async () => {
+    const service = withQueue(
+      [{ id: 1, propertyId: '7', newOwnerCommitment: '111' }],
+      [{ id: 2, propertyId: '7' }],
+    );
+
+    await expect(service.createDraft()).rejects.toThrow(/both a transfer and a revocation pending/);
+  });
+});
+
+describe('MAX_REVOCATIONS_PER_CHANGESET (D73)', () => {
+  it('matches the value whose gas was measured on-chain', () => {
+    // Double-entry ledger with BACKEND_CAP in
+    // blockchain/test/contracts/RootRegistry.revocation.test.ts. The two
+    // packages cannot import each other, so changing one side without the
+    // other has to fail HERE rather than at publish time, when the batch would
+    // revert wholesale and nothing would be written.
+    expect(MAX_REVOCATIONS_PER_CHANGESET).toBe(150);
+  });
+});
+
+describe('ChangeSetService — a transfer may not resurrect a revoked plot (D45/D72)', () => {
+  /**
+   * The regression this guards against is specific to D72. Before it, the root
+   * was rebuilt from `loadIssuedProperties()`, which filters on ISSUED and so
+   * dropped a revoked plot by accident. Projecting from the plots named in the
+   * round reads by propertyId and has no such accident, so the rule has to be
+   * written down.
+   *
+   * How it happens: a transfer is APPROVED, then the plot is revoked in a
+   * change set that publishes first. The transfer stays APPROVED with
+   * changeSetId null, so `pending()` offers it again — and re-hashing its leaf
+   * would put back a certificate the State has reclaimed.
+   */
+  function scenario() {
+    const transfer = { id: 7, propertyId: '4004', newOwnerCommitment: '888' };
+    const create = jest.fn();
+    const transaction = jest.fn().mockResolvedValue([]);
+    const prisma = {
+      transferRequest: { findMany: jest.fn().mockResolvedValue([transfer]), update: jest.fn() },
+      revocation: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn(), count: jest.fn() },
+      changeSet: {
+        create,
+        findUnique: jest.fn().mockResolvedValue({
+          id: 12,
+          status: 'DRAFT',
+          newRoot: '555',
+          txHash: null,
+          transfers: [transfer],
+          revocations: [],
+        }),
+        update: jest.fn(),
+      },
+      property: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([propertyRow({ propertyId: '4004', status: 'REVOKED' })]),
+        update: jest.fn(),
+      },
+      $transaction: transaction,
+    } as never;
+
+    const service = new ChangeSetService(
+      prisma,
+      {
+        projectRoot: jest.fn().mockResolvedValue(overlayOf(555n)),
+        applyStatements: jest.fn().mockReturnValue([]),
+      } as never,
+      {
+        getLatestRoot: jest.fn().mockResolvedValue(555n),
+      // D74 — confirm() always asks the chain itself, never the 2s cache.
+      invalidateRootCache: jest.fn(),
+        getRootVersion: jest.fn().mockResolvedValue(9),
+      } as never,
+      { recordRootStatement: jest.fn() } as never,
+      { assertNoOpenDraft: jest.fn() } as never,
+      { transferredStatements: jest.fn(), revokedStatements: jest.fn() } as never,
+    );
+    return { service, create, transaction };
+  }
+
+  it('refuses to draft a round whose transfer targets a revoked plot', async () => {
+    const { service, create } = scenario();
+
+    await expect(service.createDraft()).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('refuses to confirm one too, even if the chain root agrees', async () => {
+    const { service, transaction } = scenario();
+
+    await expect(service.confirm(12)).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(transaction).not.toHaveBeenCalled();
   });
 });

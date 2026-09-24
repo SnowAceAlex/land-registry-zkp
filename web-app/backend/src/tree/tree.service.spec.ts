@@ -76,3 +76,48 @@ describe('TreeService.loadIssuedProperties — membership rule (D45)', () => {
     expect(findMany).toHaveBeenCalledWith({ where: { status: 'ISSUED' } });
   });
 });
+
+describe('TreeService.streamIssuedProperties — paging rule (D72)', () => {
+  it('pages by the autoincrement id, never by propertyId', async () => {
+    const seen: Record<string, unknown>[] = [];
+    const findMany = jest.fn(async (args: Record<string, unknown>) => {
+      seen.push(args);
+      return seen.length === 1 ? [makeProperty({ propertyId: '10' })] : [];
+    });
+    const service = new TreeService({ property: { findMany } } as never);
+
+    for await (const batch of service.streamIssuedProperties(2)) {
+      expect(batch).toHaveLength(1);
+    }
+
+    // `propertyId` is a String column, so Postgres orders it lexicographically
+    // ("10" before "2") and paging by it would silently skip plots. Paging by
+    // the autoincrement `id` is what makes the cursor total.
+    expect(seen[0].orderBy).toEqual({ id: 'asc' });
+    expect(seen[0].cursor).toBeUndefined();
+    expect(seen[1].cursor).toEqual({ id: makeProperty({ propertyId: '10' }).id });
+    expect(seen[1].skip).toBe(1);
+  });
+
+  it('still filters on ISSUED — the membership rule is the same one (D45)', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const service = new TreeService({ property: { findMany } } as never);
+
+    for await (const _batch of service.streamIssuedProperties()) {
+      // consume
+    }
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { status: 'ISSUED' } }));
+  });
+
+  it('stops at the first empty batch instead of looping forever', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const service = new TreeService({ property: { findMany } } as never);
+
+    let batches = 0;
+    for await (const _batch of service.streamIssuedProperties()) batches++;
+
+    expect(batches).toBe(0);
+    expect(findMany).toHaveBeenCalledTimes(1);
+  });
+});

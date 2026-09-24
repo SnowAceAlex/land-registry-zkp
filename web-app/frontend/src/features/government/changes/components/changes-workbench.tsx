@@ -200,7 +200,13 @@ function DraftSummary({ draft, t }: { draft: ChangeSetDraftDetail; t: Strings })
         </div>
       ) : null}
       {draft.deferredRevocations > 0 ? (
-        <Notice tone="info" title={format(t.draftDeferred, { count: draft.deferredRevocations })} />
+        <Notice
+          tone="info"
+          title={format(t.draftDeferred, {
+            count: draft.deferredRevocations,
+            cap: propertyIds.length,
+          })}
+        />
       ) : null}
     </div>
   );
@@ -217,7 +223,7 @@ function PendingQueue({
   creating: boolean;
   onCreate: () => void;
 }) {
-  const { transfers, revocations } = pending;
+  const { transfers, revocations, revocationCap } = pending;
 
   if (transfers.length === 0 && revocations.length === 0) {
     return <EmptyState icon={FolderSync} title={t.emptyTitle} description={t.emptyBody} />;
@@ -228,7 +234,9 @@ function PendingQueue({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="font-medium text-ink">{t.pendingTitle}</h2>
-          {revocations.length > 50 ? <p className="mt-1 text-sm text-steel">{t.capNote}</p> : null}
+          {revocations.length > revocationCap ? (
+            <p className="mt-1 text-sm text-steel">{format(t.capNote, { cap: revocationCap })}</p>
+          ) : null}
         </div>
         <button type="button" className={buttonStyles.primary} disabled={creating} onClick={onCreate}>
           {creating ? (

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import {
+  RETIRED_TREE_DEPTHS,
+  TREE_DEPTH,
+} from '@land-registry/blockchain/shared/treeDimensions';
 import type { OwnerBundle } from '@/lib/bundle';
 
 import { NEIGHBOUR_SECRET, sampleBundle } from './__fixtures__/bundle';
@@ -62,15 +66,49 @@ describe('checkBundleIntegrity (UC-5)', () => {
     expect((await checkBundleIntegrity(tampered)).issues).toEqual(['merkle-mismatch']);
   });
 
-  // Not a depth-20 path means it was not issued by this registry at all, so it
-  // is worth its own message rather than a generic "corrupt".
-  it('catches a path that is not depth-20', async () => {
-    const { bundle } = await sampleBundle();
-    const short = clone(bundle);
-    short.receipt.merkleProof.siblings = short.receipt.merkleProof.siblings.slice(0, 19);
-    short.receipt.merkleProof.pathIndices = short.receipt.merkleProof.pathIndices.slice(0, 19);
+  /** Cut the receipt's path to `siblings` / `pathIndices` entries. */
+  function truncatePath(bundle: OwnerBundle, siblings: number, pathIndices = siblings) {
+    const cut = clone(bundle);
+    cut.receipt.merkleProof.siblings = cut.receipt.merkleProof.siblings.slice(0, siblings);
+    cut.receipt.merkleProof.pathIndices = cut.receipt.merkleProof.pathIndices.slice(0, pathIndices);
+    return cut;
+  }
 
-    expect((await checkBundleIntegrity(short)).issues).toEqual(['depth-mismatch']);
+  // A length this registry never issued at: damaged, or not ours.
+  it('catches a path whose length this registry never issued', async () => {
+    const { bundle } = await sampleBundle();
+
+    expect((await checkBundleIntegrity(truncatePath(bundle, 19))).issues).toEqual([
+      'depth-mismatch',
+    ]);
+  });
+
+  /**
+   * D75: every bundle issued before D71 carries a depth-20 path — including
+   * the ones this registry issued itself. It used to be reported as "not
+   * issued by this registry", i.e. forged.
+   */
+  it.each(RETIRED_TREE_DEPTHS)(
+    'names a depth-%i path as an old bundle, not a foreign one',
+    async (depth) => {
+      const { bundle } = await sampleBundle();
+
+      expect((await checkBundleIntegrity(truncatePath(bundle, depth))).issues).toEqual([
+        'depth-retired',
+      ]);
+    },
+  );
+
+  it('does not call a path retired when its two arrays disagree', async () => {
+    const { bundle } = await sampleBundle();
+
+    expect((await checkBundleIntegrity(truncatePath(bundle, 20, 19))).issues).toEqual([
+      'depth-mismatch',
+    ]);
+  });
+
+  it('never lists the current depth as retired', () => {
+    expect(RETIRED_TREE_DEPTHS).not.toContain(TREE_DEPTH);
   });
 
   it('catches a receipt whose header and record name different plots', async () => {

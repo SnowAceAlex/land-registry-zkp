@@ -1,26 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma, Property } from '@prisma/client';
-import { LURMerkleTree, generateMerkleProof } from '@land-registry/blockchain/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
-import { toLURRecord } from '../records/record.mapper';
 
 /**
  * RootService
  * ─────────────────────────────────────────────────────────────────────────────
- * Owns the "record a published root and bring the cached proofs back in sync"
- * step, shared by issuance and (once the batched change-set flow lands) transfer
- * approval. It no longer sends the publish transaction itself (D43) — that is
- * now signed in the officer's browser and confirmed by the caller (see
- * IssuanceBatchService.confirm()), which then hands the resulting {root,
- * version, txHash} to recordRootStatement()/proofCacheStatements() below.
+ * Mirrors a published root into `merkle_roots`, and shouts when the chain has
+ * moved ahead of the database. It sends no transaction (D43): the root is
+ * signed in the officer's browser wallet, and the caller — see
+ * IssuanceBatchService.confirm() and ChangeSetService.confirm() — hands the
+ * resulting {root, version, txHash} to recordRootStatement() below.
  *
- * ⚠️ Every published root invalidates EVERY cached Merkle proof, not just the
- * ones for records that changed: altering one leaf changes every node on its
- * path, and each other leaf has exactly one sibling on that path. So the
- * refresh below deliberately rewrites all issued properties — refreshing only
- * the batch would leave every other owner holding a proof that no longer
- * verifies.
+ * ⚠️ HISTORY WORTH KEEPING. This class used to rewrite the cached Merkle proof
+ * of EVERY issued property after every publish, because altering one leaf
+ * changes every node on its path and each other leaf has exactly one sibling on
+ * that path. That is still true of the tree. What changed at D72 is that the
+ * tree itself is stored, in `merkle_nodes`: "refresh every proof" is now
+ * "write O(k·TREE_DEPTH) nodes", and each owner's proof is computed when they
+ * ask for it. Do not reintroduce a proof cache here — at 2.5 million parcels it
+ * was 4–5 GB rewritten per publish, inside a single transaction.
  */
 @Injectable()
 export class RootService {
@@ -39,38 +37,6 @@ export class RootService {
       },
       update: { root: published.root.toString(), txHash: published.txHash },
     });
-  }
-
-  /**
-   * Statements that rewrite the cached leaf + Merkle proof + rootVersion for
-   * every property in the tree. Returned rather than executed so the caller can
-   * run them inside a larger transaction alongside its own writes.
-   */
-  async proofCacheStatements(
-    tree: LURMerkleTree,
-    properties: Property[],
-    rootVersion: number,
-  ): Promise<Prisma.PrismaPromise<unknown>[]> {
-    const statements: Prisma.PrismaPromise<unknown>[] = [];
-
-    for (const property of properties) {
-      const proof = await generateMerkleProof(tree, toLURRecord(property));
-      statements.push(
-        this.prisma.property.update({
-          where: { propertyId: property.propertyId },
-          data: {
-            leaf: proof.leaf.toString(),
-            merkleProof: {
-              siblings: proof.siblings.map((s) => s.toString()),
-              pathIndices: proof.pathIndices,
-            },
-            rootVersion,
-          },
-        }),
-      );
-    }
-
-    return statements;
   }
 
   /**

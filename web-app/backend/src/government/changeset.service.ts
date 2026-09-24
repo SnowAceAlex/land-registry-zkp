@@ -5,26 +5,40 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ChangeSet, Prisma, Property, Revocation, TransferRequest } from '@prisma/client';
+import { ChangeSet, Property, Revocation, TransferRequest } from '@prisma/client';
+import { hashRecord } from '@land-registry/blockchain/shared';
 
 import { ChainService } from '../chain/chain.service';
 import { DraftLockService } from '../common/draft-lock.service';
 import { PropertyEventService } from '../history/property-event.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { TreeService } from '../tree/tree.service';
+import { NodeStoreService } from '../tree/node-store.service';
+import { toLURRecord } from '../records/record.mapper';
 import { RootService } from './root.service';
 
 /**
- * Most revocations one change set may carry (D56).
+ * Most revocations one change set may carry (D56, re-measured at D73).
  *
- * `publishRootWithRevocations` has no length cap of its own, and a batch past
- * the block gas limit reverts wholesale — nothing publishes. Measured in
- * `blockchain/test/contracts/RootRegistry.revocation.test.ts`: 4,743,185 gas
- * for 50 (~95k each), a sixth of a 30M block. The cap lives here rather than in
- * the portal because createDraft() takes the WHOLE queue: there is no selection
- * step a UI could limit.
+ * `publishRootWithRevocations` caps nothing itself, and a batch past the block
+ * gas limit reverts WHOLESALE — nothing publishes at all. The cap lives here
+ * rather than in the portal because `createDraft()` takes the entire queue:
+ * there is no selection step a UI could limit.
+ *
+ * Measured in `blockchain/test/contracts/RootRegistry.revocation.test.ts`, on a
+ * linear ~93k gas per revocation:
+ *
+ *     50 → 4,743,185    100 → 9,369,525    150 → 13,996,021    180 → 16,771,994
+ *     190 and above → estimateGas itself fails on the dev network
+ *
+ * 150 is the largest rung still under half of a 30M block, which leaves room
+ * for a gas-price spike, for other transactions in the same block, and for a
+ * real mined call costing more than its estimate.
+ *
+ * Why 50 was too small: ~20,890 certificates are re-issued each month in HCMC
+ * (re-books, splits and merges = revoke + issue), which at 50 a round is ~418
+ * change sets a month — every one of them a publish and a wallet signature.
  */
-export const MAX_REVOCATIONS_PER_CHANGESET = 50;
+export const MAX_REVOCATIONS_PER_CHANGESET = 150;
 
 /** Arguments for `RootRegistry.publishRootWithRevocations`, index-aligned. */
 export interface RevocationCalldata {
@@ -79,15 +93,19 @@ export class ChangeSetService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tree: TreeService,
+    private readonly nodes: NodeStoreService,
     private readonly chain: ChainService,
     private readonly roots: RootService,
     private readonly lock: DraftLockService,
     private readonly events: PropertyEventService,
   ) {}
 
-  /** Everything currently eligible to go into the next change set. */
-  async pending(): Promise<{ transfers: TransferRequest[]; revocations: Revocation[] }> {
+  /** Everything currently eligible to go into the next change set, plus the cap (D73). */
+  async pending(): Promise<{
+    transfers: TransferRequest[];
+    revocations: Revocation[];
+    revocationCap: number;
+  }> {
     const [transfers, revocations] = await Promise.all([
       this.prisma.transferRequest.findMany({
         where: { status: 'APPROVED', changeSetId: null },
@@ -103,7 +121,7 @@ export class ChangeSetService {
         orderBy: { createdAt: 'asc' },
       }),
     ]);
-    return { transfers, revocations };
+    return { transfers, revocations, revocationCap: MAX_REVOCATIONS_PER_CHANGESET };
   }
 
   /**
@@ -132,24 +150,47 @@ export class ChangeSetService {
     // Checked against the WHOLE queue, deferred revocations included: a plot
     // transferred in this round and revoked in the next is the same conflict,
     // just spread over two publishes.
-    const seen = new Set<string>();
-    for (const item of [...transfers, ...pendingRevocations]) {
-      if (seen.has(item.propertyId)) {
+    // The message names what was actually found. The set used to be shared
+    // between both lists, so two queued transfers for one plot were reported as
+    // "a transfer and a revocation" — an officer sent looking for a revocation
+    // that does not exist. Keeping the two kinds apart costs one extra set and
+    // makes the error actionable.
+    const transferred = new Set<string>();
+    const revoked = new Set<string>();
+    for (const transfer of transfers) {
+      if (transferred.has(transfer.propertyId)) {
         throw new ConflictException(
-          `Property ${item.propertyId} has both a transfer and a revocation pending — ` +
-            `resolve the conflict before publishing.`,
+          `Property ${transfer.propertyId} has more than one approved transfer waiting — ` +
+          `reject all but one before publishing.`,
         );
       }
-      seen.add(item.propertyId);
+      transferred.add(transfer.propertyId);
+    }
+    for (const revocation of pendingRevocations) {
+      if (revoked.has(revocation.propertyId)) {
+        throw new ConflictException(
+          `Property ${revocation.propertyId} has more than one pending revocation — ` +
+          `reject all but one before publishing.`,
+        );
+      }
+      if (transferred.has(revocation.propertyId)) {
+        throw new ConflictException(
+          `Property ${revocation.propertyId} has both a transfer and a revocation pending — ` +
+          `resolve the conflict before publishing.`,
+        );
+      }
+      revoked.add(revocation.propertyId);
     }
 
     // D56 — oldest first (pending() orders by createdAt), the rest wait.
     const revocations = pendingRevocations.slice(0, MAX_REVOCATIONS_PER_CHANGESET);
 
-    // Apply every change in memory, then take ONE root from the result. N
-    // transfers and revocations batched together produce one root, not N.
-    const applied = await this.applyChangesInMemory(transfers, revocations);
-    const { tree } = await this.tree.buildFrom(applied);
+    // Project every change at once and take ONE root. N transfers and
+    // revocations batched together produce one root, not N. Only the plots in
+    // this round are read (D72) — the projection walks up from their leaves
+    // instead of rebuilding the registry.
+    const { updates } = await this.leafUpdatesFor(transfers, revocations);
+    const overlay = await this.nodes.projectRoot(updates);
 
     // No relation `connect` touches Property here — same reasoning as
     // IssuanceBatchService.createDraft(): only confirm() may write it, and
@@ -157,7 +198,7 @@ export class ChangeSetService {
     const draft = await this.prisma.changeSet.create({
       data: {
         status: 'DRAFT',
-        newRoot: tree.root.toString(),
+        newRoot: overlay.root.toString(),
         transfers: { connect: transfers.map((t) => ({ id: t.id })) },
         revocations: { connect: revocations.map((r) => ({ id: r.id })) },
       },
@@ -165,7 +206,7 @@ export class ChangeSetService {
 
     this.logger.log(
       `change set draft #${draft.id}: ${transfers.length} transfer(s), ` +
-        `${revocations.length} revocation(s), projected root ${tree.root}`,
+      `${revocations.length} revocation(s), projected root ${overlay.root}`,
     );
 
     return this.toDraftDetail(
@@ -264,48 +305,37 @@ export class ChangeSetService {
       draft.txHash = txHash;
     }
 
+    // D74 — the root read is cached for 2 seconds; a confirm must always ask
+    // the chain itself, or a just-mined publish can be reported as unmined.
+    this.chain.invalidateRootCache();
     const latestRoot = await this.chain.getLatestRoot();
     if (latestRoot.toString() !== draft.newRoot) {
       throw new UnprocessableEntityException(
         `On-chain latestRoot is ${latestRoot}, but this change set projects ${draft.newRoot}. ` +
-          `The publish transaction has not been mined, or a different root was published.`,
+        `The publish transaction has not been mined, or a different root was published.`,
       );
     }
     const rootVersion = await this.chain.getRootVersion();
 
-    // Snapshot "before" state for the history rows — previousOwnerCommitment /
-    // previousLeaf must reflect the tree as it stood before THIS round, not
-    // after (PropertyEventService writes only forward-looking rows).
-    const before = await this.prisma.property.findMany({
-      where: {
-        propertyId: {
-          in: [
-            ...draft.transfers.map((t) => t.propertyId),
-            ...draft.revocations.map((r) => r.propertyId),
-          ],
-        },
-      },
-    });
-    const beforeById = new Map(before.map((property) => [property.propertyId, property]));
-
-    const applied = await this.applyChangesInMemory(draft.transfers, draft.revocations);
-    const { tree, properties } = await this.tree.buildFrom(applied);
+    // `beforeById` is the "before" snapshot the history rows need:
+    // previousOwnerCommitment / previousLeaf must describe the tree as it stood
+    // before THIS round (PropertyEventService writes only forward-looking
+    // rows). It comes out of leafUpdatesFor because that call already has to
+    // read exactly these plots — reading them twice was the old shape.
+    const { updates, newLeaves, before: beforeById } = await this.leafUpdatesFor(
+      draft.transfers,
+      draft.revocations,
+    );
+    const overlay = await this.nodes.projectRoot(updates);
 
     // Paranoia that has already paid for itself once in IssuanceBatchService:
-    // if the rebuilt tree no longer matches the signed root, something moved
+    // if the re-projected root no longer matches the signed one, something moved
     // underneath the draft and applying it would corrupt the registry.
-    if (tree.root.toString() !== draft.newRoot) {
+    if (overlay.root.toString() !== draft.newRoot) {
       throw new UnprocessableEntityException(
-        `Rebuilt root ${tree.root} no longer matches the signed root ${draft.newRoot}. ` +
-          `Discard this change set and start again.`,
+        `Reprojected root ${overlay.root} no longer matches the signed root ${draft.newRoot}. ` +
+        `Discard this change set and start again.`,
       );
-    }
-
-    const newLeaves = new Map<string, string>();
-    for (const transfer of draft.transfers) {
-      const property = applied.find((p) => p.propertyId === transfer.propertyId)!;
-      const proof = await this.tree.proofFor(tree, property);
-      newLeaves.set(transfer.propertyId, proof.leaf.toString());
     }
 
     const decidedAt = new Date();
@@ -315,7 +345,11 @@ export class ChangeSetService {
         ...draft.transfers.map((transfer) =>
           this.prisma.property.update({
             where: { propertyId: transfer.propertyId },
-            data: { ownerCommitment: transfer.newOwnerCommitment },
+            data: {
+              ownerCommitment: transfer.newOwnerCommitment,
+              leaf: newLeaves.get(transfer.propertyId)!,
+              rootVersion,
+            },
           }),
         ),
         ...draft.transfers.map((transfer) =>
@@ -325,22 +359,14 @@ export class ChangeSetService {
           }),
         ),
 
-        // A revoked plot leaves the tree (status !== ISSUED, D45) and its cached
-        // proof is cleared: a cached path into a tree that no longer contains
-        // the leaf is worse than no cache at all, because it still looks
-        // answerable. merkleProof is a JSON column, so clearing it needs
-        // Prisma.DbNull — plain `null` would store the JSON value `null`, which
-        // still reads as "cached data present" to anything that only checks
-        // for column presence rather than its content.
+        // A revoked plot leaves the tree (status !== ISSUED, D45), and its leaf
+        // is cleared along with the root version that leaf belonged to. The
+        // node itself is deleted by `applyStatements` below — the two have to
+        // agree, or a row would claim a leaf the tree no longer holds.
         ...draft.revocations.map((revocation) =>
           this.prisma.property.update({
             where: { propertyId: revocation.propertyId },
-            data: {
-              status: 'REVOKED',
-              leaf: null,
-              merkleProof: Prisma.DbNull,
-              rootVersion: null,
-            },
+            data: { status: 'REVOKED', leaf: null, rootVersion: null },
           }),
         ),
         ...draft.revocations.map((revocation) =>
@@ -351,19 +377,16 @@ export class ChangeSetService {
         ),
 
         this.roots.recordRootStatement({
-          root: tree.root,
+          root: overlay.root,
           version: rootVersion,
           txHash: draft.txHash ?? '',
         }),
-        // Rewrites every remaining ISSUED property, not just this round's two
-        // lists — see the warning on RootService. `properties` here is already
-        // the full rebuilt tree membership: every previously issued plot this
-        // round left untouched, plus transferred plots (now carrying their new
-        // commitment), minus revoked ones (already dropped by
-        // applyChangesInMemory). Passing only draft.transfers/draft.revocations
-        // here would silently leave every untouched owner holding a proof
-        // against a superseded root.
-        ...(await this.roots.proofCacheStatements(tree, properties, rootVersion)),
+        // Writes exactly the nodes this round moved — O(k·TREE_DEPTH), not the
+        // whole registry (D72). Every other owner needs no write at all: their
+        // proof is read out of this same table when they ask for it. That is
+        // the difference between one publish touching a few thousand rows and
+        // one publish rewriting 2.5 million.
+        ...this.nodes.applyStatements(overlay),
 
         ...this.events.transferredStatements(
           draft.transfers.map((transfer) => ({
@@ -405,7 +428,7 @@ export class ChangeSetService {
 
     this.logger.log(
       `change set #${draft.id} confirmed at root version ${rootVersion}: ` +
-        `${draft.transfers.length} transfer(s), ${draft.revocations.length} revocation(s)`,
+      `${draft.transfers.length} transfer(s), ${draft.revocations.length} revocation(s)`,
     );
 
     return {
@@ -418,25 +441,74 @@ export class ChangeSetService {
   }
 
   /**
-   * The tree as it WOULD look with every pending change applied: transferred
-   * plots carry their new commitment, revoked plots are dropped entirely.
-   * Purely in memory — nothing here writes.
+   * Exactly what one publishing round needs to know: the new leaf of every
+   * transferred plot, `null` for every revoked one, and the "before" snapshot
+   * the history rows are written from.
+   *
+   * ⚠️ Reads ONLY the plots in the round. Before D72 this loaded the entire
+   * tree to rebuild a root; now `projectRoot()` walks up from these leaves, so
+   * reading one plot outside the round would be pure waste.
    */
-  private async applyChangesInMemory(
+  private async leafUpdatesFor(
     transfers: { propertyId: string; newOwnerCommitment: string }[],
     revocations: { propertyId: string }[],
-  ): Promise<Property[]> {
-    const current = await this.tree.loadIssuedProperties();
-    const newCommitments = new Map(transfers.map((t) => [t.propertyId, t.newOwnerCommitment]));
-    const revoked = new Set(revocations.map((r) => r.propertyId));
+  ): Promise<{
+    updates: Map<number, bigint | null>;
+    newLeaves: Map<string, string>;
+    before: Map<string, Property>;
+  }> {
+    const propertyIds = [
+      ...transfers.map((transfer) => transfer.propertyId),
+      ...revocations.map((revocation) => revocation.propertyId),
+    ];
+    const rows = await this.prisma.property.findMany({
+      where: { propertyId: { in: propertyIds } },
+    });
+    const before = new Map(rows.map((property) => [property.propertyId, property]));
 
-    return current
-      .filter((property) => !revoked.has(property.propertyId))
-      .map((property) =>
-        newCommitments.has(property.propertyId)
-          ? { ...property, ownerCommitment: newCommitments.get(property.propertyId)! }
-          : property,
+    const updates = new Map<number, bigint | null>();
+    const newLeaves = new Map<string, string>();
+
+    for (const transfer of transfers) {
+      const property = before.get(transfer.propertyId);
+      if (!property) {
+        throw new UnprocessableEntityException(
+          `Property ${transfer.propertyId} referenced by this round no longer exists. ` +
+          `Discard the draft and start again.`,
+        );
+      }
+      // ⚠️ The status check is load-bearing, and its absence would be silent.
+      // Before D72 this method rebuilt from `loadIssuedProperties()`, which
+      // filtered on ISSUED and therefore dropped a revoked plot by accident.
+      // Reading by propertyId does not, so an APPROVED transfer left dangling
+      // on a plot revoked in an EARLIER round would put its leaf back into the
+      // tree — resurrecting a certificate the State has already reclaimed.
+      // TransfersService.submit() refuses a revoked plot, but it cannot refuse
+      // one that was revoked after approval.
+      if (property.status !== 'ISSUED') {
+        throw new UnprocessableEntityException(
+          `Property ${transfer.propertyId} is ${property.status}, not ISSUED, so the approved ` +
+          `transfer for it cannot be published. Reject that transfer request first.`,
+        );
+      }
+      // Only `ownerCommitment` changes — every other leaf field is carried over
+      // from the stored row, which is what makes a transfer a transfer and not
+      // an edit (D41/§2.4).
+      const leaf = await hashRecord(
+        toLURRecord({ ...property, ownerCommitment: transfer.newOwnerCommitment }),
       );
+      updates.set(Number(transfer.propertyId), leaf);
+      newLeaves.set(transfer.propertyId, leaf.toString());
+    }
+
+    // Revocation = remove the leaf (D45). The enforcement lives here, not in
+    // the on-chain reason list: with no leaf there is no Merkle path, so no
+    // circuit can produce a proof for the plot afterwards.
+    for (const revocation of revocations) {
+      updates.set(Number(revocation.propertyId), null);
+    }
+
+    return { updates, newLeaves, before };
   }
 
   /**
