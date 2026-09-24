@@ -34,7 +34,6 @@
     "transfer:smoke": "ts-node scripts/tools/transferSmoke.ts",
     "owner:smoke": "ts-node scripts/tools/ownerSmoke.ts",
     "proof:bodies": "ts-node scripts/tools/proofBodies.ts",
-    "bundle:buyer": "ts-node scripts/tools/createBuyerBundle.ts",
     "bench:proof-load": "ts-node scripts/bench/proofLoad.ts",
     "bench:prove": "ts-node scripts/bench/proveBench.ts"
   },

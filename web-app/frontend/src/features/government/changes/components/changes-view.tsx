@@ -20,6 +20,8 @@
  *  5. A change set carries at most 150 revocations (D56 + D73); the rest wait
  *     and the draft reports them as deferredRevocations. The portal reads the
  *     number from `revocationCap` on pending-changes, never from a copy.
+ *  6. A round with transfers produces an archive of the buyers' bundles (D77),
+ *     downloadable from the history table for 7 days.
  */
 import type { Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';

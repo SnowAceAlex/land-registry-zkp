@@ -7,8 +7,13 @@
  * carries the revocation calldata to sign.
  */
 
-import { govDelete, govGet, govPost } from '../api/gov-client';
-import type { ChangeSetDraftDetail, DraftConfirmation, PendingChanges } from '../api/types';
+import { govDelete, govDownload, govGet, govPost } from '../api/gov-client';
+import type {
+  ChangeSetDraftDetail,
+  ChangeSetSummary,
+  DraftConfirmation,
+  PendingChanges,
+} from '../api/types';
 
 export function getPendingChanges(): Promise<PendingChanges> {
   return govGet<PendingChanges>('/government/pending-changes');
@@ -34,4 +39,14 @@ export function confirmChangeSetDraft(id: number, txHash?: string): Promise<Draf
 
 export function discardChangeSetDraft(id: number): Promise<{ discarded: number }> {
   return govDelete<{ discarded: number }>(`/government/changesets/${id}`);
+}
+
+/** Every change set, newest first — summary columns only (D77). */
+export function listChangeSets(): Promise<ChangeSetSummary[]> {
+  return govGet<ChangeSetSummary[]>('/government/changesets');
+}
+
+/** The buyers' bundles of one round, one folder per transferred plot (D77). */
+export function downloadChangeSetArchive(id: number): Promise<string> {
+  return govDownload(`/government/changesets/${id}/archive`);
 }

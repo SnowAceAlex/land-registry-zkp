@@ -42,6 +42,6 @@ import { ZipService } from './zip.service';
     ArchiveService,
     IssuanceBatchService,
   ],
-  exports: [IssuanceService, IssuerService, IssuanceBatchService],
+  exports: [IssuanceService, IssuerService, IssuanceBatchService, ArchiveService],
 })
 export class IssuanceModule {}

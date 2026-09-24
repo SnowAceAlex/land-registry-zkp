@@ -1,14 +1,15 @@
 /**
  * features/government/transfers/api.ts - UC-3 backend calls.
  *
- * Every route here is officer-only (D47). What crosses the network is public
- * by design: a commitment, a proof and its public signals. The two secrets the
- * proof was built from never appear in any request below.
+ * Every route here is officer-only (D47). The seller's secret never appears in
+ * any request below. The buyer's does, by design (D77): the registry issues it
+ * in the preview, exactly like an issuance round's secret, and it comes back
+ * with the proof so the change set's archive can deliver it to the buyer.
  */
 
 import type { Groth16Proof, PublicSignals } from '@land-registry/blockchain/shared';
 
-import { govDownload, govGet, govPost } from '../api/gov-client';
+import { govGet, govPost } from '../api/gov-client';
 import type {
   PropertyDetail,
   TransferPreview,
@@ -21,15 +22,16 @@ export function getPropertyDetail(propertyId: string): Promise<PropertyDetail> {
   return govGet<PropertyDetail>(`/government/properties/${encodeURIComponent(propertyId)}`);
 }
 
-/** POST /transfers/preview — both Merkle paths for the witness (D28 step 2). */
-export function previewTransfer(propertyId: string, newOwnerCommitment: string): Promise<TransferPreview> {
-  return govPost<TransferPreview>('/transfers/preview', { propertyId, newOwnerCommitment });
+/** POST /transfers/preview — both Merkle paths and the buyer's new secret (D28 step 2, D77). */
+export function previewTransfer(propertyId: string): Promise<TransferPreview> {
+  return govPost<TransferPreview>('/transfers/preview', { propertyId });
 }
 
 /** POST /transfers — queue a proof for approval (D28 step 3). */
 export function submitTransfer(body: {
   propertyId: string;
   newOwnerCommitment: string;
+  newOwnerSecret: string;
   proof: Groth16Proof;
   publicSignals: PublicSignals;
 }): Promise<TransferRequest> {
@@ -47,9 +49,4 @@ export function approveTransfer(id: number): Promise<{ id: number; status: Trans
 
 export function rejectTransfer(id: number, reason?: string): Promise<TransferRequest> {
   return govPost<TransferRequest>(`/transfers/${id}/reject`, reason ? { reason } : {});
-}
-
-/** The new owner's receipt.json + certificate.pdf once PUBLISHED (D51). */
-export function downloadBuyerBundle(id: number): Promise<string> {
-  return govDownload(`/transfers/${id}/bundle`);
 }

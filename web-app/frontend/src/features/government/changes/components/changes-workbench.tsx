@@ -7,6 +7,7 @@
  *   - an issuance draft is open  → blocked, with a link to it;
  *   - no draft                   → the queue and "Draft a change set".
  * Revocation requests can be queued in every state; they wait for a round.
+ * The history below lists every round with its buyers' archive (D77).
  */
 
 import { useState } from 'react';
@@ -33,6 +34,7 @@ import {
   discardChangeSetDraft,
   getPendingChanges,
 } from '../api';
+import { ChangeSetHistory } from './changeset-history';
 import { RevocationForm } from './revocation-form';
 
 type Strings = Dictionary['govChanges'];
@@ -65,6 +67,7 @@ export function ChangesWorkbench({
       queryClient.invalidateQueries({ queryKey: govKeys.openDraft }),
       queryClient.invalidateQueries({ queryKey: govKeys.status }),
       queryClient.invalidateQueries({ queryKey: govKeys.pendingChanges }),
+      queryClient.invalidateQueries({ queryKey: govKeys.changeSets }),
       queryClient.invalidateQueries({ queryKey: ['gov', 'transfers'] }),
     ]);
   }
@@ -130,6 +133,9 @@ export function ChangesWorkbench({
             summary={<DraftSummary draft={draft} t={t} />}
             warnings={
               <>
+                {draft.transferIds.length > 0 ? (
+                  <Notice tone="warning" title={t.archiveWarning} />
+                ) : null}
                 {draft.revocationIds.length > 0 ? (
                   <Notice tone="warning" title={t.revocationsPermanent} />
                 ) : null}
@@ -171,6 +177,8 @@ export function ChangesWorkbench({
       </div>
 
       <RevocationForm t={t} errors={errors} />
+
+      <ChangeSetHistory t={t} errors={errors} />
     </div>
   );
 }

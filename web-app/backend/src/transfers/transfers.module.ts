@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 
 import { ChainModule } from '../chain/chain.module';
 import { IssuanceModule } from '../issuance/issuance.module';
-import { TransferBundleService } from './transfer-bundle.service';
 import { TransfersController } from './transfers.controller';
 import { TransfersService } from './transfers.service';
 import { TreeModule } from '../tree/tree.module';
@@ -20,13 +19,12 @@ import { TreeModule } from '../tree/tree.module';
  * the change goes on chain later, batched into a ChangeSet. That is why this module
  * no longer needs GovernmentModule/RootService.
  *
- * IssuanceModule is imported for the buyer bundle (D51): the receipt and
- * certificate a new owner downloads are built by the same IssuanceService that
- * builds an issued owner's, so the two formats cannot drift apart.
+ * IssuanceModule is imported for the buyer's secret (D77): it is issued by the
+ * same IssuanceService.generateOwnerSecret() as an issuance round's.
  */
 @Module({
   imports: [ChainModule, TreeModule, IssuanceModule],
   controllers: [TransfersController],
-  providers: [TransfersService, TransferBundleService],
+  providers: [TransfersService],
 })
 export class TransfersModule {}

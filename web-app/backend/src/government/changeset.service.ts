@@ -1,19 +1,24 @@
 import {
   ConflictException,
+  GoneException,
   Injectable,
   Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ChangeSet, Property, Revocation, TransferRequest } from '@prisma/client';
-import { hashRecord } from '@land-registry/blockchain/shared';
+import { ChangeSet, DraftStatus, Property, Revocation, TransferRequest } from '@prisma/client';
+import { type TreeOverlay, hashRecord } from '@land-registry/blockchain/shared';
 
 import { ChainService } from '../chain/chain.service';
 import { DraftLockService } from '../common/draft-lock.service';
+import { ARCHIVE_TTL_DAYS, ArchiveEntry, ArchiveService } from '../issuance/archive.service';
+import { IssuanceService } from '../issuance/issuance.service';
 import { PropertyEventService } from '../history/property-event.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeStoreService } from '../tree/node-store.service';
 import { toLURRecord } from '../records/record.mapper';
+import { TransferRequestDto } from '../transfers/dto/transfer.response.dto';
+import { toTransferRequestDto } from '../transfers/transfer-request.serializer';
 import { RootService } from './root.service';
 
 /**
@@ -45,6 +50,20 @@ export interface RevocationCalldata {
   propertyIds: string[];
   reasonCodes: number[];
   detailHashes: string[];
+}
+
+/** Summary row for `list()` — deliberately excludes `archiveZip` (D77). */
+export interface ChangeSetSummary {
+  id: number;
+  status: DraftStatus;
+  newRoot: string;
+  rootVersion: number | null;
+  txHash: string | null;
+  createdAt: Date;
+  publishedAt: Date | null;
+  archiveExpiresAt: Date | null;
+  transferCount: number;
+  revocationCount: number;
 }
 
 /** What a portal needs to sign (or resume signing) a change-set draft (D53). */
@@ -86,6 +105,11 @@ export interface ChangeSetDraftDetail {
  * produce a proof for it afterwards. The on-chain `revocations` mapping this
  * draft's calldata feeds is for public auditability, not enforcement —
  * enforcement is already free.
+ *
+ * Since D77 a round with transfers also produces an archive: each transferred
+ * plot's folder holds the buyer's receipt, secret, certificate and README,
+ * exactly like an issuance folder, and the secrets leave the TransferRequest
+ * rows in the same transaction that stores it.
  */
 @Injectable()
 export class ChangeSetService {
@@ -98,14 +122,30 @@ export class ChangeSetService {
     private readonly roots: RootService,
     private readonly lock: DraftLockService,
     private readonly events: PropertyEventService,
+    private readonly issuance: IssuanceService,
+    private readonly archive: ArchiveService,
   ) {}
 
-  /** Everything currently eligible to go into the next change set, plus the cap (D73). */
+  /**
+   * Everything eligible for the next change set, as the portal sees it, plus
+   * the cap (D73). Transfers go through toTransferRequestDto: the rows hold the
+   * buyers' secrets until a change set archives them (D77).
+   */
   async pending(): Promise<{
-    transfers: TransferRequest[];
+    transfers: TransferRequestDto[];
     revocations: Revocation[];
     revocationCap: number;
   }> {
+    const { transfers, revocations } = await this.queue();
+    return {
+      transfers: transfers.map(toTransferRequestDto),
+      revocations,
+      revocationCap: MAX_REVOCATIONS_PER_CHANGESET,
+    };
+  }
+
+  /** The raw queue — rows with their secrets, for this service only. */
+  private async queue(): Promise<{ transfers: TransferRequest[]; revocations: Revocation[] }> {
     const [transfers, revocations] = await Promise.all([
       this.prisma.transferRequest.findMany({
         where: { status: 'APPROVED', changeSetId: null },
@@ -121,7 +161,7 @@ export class ChangeSetService {
         orderBy: { createdAt: 'asc' },
       }),
     ]);
-    return { transfers, revocations, revocationCap: MAX_REVOCATIONS_PER_CHANGESET };
+    return { transfers, revocations };
   }
 
   /**
@@ -134,7 +174,7 @@ export class ChangeSetService {
   async createDraft(): Promise<ChangeSetDraftDetail> {
     await this.lock.assertNoOpenDraft();
 
-    const { transfers, revocations: pendingRevocations } = await this.pending();
+    const { transfers, revocations: pendingRevocations } = await this.queue();
     if (transfers.length === 0 && pendingRevocations.length === 0) {
       throw new ConflictException('Nothing to publish — no approved transfers, no revocations');
     }
@@ -182,7 +222,19 @@ export class ChangeSetService {
       revoked.add(revocation.propertyId);
     }
 
-    // D56 — oldest first (pending() orders by createdAt), the rest wait.
+    // D77 — the buyer's secret travels with the request into this round's
+    // archive. A request submitted before D77 has none (the buyer took it home
+    // from the counter), and publishing its commitment would leave a plot whose
+    // archive holds no key. Refuse and name them.
+    const secretless = transfers.filter((transfer) => transfer.newOwnerSecret === null);
+    if (secretless.length > 0) {
+      throw new ConflictException(
+        `Transfer request(s) ${secretless.map((t) => `#${t.id}`).join(', ')} carry no buyer ` +
+          `secret — they were submitted before D77. Reject them and redo the transfers at the counter.`,
+      );
+    }
+
+    // D56 — oldest first (queue() orders by createdAt), the rest wait.
     const revocations = pendingRevocations.slice(0, MAX_REVOCATIONS_PER_CHANGESET);
 
     // Project every change at once and take ONE root. N transfers and
@@ -295,6 +347,16 @@ export class ChangeSetService {
       throw new ConflictException(`Change set #${id} is already ${draft.status}`);
     }
 
+    // Same rule as createDraft(), re-checked because a draft may predate D77.
+    // Before the chain read: nothing about this draft can be applied anyway.
+    const secretless = draft.transfers.filter((transfer) => transfer.newOwnerSecret === null);
+    if (secretless.length > 0) {
+      throw new UnprocessableEntityException(
+        `Transfer request(s) ${secretless.map((t) => `#${t.id}`).join(', ')} in change set #${id} ` +
+          `carry no buyer secret. Discard this change set, reject them, and redo them at the counter.`,
+      );
+    }
+
     // `txHash` is a label for humans — surfaced later in history views so a
     // reader can jump to a block explorer — never evidence that the publish
     // happened. That authority stays exactly the chain read immediately
@@ -339,6 +401,20 @@ export class ChangeSetService {
     }
 
     const decidedAt = new Date();
+    const archiveZip =
+      draft.transfers.length > 0
+        ? await this.buildArchive({
+            changeSetId: draft.id,
+            txHash: draft.txHash,
+            rootVersion,
+            overlay,
+            transfers: draft.transfers,
+            before: beforeById,
+            newLeaves,
+            publishedAt: decidedAt,
+          })
+        : null;
+    const archiveExpiresAt = new Date(decidedAt.getTime() + ARCHIVE_TTL_DAYS * 24 * 60 * 60 * 1000);
 
     try {
       await this.prisma.$transaction([
@@ -355,7 +431,9 @@ export class ChangeSetService {
         ...draft.transfers.map((transfer) =>
           this.prisma.transferRequest.update({
             where: { id: transfer.id },
-            data: { status: 'PUBLISHED', txHash: draft.txHash, decidedAt },
+            // D77 — the secret's copy of record is now the archive written by
+            // the changeSet update below, in this same transaction.
+            data: { status: 'PUBLISHED', txHash: draft.txHash, decidedAt, newOwnerSecret: null },
           }),
         ),
 
@@ -413,7 +491,18 @@ export class ChangeSetService {
 
         this.prisma.changeSet.update({
           where: { id: draft.id },
-          data: { status: 'PUBLISHED', rootVersion, publishedAt: decidedAt, txHash: draft.txHash },
+          data: {
+            status: 'PUBLISHED',
+            rootVersion,
+            publishedAt: decidedAt,
+            txHash: draft.txHash,
+            // Same rule as IssuanceBatchService.confirm(): the secrets are
+            // cleared above only because this archive lands in the same
+            // transaction. Buffer IS a Uint8Array; see the cast there.
+            ...(archiveZip
+              ? { archiveZip: archiveZip as Uint8Array<ArrayBuffer>, archiveExpiresAt }
+              : {}),
+          },
         }),
       ]);
     } catch (error) {
@@ -512,6 +601,67 @@ export class ChangeSetService {
   }
 
   /**
+   * The buyers' bundles for this round (D77): one folder per transferred plot,
+   * the same four files as an issuance folder, built by the same
+   * IssuanceService.buildBundleFiles so the two formats cannot drift apart.
+   *
+   * Every path comes from the projected overlay, never from the node table:
+   * applyStatements has not run yet, so the table still holds the tree as it
+   * stood BEFORE this round, and a receipt built from it would not verify
+   * against the root that was just signed.
+   */
+  private async buildArchive(input: {
+    changeSetId: number;
+    txHash: string | null;
+    rootVersion: number;
+    overlay: TreeOverlay;
+    transfers: { propertyId: string; newOwnerCommitment: string; newOwnerSecret: string | null }[];
+    before: Map<string, Property>;
+    newLeaves: Map<string, string>;
+    publishedAt: Date;
+  }): Promise<Buffer> {
+    const { issuer, issuedOn } = this.issuance.batchContext();
+    const context = {
+      rootVersion: input.rootVersion,
+      merkleRoot: input.overlay.root,
+      transactionHash: input.txHash ?? '',
+      contractAddress: this.chain.rootRegistryAddress,
+      explorerTxUrlPrefix: this.chain.explorerTxUrlPrefix,
+    };
+
+    const entries: ArchiveEntry[] = [];
+    for (const transfer of input.transfers) {
+      const property = {
+        ...input.before.get(transfer.propertyId)!,
+        ownerCommitment: transfer.newOwnerCommitment,
+      };
+      const leaf = BigInt(input.newLeaves.get(transfer.propertyId)!);
+      const merkleProof = await this.nodes.proofInOverlay(property, leaf, input.overlay);
+      const built = await this.issuance.buildBundleFiles(
+        { property, ownerSecret: BigInt(transfer.newOwnerSecret!), merkleProof },
+        context,
+        issuer,
+        issuedOn,
+      );
+      entries.push({
+        propertyId: property.propertyId,
+        certificateSerial: property.certificateSerial,
+        leaf: leaf.toString(),
+        files: built.files,
+      });
+    }
+
+    return this.archive.build({
+      kind: 'changeset',
+      batchId: input.changeSetId,
+      rootVersion: input.rootVersion,
+      txHash: input.txHash,
+      publishedAt: input.publishedAt,
+      entries,
+    });
+  }
+
+  /**
    * Abandon a draft. Nothing was ever written to Property, TransferRequest or
    * Revocation — only `connect`ed to this draft — so releasing the relation is
    * enough to return them to `pending()`.
@@ -531,5 +681,47 @@ export class ChangeSetService {
       where: { id },
       data: { status: 'DISCARDED', transfers: { set: [] }, revocations: { set: [] } },
     });
+  }
+
+  /** Every change set, newest first. Summary columns only — never `archiveZip` (D77). */
+  async list(): Promise<ChangeSetSummary[]> {
+    const rows = await this.prisma.changeSet.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        newRoot: true,
+        rootVersion: true,
+        txHash: true,
+        createdAt: true,
+        publishedAt: true,
+        archiveExpiresAt: true,
+        _count: { select: { transfers: true, revocations: true } },
+      },
+    });
+    return rows.map(({ _count, ...row }) => ({
+      ...row,
+      transferCount: _count.transfers,
+      revocationCount: _count.revocations,
+    }));
+  }
+
+  /** The buyers' archive, while it still exists. An expired archive is gone for good. */
+  async archiveFor(id: number): Promise<{ zip: Buffer; filename: string }> {
+    const changeSet = await this.prisma.changeSet.findUnique({
+      where: { id },
+      select: { archiveZip: true, archiveExpiresAt: true },
+    });
+    if (!changeSet || !changeSet.archiveZip) {
+      throw new NotFoundException(`Change set #${id} has no archive`);
+    }
+    if (changeSet.archiveExpiresAt && changeSet.archiveExpiresAt.getTime() < Date.now()) {
+      await this.prisma.changeSet.update({ where: { id }, data: { archiveZip: null } });
+      throw new GoneException(
+        `The archive for change set #${id} expired on ${changeSet.archiveExpiresAt.toISOString()}. ` +
+          `The buyers' secrets are unrecoverable — the affected plots must be re-issued.`,
+      );
+    }
+    return { zip: Buffer.from(changeSet.archiveZip), filename: `changeset-${id}.zip` };
   }
 }

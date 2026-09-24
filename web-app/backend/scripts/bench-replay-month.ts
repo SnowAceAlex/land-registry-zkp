@@ -47,7 +47,7 @@ dotenv.config({ path: path.resolve(__dirname, '..', '..', '..', '.env') });
 // From `bench-secret`, NOT from `bench-seed-genesis`: the seeder imports
 // AppModule at the top level, so importing it here would boot a second Nest
 // context with its own RPC connection and database pool.
-import { nextOwnerCommitment } from './bench-secret';
+import { nextOwnerCommitment, nextOwnerSecret } from './bench-secret';
 
 const TRANSFERS = Number(process.env.TRANSFERS ?? 65_868);
 const REVOCATIONS = Number(process.env.REVOCATIONS ?? 20_890);
@@ -241,10 +241,14 @@ async function main(): Promise<void> {
     // Transfers go straight in as APPROVED (see assumption 2). The new owner
     // commitment is REAL — the projected root has to be correct or confirm()
     // rejects the round, which would make the whole measurement meaningless.
+    // Its secret is stored too: since D77 confirm() archives it for the buyer
+    // and refuses a round that has none.
     const rows: Prisma.Sql[] = [];
     for (const { propertyId, ownerCommitment } of todayTransfers) {
+      const secret = await nextOwnerSecret(ownerCommitment!);
       rows.push(Prisma.sql`(
-        ${propertyId}, ${await nextOwnerCommitment(ownerCommitment!)}, ${'0'}, ${'0'},
+        ${propertyId}, ${await nextOwnerCommitment(ownerCommitment!)}, ${secret.toString()},
+        ${'0'}, ${'0'},
         ${'{}'}::jsonb, ${'[]'}::jsonb, ${'APPROVED'}::"TransferStatus",
         ${new Date().toISOString()}::timestamp
       )`);
@@ -252,7 +256,7 @@ async function main(): Promise<void> {
     for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
       await prisma.$executeRaw(
         Prisma.sql`INSERT INTO transfer_requests (
-          "propertyId", "newOwnerCommitment", "oldRoot", "newRoot",
+          "propertyId", "newOwnerCommitment", "newOwnerSecret", "oldRoot", "newRoot",
           "proof", "publicSignals", "status", "createdAt"
         ) VALUES ${Prisma.join(rows.slice(i, i + INSERT_CHUNK))}`,
       );

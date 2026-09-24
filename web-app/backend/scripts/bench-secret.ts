@@ -39,6 +39,15 @@ export async function benchOwnerSecret(propertyId: bigint): Promise<bigint> {
  * Still fully deterministic: same starting state, same sequence of roots.
  */
 export async function nextOwnerCommitment(currentCommitment: string): Promise<string> {
-  const nextSecret = await poseidonHash([BigInt(currentCommitment), BENCH_SECRET_SEED]);
-  return (await poseidonHash([nextSecret])).toString();
+  return (await poseidonHash([await nextOwnerSecret(currentCommitment)])).toString();
+}
+
+/**
+ * The secret behind `nextOwnerCommitment` — same chaining, same determinism.
+ *
+ * Since D77 a queued transfer carries the buyer's secret (ChangeSetService
+ * refuses a round with a secretless transfer), so the bench has to store it.
+ */
+export async function nextOwnerSecret(currentCommitment: string): Promise<bigint> {
+  return poseidonHash([BigInt(currentCommitment), BENCH_SECRET_SEED]);
 }

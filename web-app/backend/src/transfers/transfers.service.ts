@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Property, TransferStatus } from '@prisma/client';
 import {
+  BN254_FIELD_MODULUS,
   Groth16Proof,
   PublicSignals,
   assertProofFresh,
@@ -19,6 +20,7 @@ import {
 
 import { ChainService, ProofRejectedError } from '../chain/chain.service';
 import { blockchainDir } from '../common/paths';
+import { IssuanceService } from '../issuance/issuance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeStoreService } from '../tree/node-store.service';
 import { toLURRecord } from '../records/record.mapper';
@@ -28,6 +30,7 @@ import {
   TransferPreviewResult,
   TransferRequestDto,
 } from './dto/transfer.response.dto';
+import { toTransferRequestDto } from './transfer-request.serializer';
 
 /**
  * TransfersService — the two-part transfer flow of D28.
@@ -35,7 +38,9 @@ import {
  * Part 1 (preview) is automatic and public: computing what the tree would look
  * like after the transfer reveals nothing and needs no judgement. Without it
  * the two parties simply cannot run transfer.circom — the new Merkle path is a
- * private input only the registry can compute.
+ * private input only the registry can compute. Since D77 it also issues the
+ * buyer's secret, which submit stores with the request and the change set's
+ * archive delivers — the same path an issued owner's secret takes.
  *
  * Part 2 (approve) requires a human at the authority. A transfer proof shows
  * that someone holds the old owner's secret; it cannot show that they are the
@@ -57,6 +62,7 @@ export class TransfersService {
     private readonly prisma: PrismaService,
     private readonly nodes: NodeStoreService,
     private readonly chain: ChainService,
+    private readonly issuance: IssuanceService,
   ) {}
 
   /**
@@ -71,18 +77,27 @@ export class TransfersService {
   async preview(dto: TransferPreviewDto): Promise<TransferPreviewResult> {
     const property = await this.requireTransferableProperty(dto.propertyId);
 
+    // D77 — the buyer's secret is issued here, by the same generator and to the
+    // same 248-bit bound as an issuance round's (D14). Nothing is stored: the
+    // secret comes back with the proof at submit and is saved in that same
+    // insert, so an abandoned preview leaves no row behind.
+    const newOwnerSecret = this.issuance.generateOwnerSecret();
+    const newOwnerCommitment = (await this.issuance.commitmentFor(newOwnerSecret)).toString();
+
     const oldProof = await this.nodes.proofFor(property);
 
     // Only `ownerCommitment` may differ — transfer.circom derives both leaves
     // from one set of record-field signals (D41/§2.4), so the projection swaps
     // that single field and leaves the leaf in its propertyId slot.
-    const moved = { ...property, ownerCommitment: dto.newOwnerCommitment };
+    const moved = { ...property, ownerCommitment: newOwnerCommitment };
     const newLeaf = await hashRecord(toLURRecord(moved));
     const overlay = await this.nodes.projectRoot(new Map([[Number(dto.propertyId), newLeaf]]));
     const newProof = await this.nodes.proofInOverlay(property, newLeaf, overlay);
 
     return {
       propertyId: dto.propertyId,
+      newOwnerSecret: newOwnerSecret.toString(),
+      newOwnerCommitment,
       rootVersion: await this.chain.getRootVersion(),
       oldMerkleRoot: oldProof.root.toString(),
       newMerkleRoot: overlay.root.toString(),
@@ -104,6 +119,7 @@ export class TransfersService {
     const publicSignals = dto.publicSignals as PublicSignals;
 
     this.assertSignalsMatch(publicSignals, dto);
+    await this.assertSecretOpensCommitment(dto.newOwnerSecret, dto.newOwnerCommitment);
     await this.verifyOffChain(proof, publicSignals);
 
     const latestRoot = await this.chain.getLatestRoot();
@@ -133,23 +149,26 @@ export class TransfersService {
       );
     }
 
-    return this.prisma.transferRequest.create({
+    const created = await this.prisma.transferRequest.create({
       data: {
         propertyId: dto.propertyId,
         newOwnerCommitment: dto.newOwnerCommitment,
+        newOwnerSecret: dto.newOwnerSecret,
         oldRoot: publicSignals[OLD_ROOT],
         newRoot: publicSignals[NEW_ROOT],
         proof: dto.proof as object,
         publicSignals: dto.publicSignals as object,
       },
     });
+    return toTransferRequestDto(created);
   }
 
   async list(status?: TransferStatus): Promise<TransferRequestDto[]> {
-    return this.prisma.transferRequest.findMany({
+    const rows = await this.prisma.transferRequest.findMany({
       where: status ? { status } : undefined,
       orderBy: { createdAt: 'desc' },
     });
+    return rows.map(toTransferRequestDto);
   }
 
   /**
@@ -223,14 +242,18 @@ export class TransfersService {
 
   async reject(id: number, reason?: string): Promise<TransferRequestDto> {
     const request = await this.requirePendingRequest(id);
-    return this.prisma.transferRequest.update({
+    const updated = await this.prisma.transferRequest.update({
       where: { id: request.id },
       data: {
         status: TransferStatus.REJECTED,
         rejectReason: reason ?? 'Rejected by the issuing authority',
+        // D77 — a rejected commitment never reaches the chain, so its secret
+        // has no further use.
+        newOwnerSecret: null,
         decidedAt: new Date(),
       },
     });
+    return toTransferRequestDto(updated);
   }
 
   /**
@@ -249,6 +272,23 @@ export class TransfersService {
     const valid = await verifyGroth16Proof(vkeyPath, publicSignals, proof);
     if (!valid) {
       throw new UnprocessableEntityException('The transfer proof is not cryptographically valid');
+    }
+  }
+
+  /**
+   * D77 — the secret stored with a request must open its commitment, or the
+   * change set's archive would hand the buyer a key to nothing. Bounded below
+   * the BN254 field because Poseidon reduces its input: a value ≥ p opens the
+   * same commitment as its residue, while the owner's proofs would later be
+   * built from a different number.
+   */
+  private async assertSecretOpensCommitment(secret: string, commitment: string): Promise<void> {
+    const value = BigInt(secret);
+    if (value <= 0n || value >= BN254_FIELD_MODULUS) {
+      throw new BadRequestException('newOwnerSecret must be a field element in (0, p)');
+    }
+    if ((await this.issuance.commitmentFor(value)).toString() !== commitment) {
+      throw new BadRequestException('newOwnerSecret does not open newOwnerCommitment');
     }
   }
 

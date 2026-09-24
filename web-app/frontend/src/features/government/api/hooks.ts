@@ -22,6 +22,7 @@ export const govKeys = {
   properties: (status: string, skip: number) => ['gov', 'properties', status, skip] as const,
   issuanceBatches: ['gov', 'issuance-batches'] as const,
   pendingChanges: ['gov', 'pending-changes'] as const,
+  changeSets: ['gov', 'changesets'] as const,
 };
 
 /** GET /government/status — chain identity (D54) and the on-chain root. */
