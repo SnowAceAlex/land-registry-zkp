@@ -76,3 +76,31 @@ describe('TtlCache', () => {
     expect(results.map((r) => r.status)).toEqual(['rejected', 'rejected']);
   });
 });
+
+describe('TtlCache under a failing loader (the Sepolia case)', () => {
+  it('keeps serving the cached value while it is still fresh, even if the next load would fail', async () => {
+    // The shape that matters on a real network: the RPC is intermittent, and a
+    // request that arrives inside the TTL must not be dragged into the failure.
+    let now = 1_000;
+    const cache = new TtlCache<string>(2_000, () => now);
+
+    expect(await cache.get(async () => 'v1')).toBe('v1');
+    now = 2_000;
+    expect(await cache.get(async () => Promise.reject(new Error('rpc down')))).toBe('v1');
+  });
+
+  it('surfaces the failure once the value has expired, rather than serving it stale', async () => {
+    // Deliberate: a stale root would make `inSync` and `rootVersion` lie. The
+    // caller turns this into a 503 (ChainService.asServiceUnavailable), which
+    // says "retry" — a stale-but-plausible answer would say nothing at all.
+    let now = 1_000;
+    const cache = new TtlCache<string>(2_000, () => now);
+
+    await cache.get(async () => 'v1');
+    now = 5_000;
+
+    await expect(cache.get(async () => Promise.reject(new Error('rpc down')))).rejects.toThrow(
+      'rpc down',
+    );
+  });
+});

@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ethers } from 'ethers';
 import {
   LandRegistryVerifier,
@@ -166,10 +166,40 @@ export class ChainService implements OnModuleInit {
    * and enough to put a wrong number into a refreshed receipt.
    */
   async getRoot(): Promise<{ root: bigint; version: number }> {
-    return this.rootCache.get(async () => ({
-      root: BigInt(await this.registry.latestRoot()),
-      version: Number(await this.registry.rootVersion()),
-    }));
+    return this.rootCache.get(async () =>
+      this.asServiceUnavailable(async () => ({
+        root: BigInt(await this.registry.latestRoot()),
+        version: Number(await this.registry.rootVersion()),
+      })),
+    );
+  }
+
+  /**
+   * Turn an unreachable or slow RPC into a 503, never a 500.
+   *
+   * ⚠️ Found on Sepolia, and unreachable on a local node: a read that times out
+   * upstream used to propagate as an unhandled error, so the UNAUTHENTICATED
+   * `GET /api/proof/:propertyId` answered a citizen with "Internal server
+   * error". That is wrong twice over — the server is not broken, and the caller
+   * is told nothing they can act on. A 503 says "the registry could not reach
+   * the chain, try again", which is both true and actionable.
+   *
+   * Measured cost of the underlying call on Sepolia: p50 2,883 ms, up to
+   * 4,560 ms, versus 6 ms when the 2-second cache answers (D74). The cache is
+   * what keeps that latency off the hot path; this is what keeps a failure from
+   * looking like a defect.
+   */
+  private async asServiceUnavailable<T>(read: () => Promise<T>): Promise<T> {
+    try {
+      return await read();
+    } catch (error) {
+      const message = (error as Error)?.message ?? 'unknown error';
+      this.logger.error(`chain read failed against ${this.network}: ${message}`);
+      throw new ServiceUnavailableException(
+        `The registry could not reach the blockchain (${this.network}). This is usually ` +
+          `transient — retry in a few seconds.`,
+      );
+    }
   }
 
   /** Current effective root, as the bigint the Merkle layer speaks in. */

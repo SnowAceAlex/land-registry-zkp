@@ -56,6 +56,20 @@ const API_BASE = process.env.API_BASE ?? 'http://localhost:3001/api';
 const API_KEY = process.env.GOV_API_KEY ?? '';
 const INSERT_CHUNK = 1_000;
 
+/**
+ * Which `sign:root` variant to run.
+ *
+ * ⚠️ `sign:root` is hardcoded to `--network localhost`. Running it while the
+ * backend talks to Sepolia publishes the root to the WRONG CHAIN, and confirm()
+ * then refuses the round — correctly, and confusingly, because the message says
+ * the transaction "has not been mined" when in fact it was mined somewhere
+ * else. The network has to be chosen here, from the same variable the backend
+ * was started with.
+ */
+const SIGN_SCRIPT = (process.env.CHAIN_NETWORK ?? 'localhost') === 'sepolia'
+  ? 'sign:root:sepolia'
+  : 'sign:root';
+
 interface DayResult {
   day: number;
   transfers: number;
@@ -67,6 +81,12 @@ interface DayResult {
   confirmMs: number;
   gasUsed: string;
   rootVersion: number;
+  /**
+   * Needed to reconstruct the real cost afterwards: `gasUsed × effectiveGasPrice`
+   * only exists on the receipt, and on a public chain the receipt is the only
+   * record of what was actually paid.
+   */
+  txHash: string;
 }
 
 /**
@@ -148,7 +168,7 @@ function signRoot(
   newRoot: string,
   revocations?: unknown,
 ): { txHash: string; gasUsed: string; rootVersion: number } {
-  const out = execFileSync('pnpm', ['--filter', 'blockchain', 'run', 'sign:root'], {
+  const out = execFileSync('pnpm', ['--filter', 'blockchain', 'run', SIGN_SCRIPT], {
     env: {
       ...process.env,
       NEW_ROOT: newRoot,
@@ -181,7 +201,9 @@ async function main(): Promise<void> {
   const needed = TRANSFERS + REVOCATIONS;
   const pool_ = await prisma.property.findMany({
     where: { status: 'ISSUED' },
-    select: { propertyId: true },
+    // The current commitment is needed: the next owner is chained from it, so
+    // that replaying against an already-replayed database still moves each leaf.
+    select: { propertyId: true, ownerCommitment: true },
     orderBy: { id: 'asc' },
     take: needed,
   });
@@ -198,7 +220,8 @@ async function main(): Promise<void> {
 
   console.log(
     `  replaying ${TRANSFERS.toLocaleString('en-US')} transfers + ` +
-      `${REVOCATIONS.toLocaleString('en-US')} revocations over ${DAYS} working day(s)`,
+      `${REVOCATIONS.toLocaleString('en-US')} revocations over ${DAYS} working day(s), ` +
+      `signing via ${SIGN_SCRIPT}`,
   );
 
   const days: DayResult[] = [];
@@ -219,9 +242,9 @@ async function main(): Promise<void> {
     // commitment is REAL — the projected root has to be correct or confirm()
     // rejects the round, which would make the whole measurement meaningless.
     const rows: Prisma.Sql[] = [];
-    for (const { propertyId } of todayTransfers) {
+    for (const { propertyId, ownerCommitment } of todayTransfers) {
       rows.push(Prisma.sql`(
-        ${propertyId}, ${await nextOwnerCommitment(propertyId)}, ${'0'}, ${'0'},
+        ${propertyId}, ${await nextOwnerCommitment(ownerCommitment!)}, ${'0'}, ${'0'},
         ${'{}'}::jsonb, ${'[]'}::jsonb, ${'APPROVED'}::"TransferStatus",
         ${new Date().toISOString()}::timestamp
       )`);
@@ -283,6 +306,7 @@ async function main(): Promise<void> {
       confirmMs,
       gasUsed: signed.gasUsed,
       rootVersion: signed.rootVersion,
+      txHash: signed.txHash,
     });
 
     console.log(

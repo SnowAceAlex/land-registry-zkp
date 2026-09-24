@@ -27,12 +27,18 @@ export async function benchOwnerSecret(propertyId: bigint): Promise<bigint> {
 }
 
 /**
- * The commitment of the plot's NEXT owner — one step along the same chain.
+ * The commitment of the plot's NEXT owner, derived from its CURRENT one.
  *
- * Deterministic so a replay can be re-run against a freshly seeded database and
- * produce exactly the same roots.
+ * ⚠️ Chained from the current commitment, not from the propertyId. An earlier
+ * version derived it from the plot id alone, which meant transferring a plot
+ * twice produced the same commitment the second time — the leaf did not move,
+ * the projected root equalled the published one, and `publishRoot` reverted
+ * with `DuplicateRoot`. That makes a replay un-re-runnable against a database
+ * that has already been replayed once.
+ *
+ * Still fully deterministic: same starting state, same sequence of roots.
  */
-export async function nextOwnerCommitment(propertyId: string): Promise<string> {
-  const nextSecret = await poseidonHash([await benchOwnerSecret(BigInt(propertyId)), 1n]);
+export async function nextOwnerCommitment(currentCommitment: string): Promise<string> {
+  const nextSecret = await poseidonHash([BigInt(currentCommitment), BENCH_SECRET_SEED]);
   return (await poseidonHash([nextSecret])).toString();
 }
