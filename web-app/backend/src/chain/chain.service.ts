@@ -39,14 +39,34 @@ import { TtlCache } from '../common/ttl-cache';
 export type { ChainNetwork, DeploymentRecord };
 
 /**
- * How long a read of the current root stays good (D74).
+ * How long a read of the current root stays FRESH (D74).
  *
- * 2 seconds: short enough that correctness never has to be reasoned about —
- * every write path calls `invalidateRootCache()` immediately before reading —
- * and long enough that a 100 req/s burst costs at most one RPC call a second
- * instead of two hundred.
+ * 10 seconds. The root changes about six times a working day (D73), so ten
+ * seconds is far inside what is actually true — the number is not chosen for
+ * accuracy but to bound how often the RPC is touched at all.
  */
-const ROOT_CACHE_TTL_MS = 2_000;
+const ROOT_CACHE_TTL_MS = 10_000;
+
+/**
+ * How long a root may still be SERVED while it is refreshed in the background.
+ *
+ * ⚠️ This, not the TTL, is what fixes the tail. Measured against Sepolia, one
+ * read of the chain root costs p50 2,883 ms. With a plain expiry, whoever
+ * arrives on the expiry pays that in full and blocks the queue behind them —
+ * `GET /api/proof/:id` measured p99 1,003 ms and a worst case of 17,476 ms.
+ * Raising the TTL alone only makes that rarer; the stale band removes it, since
+ * past the TTL the cached root is returned at once and refreshed behind the
+ * caller.
+ *
+ * 60 seconds is the point past which a caller is made to wait rather than be
+ * handed something that old. It is safe for a different reason than the TTL:
+ * every `confirm()` calls `invalidateRootCache()` before reading, so a round
+ * this backend publishes is never decided on a cached value. The window where a
+ * stale root could mislead is the gap between the officer's wallet publishing
+ * and `confirm()` running — which already exists, is measured in tens of
+ * seconds, and is not made materially worse by this.
+ */
+const ROOT_CACHE_STALE_MS = 60_000;
 
 /** A LandRegistryVerifier rejection, decoded from its typed revert (D33). */
 export class ProofRejectedError extends Error {
@@ -69,7 +89,10 @@ export class ChainService implements OnModuleInit {
   private registry!: RootRegistry;
   private verifier!: LandRegistryVerifier;
   private deployment!: DeploymentRecord;
-  private readonly rootCache = new TtlCache<{ root: bigint; version: number }>(ROOT_CACHE_TTL_MS);
+  private readonly rootCache = new TtlCache<{ root: bigint; version: number }>(
+    ROOT_CACHE_TTL_MS,
+    { staleMs: ROOT_CACHE_STALE_MS },
+  );
 
   async onModuleInit(): Promise<void> {
     const network = (process.env.CHAIN_NETWORK ?? 'localhost') as ChainNetwork;
