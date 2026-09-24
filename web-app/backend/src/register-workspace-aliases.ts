@@ -25,15 +25,31 @@ type ResolveFilename = (request: string, ...rest: unknown[]) => string;
 // dist/web-app/backend/src → dist
 const distRoot = path.resolve(__dirname, '..', '..', '..');
 
+/**
+ * Package prefixes and the dist directory each one maps onto.
+ *
+ * ⚠️ PREFIXES, NOT EXACT NAMES. The D67 subpaths
+ * (`@land-registry/blockchain/shared/treeDimensions`, …) must be redirected
+ * too. With exact-name matching, `node-store.service.ts`'s subpath import fell
+ * through to the raw `.ts` — and ran anyway, only because treeDimensions.ts
+ * happened to contain no type syntax. The first annotation added to it
+ * (`RETIRED_TREE_DEPTHS: readonly number[]`, D75) crashed `start:dev` with
+ * "Missing initializer in const declaration".
+ */
 const aliases: Record<string, string> = {
-  '@land-registry/blockchain/shared': path.join(distRoot, 'blockchain', 'shared', 'index.js'),
-  '@land-registry/blockchain/typechain-types': path.join(
-    distRoot,
-    'blockchain',
-    'typechain-types',
-    'index.js',
-  ),
+  '@land-registry/blockchain/shared': path.join(distRoot, 'blockchain', 'shared'),
+  '@land-registry/blockchain/typechain-types': path.join(distRoot, 'blockchain', 'typechain-types'),
 };
+
+/** `…/shared` → `dist/…/shared/index.js`; `…/shared/x` → `dist/…/shared/x.js`. */
+function compiledPathFor(request: string): string | undefined {
+  for (const [prefix, dir] of Object.entries(aliases)) {
+    if (request === prefix) return path.join(dir, 'index.js');
+    if (request.startsWith(`${prefix}/`))
+      return path.join(dir, `${request.slice(prefix.length + 1)}.js`);
+  }
+  return undefined;
+}
 
 // Must be require(): this patches module resolution, so it has to run before
 // anything it affects is resolved — an ESM import would be hoisted above it.
@@ -42,7 +58,7 @@ const ModuleCtor = require('module') as { _resolveFilename: ResolveFilename };
 const originalResolveFilename = ModuleCtor._resolveFilename;
 
 ModuleCtor._resolveFilename = function (request: string, ...rest: unknown[]): string {
-  const compiled = aliases[request];
+  const compiled = compiledPathFor(request);
   if (compiled && fs.existsSync(compiled)) {
     return originalResolveFilename.call(this, compiled, ...rest);
   }
