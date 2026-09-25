@@ -4,29 +4,13 @@
  * A change set batches every approved transfer and up to `revocationCap`
  * pending revocations (150 since D73; the backend reports it with the queue)
  * into ONE new root. Same draft → sign → confirm shape as issuance; the draft
- * carries the revocation calldata to sign.
+ * carries the revocation calldata to sign. Revocations are queued on the
+ * Revocations page (features/government/revocations); the queue itself is read
+ * through usePendingChanges() in the portal's api/hooks.
  */
 
 import { govDelete, govDownload, govGet, govPost } from '../api/gov-client';
-import type {
-  ChangeSetDraftDetail,
-  ChangeSetSummary,
-  DraftConfirmation,
-  PendingChanges,
-} from '../api/types';
-
-export function getPendingChanges(): Promise<PendingChanges> {
-  return govGet<PendingChanges>('/government/pending-changes');
-}
-
-/** Queue a revocation; only keccak256(detailText) will reach the chain (D45). */
-export function requestRevocation(body: {
-  propertyId: string;
-  reasonCode: number;
-  detailText: string;
-}): Promise<{ id: number; propertyId: string; detailHash: string }> {
-  return govPost('/government/revocations', body);
-}
+import type { ChangeSetDraftDetail, ChangeSetSummary, DraftConfirmation } from '../api/types';
 
 export function createChangeSetDraft(): Promise<ChangeSetDraftDetail> {
   return govPost<ChangeSetDraftDetail>('/government/changesets');

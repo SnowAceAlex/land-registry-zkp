@@ -1,11 +1,11 @@
 /**
- * features/government/changes/components/changes-view.tsx - UC-4, batch changes
- * and revocations.
+ * features/government/changes/components/changes-view.tsx - UC-4, publish a
+ * change set.
  *
  * Implemented in Phase 8 (ChangesWorkbench + publishing/DraftPanel); the list
  * below is the spec they follow:
- *  1. GET /api/government/pending-changes for approved transfers plus queued
- *     revocations.
+ *  1. GET /api/government/pending-changes for approved transfers plus the
+ *     revocations queued on /government/revocations.
  *  2. POST /api/government/changesets to draft, sign with Metamask, then
  *     POST /api/government/changesets/:id/confirm. Same two-phase shape as
  *     issuance, same D44 single-draft rule.

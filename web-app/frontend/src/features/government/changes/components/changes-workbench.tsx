@@ -6,13 +6,14 @@
  *     when the round revokes anything, publishRoot otherwise);
  *   - an issuance draft is open  → blocked, with a link to it;
  *   - no draft                   → the queue and "Draft a change set".
- * Revocation requests can be queued in every state; they wait for a round.
+ * Revocation requests are queued on the Revocations page; this screen only
+ * publishes them.
  * The history below lists every round with its buyers' archive (D77).
  */
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { FolderSync, LoaderCircle } from 'lucide-react';
 
 import type { Locale } from '@/i18n/config';
@@ -25,17 +26,11 @@ import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { type Failure, apiFailure } from '../../api/error-message';
-import { govKeys, useOpenDraft, usePendingTransferCount } from '../../api/hooks';
+import { govKeys, useOpenDraft, usePendingChanges, usePendingTransferCount } from '../../api/hooks';
 import type { ChangeSetDraftDetail, PendingChanges } from '../../api/types';
 import { type DraftOutcome, DraftPanel } from '../../publishing/components/draft-panel';
-import {
-  confirmChangeSetDraft,
-  createChangeSetDraft,
-  discardChangeSetDraft,
-  getPendingChanges,
-} from '../api';
+import { confirmChangeSetDraft, createChangeSetDraft, discardChangeSetDraft } from '../api';
 import { ChangeSetHistory } from './changeset-history';
-import { RevocationForm } from './revocation-form';
 
 type Strings = Dictionary['govChanges'];
 type Message = { tone: 'success' | 'info'; title: string; detail?: string };
@@ -57,7 +52,7 @@ export function ChangesWorkbench({
   const queryClient = useQueryClient();
   const openDraft = useOpenDraft();
   const pendingTransfers = usePendingTransferCount();
-  const pending = useQuery({ queryKey: govKeys.pendingChanges, queryFn: getPendingChanges });
+  const pending = usePendingChanges();
   const [creating, setCreating] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
@@ -172,11 +167,15 @@ export function ChangesWorkbench({
         ) : pending.error ? (
           <Notice tone="danger" title={t.loadError} />
         ) : (
-          <PendingQueue pending={pending.data} t={t} creating={creating} onCreate={create} />
+          <PendingQueue
+            lang={lang}
+            pending={pending.data}
+            t={t}
+            creating={creating}
+            onCreate={create}
+          />
         )}
       </div>
-
-      <RevocationForm t={t} errors={errors} />
 
       <ChangeSetHistory t={t} errors={errors} />
     </div>
@@ -221,11 +220,13 @@ function DraftSummary({ draft, t }: { draft: ChangeSetDraftDetail; t: Strings })
 }
 
 function PendingQueue({
+  lang,
   pending,
   t,
   creating,
   onCreate,
 }: {
+  lang: Locale;
   pending: PendingChanges;
   t: Strings;
   creating: boolean;
@@ -293,7 +294,15 @@ function PendingQueue({
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-sm font-medium text-ink">{t.revocationsTitle}</h3>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="text-sm font-medium text-ink">{t.revocationsTitle}</h3>
+          <Link
+            href={`/${lang}/government/revocations`}
+            className="text-sm font-medium text-authority underline underline-offset-4"
+          >
+            {t.openRevocations}
+          </Link>
+        </div>
         {revocations.length === 0 ? (
           <p className="text-sm text-steel">{t.noRevocations}</p>
         ) : (
