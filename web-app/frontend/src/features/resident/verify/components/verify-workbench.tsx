@@ -40,6 +40,7 @@ import { DisclosurePanel } from './disclosure-panel';
 import { IssuerChainPanel } from './issuer-chain-panel';
 import { RevocationPanel } from './revocation-panel';
 import { type IssuerChainReport, verifyIssuerChain } from '../lib/issuer-chain';
+import { TRUSTED_ROOT_CA_PEM } from '../lib/trusted-root';
 import { verifyOnChain } from '../lib/on-chain-verify';
 import {
   type CheckName,
@@ -236,6 +237,7 @@ export function VerifyWorkbench({
           issuer: receipt.issuer,
           client,
           registry: config.contracts.RootRegistry,
+          trustedRootPem: TRUSTED_ROOT_CA_PEM,
         }),
       );
     } catch (error) {

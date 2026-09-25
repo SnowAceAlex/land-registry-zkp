@@ -20,10 +20,17 @@
  */
 
 import * as fs from 'fs';
+import * as path from 'path';
 import { ethers } from 'ethers';
 
 import { loadDeployment, resolveRpcUrl } from '../../shared/deployments';
-import { readOrganizationName, verifyIssuerSignature } from '../../shared/issuerIdentity';
+import {
+  readOrganizationName,
+  readTrustedRootPem,
+  trustedRootPath,
+  verifyCertificateIssuedBy,
+  verifyIssuerSignature,
+} from '../../shared/issuerIdentity';
 import { hashRecord, TREE_DEPTH, verifyMerkleProof } from '../../shared/merkleTree';
 import { Receipt, receiptToLURRecord } from '../../shared/receipt';
 import { RootRegistry__factory } from '../../typechain-types';
@@ -155,9 +162,25 @@ async function main(): Promise<void> {
     'the certificate does not belong to this Ethereum account',
   );
 
-  // PoC limitation, stated rather than hidden: nothing here checks the
-  // certificate against a trusted CA (D30 / Scope 1.5 — it is self-signed).
-  report.note('certificate chain is self-signed', 'no CA validation in the PoC');
+  // Link 1 (D78): the certificate must have been issued by the root CA this
+  // machine pins — never a root taken from the receipt, which an impostor
+  // controls. No pinned root is a note, not a failure: nothing to check against.
+  const repoRoot = path.resolve(BLOCKCHAIN_DIR, '..');
+  const rootPem = readTrustedRootPem(repoRoot);
+  if (rootPem === null) {
+    report.note(
+      'no pinned root CA — certificate origin not checked',
+      `expected at ${trustedRootPath(repoRoot)}; run \`pnpm --filter backend run cert:generate\``,
+    );
+  } else {
+    const chained = verifyCertificateIssuedBy(receipt.issuer.IssuerCertificateChain, rootPem);
+    report.check(
+      chained.ok,
+      'issuer certificate chains to the pinned root CA',
+      `issued by "${chained.issuedBy}"`,
+      chained.reason,
+    );
+  }
 
   process.exit(report.summarise());
 }

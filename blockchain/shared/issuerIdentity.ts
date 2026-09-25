@@ -89,6 +89,106 @@ export function verifyIssuerSignature(
   );
 }
 
+/**
+ * Where the pinned root CA certificate lives, relative to the monorepo root
+ * (D78). `pki/` sits outside every package on purpose: the CA is a different
+ * organisation from the registry, and the registry's backend never loads its
+ * key.
+ */
+export const TRUSTED_ROOT_CA_RELATIVE_PATH = 'pki/root-ca.cert.pem';
+
+/** The pinned root's path — `TRUSTED_ROOT_CA_PATH` first, then the default. */
+export function trustedRootPath(repoRoot: string): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require('path') as typeof import('path');
+  const override = process.env.TRUSTED_ROOT_CA_PATH?.trim();
+  return override ? path.resolve(override) : path.join(repoRoot, TRUSTED_ROOT_CA_RELATIVE_PATH);
+}
+
+/**
+ * The pinned root CA certificate, or null when none is configured.
+ *
+ * Absent is not an error: a fresh checkout has no root, and link 1 then reports
+ * what it always did before D78 — `not-verifiable`.
+ */
+export function readTrustedRootPem(repoRoot: string): string | null {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require('fs') as typeof import('fs');
+  const file = trustedRootPath(repoRoot);
+  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+}
+
+/**
+ * Both branches name both fields so the result reads the same in the backend,
+ * which compiles without `strictNullChecks` and so cannot narrow on `ok`.
+ */
+export type IssuanceCheck =
+  | { ok: true; issuedBy: string; reason?: undefined }
+  | { ok: false; reason: string; issuedBy?: undefined };
+
+/**
+ * Link 1 of the D30 chain (D78): was `leafPem` issued by the pinned root?
+ *
+ * The root must come from the verifier's own configuration, never from the
+ * receipt — an impostor can ship a CA of their own exactly as easily as a
+ * self-signed certificate. The browser applies the same rules in the same order
+ * in `issuer-chain.ts` (`checkIssuedByRoot`); `issuer-chain.test.ts` holds the
+ * two to agreement on `ok`. One nuance: `checkIssued` is OpenSSL's
+ * X509_check_issued, which also compares key identifiers, so a look-alike root
+ * with the same name is refused here one step before the signature check.
+ */
+export function verifyCertificateIssuedBy(
+  leafPem: string,
+  rootPem: string,
+  now: Date = new Date(),
+): IssuanceCheck {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { X509Certificate } = require('crypto') as typeof import('crypto');
+
+  let root: InstanceType<typeof X509Certificate>;
+  let leaf: InstanceType<typeof X509Certificate>;
+  try {
+    root = new X509Certificate(rootPem);
+  } catch {
+    return { ok: false, reason: 'the pinned root certificate cannot be parsed' };
+  }
+  try {
+    leaf = new X509Certificate(leafPem);
+  } catch {
+    return { ok: false, reason: 'the issuer certificate cannot be parsed' };
+  }
+
+  const inWindow = (cert: InstanceType<typeof X509Certificate>) =>
+    now.getTime() >= new Date(cert.validFrom).getTime() &&
+    now.getTime() <= new Date(cert.validTo).getTime();
+
+  if (!root.ca) return { ok: false, reason: 'the pinned root is not a CA certificate' };
+  if (!inWindow(root))
+    return { ok: false, reason: 'the pinned root is outside its validity window' };
+  if (!inWindow(leaf)) {
+    return { ok: false, reason: 'the issuer certificate is outside its validity window' };
+  }
+  if (!leaf.checkIssued(root)) {
+    return { ok: false, reason: 'the issuer certificate was not issued by the pinned root' };
+  }
+  if (!leaf.verify(root.publicKey)) {
+    return {
+      ok: false,
+      reason: "the issuer certificate's signature does not verify under the root key",
+    };
+  }
+
+  return { ok: true, issuedBy: commonName(root.subject) };
+}
+
+/** CN, else O, else the whole subject — the name a verifier is shown. */
+function commonName(subject: string): string {
+  const rdns = subject.split('\n');
+  const pick = (key: string) =>
+    rdns.find((rdn) => rdn.startsWith(`${key}=`))?.slice(key.length + 1);
+  return (pick('CN') ?? pick('O') ?? subject).trim();
+}
+
 /** Sign an address with the certificate's private key — the issuer's half. */
 export function signIssuerAddress(privateKeyPem: string, checksummedAddress: string): string {
   // eslint-disable-next-line @typescript-eslint/no-require-imports

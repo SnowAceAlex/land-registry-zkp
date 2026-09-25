@@ -5,11 +5,14 @@ import { ethers } from 'ethers';
 import {
   IssuerBlock,
   readOrganizationName,
+  readTrustedRootPem,
   signIssuerAddress,
+  trustedRootPath,
+  verifyCertificateIssuedBy,
 } from '@land-registry/blockchain/shared';
 
 import { ChainService } from '../chain/chain.service';
-import { backendDir } from '../common/paths';
+import { backendDir, repoRoot } from '../common/paths';
 
 /**
  * IssuerService
@@ -54,6 +57,7 @@ export class IssuerService implements OnModuleInit {
     this.organizationName = readOrganizationName(this.certificatePem);
 
     this.logger.log(`issuer certificate loaded — O="${this.organizationName}"`);
+    this.warnIfNotChained();
     await this.warnIfAnchorMismatch();
   }
 
@@ -83,6 +87,34 @@ export class IssuerService implements OnModuleInit {
       ethereumAccountSignature: this.signEthereumAccount(ethereumAccount),
       IssuerCertificateChain: this.certificatePem,
     };
+  }
+
+  /**
+   * D78: a certificate the pinned root did not issue fails link 1 in every
+   * verifier, so every bundle would be rejected. Loud, but not fatal — the
+   * backend only reads the root's CERTIFICATE (never its key, which belongs to
+   * the CA), and a missing root is a fresh checkout, not a fault.
+   */
+  private warnIfNotChained(): void {
+    const rootPem = readTrustedRootPem(repoRoot());
+    if (rootPem === null) {
+      this.logger.warn(
+        `no root CA at ${trustedRootPath(repoRoot())} — verifiers built without it ` +
+          `will report the issuer certificate as unverifiable. Run \`cert:generate\`.`,
+      );
+      return;
+    }
+
+    const chained = verifyCertificateIssuedBy(this.certificatePem, rootPem);
+    if (chained.ok) {
+      this.logger.log(`issuer certificate chains to "${chained.issuedBy}"`);
+    } else {
+      this.logger.error(
+        `issuer certificate does not chain to the pinned root CA: ${chained.reason}. ` +
+          `Issued bundles will FAIL the verifier's certificate check — ` +
+          `re-run \`FORCE=1 pnpm --filter backend run cert:generate\`.`,
+      );
+    }
   }
 
   /**

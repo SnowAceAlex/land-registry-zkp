@@ -20,7 +20,8 @@ function issuer(overrides: Partial<Record<keyof IssuerChainReport['links'], Link
     account: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
     organizationName: 'So Tai nguyen va Moi truong TP.HCM',
     links: {
-      // The PoC certificate is self-signed, so this is the realistic best case.
+      // No pinned root (a fresh checkout): link 1 cannot be checked. Tests that
+      // need the D78 best case override it to 'pass'.
       certificate: 'not-verifiable',
       organization: 'pass',
       signature: 'pass',
@@ -121,11 +122,10 @@ describe('summariseTrust (D63)', () => {
   });
 
   /**
-   * With a receipt supplied, this deployment can never reach a clean accept:
-   * link 1 is `not-verifiable` because the certificate is self-signed. That is
-   * the honest ceiling for the PoC and belongs in the thesis Limitations.
+   * A verifier built without a pinned root (D78) cannot say who issued the
+   * certificate, so it can never reach a clean accept with a receipt supplied.
    */
-  it('warns for a self-signed issuer certificate', () => {
+  it('warns when no trusted root CA is configured', () => {
     expect(summariseTrust(facts())).toEqual({
       verdict: 'accept-with-warning',
       reasons: ['issuer-unverified'],

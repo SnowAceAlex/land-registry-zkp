@@ -1,8 +1,44 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import type { NextConfig } from "next";
+
+/**
+ * The root CA the resident verifier pins (D78), read once at build time.
+ *
+ * Same location rule as `trustedRootPath()` in blockchain/shared/issuerIdentity.ts
+ * (`TRUSTED_ROOT_CA_PATH`, else `<repo>/pki/root-ca.cert.pem`) — restated here
+ * rather than imported because the config is loaded before the workspace
+ * package is transpiled. The repo root is found by walking up to
+ * pnpm-workspace.yaml, so it does not depend on which directory `next` ran in.
+ * Missing file → empty string → link 1 is `not-verifiable`, and the build
+ * still succeeds on a fresh checkout.
+ */
+function readTrustedRootPem(): string {
+  const override = process.env.TRUSTED_ROOT_CA_PATH?.trim();
+  let file = override ? path.resolve(override) : "";
+
+  if (!file) {
+    let dir = process.cwd();
+    while (!fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) {
+      const parent = path.dirname(dir);
+      if (parent === dir) return "";
+      dir = parent;
+    }
+    file = path.join(dir, "pki", "root-ca.cert.pem");
+  }
+
+  return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+}
 
 const nextConfig: NextConfig = {
   // Transpile the pnpm workspace package so Next.js can handle its TypeScript source
   transpilePackages: ["@land-registry/blockchain"],
+
+  // Inlined into the client bundle at build time — see src/features/resident/verify/lib/trusted-root.ts
+  env: {
+    TRUSTED_ROOT_CA_PEM: readTrustedRootPem(),
+  },
 
   // snarkjs uses WASM — exclude it from server-side bundle (run client-side only)
   serverExternalPackages: ["snarkjs"],

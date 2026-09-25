@@ -37,6 +37,10 @@ web-app/backend/openapi.json
 # Regenerate with `pnpm --filter backend run cert:generate`.
 web-app/backend/certs/
 
+# Demo Government Root CA (D78) — root-ca.key.pem is the CA's private key.
+# Created by `cert:generate`; the verifier pins root-ca.cert.pem at build time.
+pki/
+
 # Mock data fixtures (Phase 0) — regenerated via `pnpm --filter blockchain run mock:generate`;
 # mockSecrets.json holds ownerSecret private key material, never commit it.
 blockchain/fixtures/
