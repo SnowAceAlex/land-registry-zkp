@@ -10,9 +10,12 @@ const ORG_NAME = 'So Tai nguyen va Moi truong TP.HCM';
 const ACCOUNT = '0xc128Eb26F177BB6a3b4374A715be350887ED7726';
 
 /**
- * Generates a throwaway self-signed certificate the same shape as
+ * Generates a throwaway certificate with the subject shape
  * scripts/generate-issuer-cert.ts produces, so the test exercises real RSA
- * signing rather than a stub. Uses openssl, which the cert script requires too.
+ * signing rather than a stub. Self-signed here: what this spec covers is the
+ * address signature and the issuer block, not the D78 root chain (that is
+ * `issuer-chain.test.ts` in the frontend). Uses openssl, which the cert script
+ * requires too.
  */
 function makeTestCertificate(): { keyPem: string; certPem: string } {
   const { execFileSync } = require('child_process') as typeof import('child_process');

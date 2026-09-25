@@ -19,6 +19,8 @@ const bits = (seed: number) => Array.from({ length: TREE_DEPTH }, (_, i) => (see
 
 const preview: TransferPreview = {
   propertyId: '1001',
+  newOwnerSecret: '43',
+  newOwnerCommitment: '222',
   rootVersion: 3,
   oldMerkleRoot: '5000',
   newMerkleRoot: '6000',
@@ -34,8 +36,6 @@ describe('buildCounterTransferInput (D28 step 3, at the counter)', () => {
       sellerRecord,
       sellerLeaf: 7777n,
       sellerSecret: 42n,
-      buyerSecret: 43n,
-      buyerCommitment: 222n,
       preview,
       currentTimestamp: 1_800_000_000n,
       minRequiredRemainingTerm: 0n,
@@ -69,14 +69,30 @@ describe('buildCounterTransferInput (D28 step 3, at the counter)', () => {
     );
   });
 
+  it('takes the buyer secret and commitment from the preview (D77)', () => {
+    const params = {
+      sellerRecord,
+      sellerLeaf: 7777n,
+      sellerSecret: 42n,
+      currentTimestamp: 1_800_000_000n,
+      minRequiredRemainingTerm: 0n,
+    };
+
+    const issued = buildCounterTransferInput({ ...params, preview });
+    const other = buildCounterTransferInput({
+      ...params,
+      preview: { ...preview, newOwnerSecret: '77', newOwnerCommitment: '333' },
+    });
+
+    expect(other).not.toEqual(issued);
+  });
+
   it('refuses a preview for a different plot', () => {
     expect(() =>
       buildCounterTransferInput({
         sellerRecord,
         sellerLeaf: 7777n,
         sellerSecret: 42n,
-        buyerSecret: 43n,
-        buyerCommitment: 222n,
         preview: { ...preview, propertyId: '1002' },
         currentTimestamp: 1_800_000_000n,
         minRequiredRemainingTerm: 0n,

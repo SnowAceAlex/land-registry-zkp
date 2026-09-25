@@ -288,6 +288,11 @@ model ChangeSet {
   rootVersion Int?
   txHash      String?
 
+  /// The buyers' bundles, built at confirm time (D77); null for a revocation-only round
+  archiveZip       Bytes?
+  /// TTL — after this the buyers' secrets are unrecoverable
+  archiveExpiresAt DateTime?
+
   transfers   TransferRequest[]
   revocations Revocation[]
 
@@ -363,6 +368,10 @@ model TransferRequest {
   propertyId         String
   /// Poseidon([newOwnerSecret]) as decimal string
   newOwnerCommitment String
+  /// Buyer's secret, decimal string (D77). Set at submit, cleared in the same
+  /// transaction that writes the change set's archive, or on reject. Never
+  /// serialised — see transfers/transfer-request.serializer.ts.
+  newOwnerSecret     String?
   /// publicSignals[0] — root the proof was generated against
   oldRoot            String
   /// publicSignals[1] — projected root to publish on approval

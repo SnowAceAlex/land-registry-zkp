@@ -1,11 +1,11 @@
 /**
- * features/government/changes/components/changes-view.tsx - UC-4, batch changes
- * and revocations.
+ * features/government/changes/components/changes-view.tsx - UC-4, publish a
+ * change set.
  *
  * Implemented in Phase 8 (ChangesWorkbench + publishing/DraftPanel); the list
  * below is the spec they follow:
- *  1. GET /api/government/pending-changes for approved transfers plus queued
- *     revocations.
+ *  1. GET /api/government/pending-changes for approved transfers plus the
+ *     revocations queued on /government/revocations.
  *  2. POST /api/government/changesets to draft, sign with Metamask, then
  *     POST /api/government/changesets/:id/confirm. Same two-phase shape as
  *     issuance, same D44 single-draft rule.
@@ -20,6 +20,8 @@
  *  5. A change set carries at most 150 revocations (D56 + D73); the rest wait
  *     and the draft reports them as deferredRevocations. The portal reads the
  *     number from `revocationCap` on pending-changes, never from a copy.
+ *  6. A round with transfers produces an archive of the buyers' bundles (D77),
+ *     downloadable from the history table for 7 days.
  */
 import type { Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';

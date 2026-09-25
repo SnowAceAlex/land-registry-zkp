@@ -340,6 +340,7 @@ describe('IssuanceBatchService (D43)', () => {
     });
 
     expect(archiveBuild).toHaveBeenCalledWith({
+      kind: 'issuance',
       batchId: 1,
       rootVersion: 7,
       txHash: undefined,

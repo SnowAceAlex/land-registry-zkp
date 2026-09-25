@@ -131,38 +131,7 @@ export class IssuanceService {
     };
   }
 
-  /**
-   * The new owner's bundle after a published transfer (D51): receipt.json,
-   * certificate.pdf and README.txt — and deliberately no secret.json.
-   *
-   * The buyer's secret was generated in the officer's browser at the counter
-   * and never reached this backend, so there is nothing to put in one. The
-   * README tells the buyer to pair this with the secret.json handed over there.
-   */
-  async buildBuyerBundle(
-    source: ReceiptSource,
-    context: PublishedRootContext,
-    issuedAt: Date,
-  ): Promise<{ zip: Buffer; receipt: Receipt }> {
-    const { receipt, receiptFile, certificateFile } = await this.buildReceiptFiles(
-      source,
-      context,
-      this.issuer.buildIssuerBlock(),
-      formatIssuedOn(issuedAt),
-    );
-    const zip = await this.zip.create([
-      receiptFile,
-      certificateFile,
-      { name: 'README.txt', content: BUYER_README },
-    ]);
-    return { zip, receipt };
-  }
-
-  /**
-   * The shareable half of any bundle: the receipt and the certificate printed
-   * from it. One implementation for the owner bundle and the buyer bundle, so
-   * the two can never describe a record differently.
-   */
+  /** The shareable half of a bundle: the receipt and the certificate printed from it. */
   private async buildReceiptFiles(
     source: ReceiptSource,
     context: PublishedRootContext,
@@ -246,31 +215,5 @@ LƯU Ý VỀ TÍNH MỚI CỦA BẰNG CHỨNG MERKLE
 Mỗi lần có giao dịch chuyển nhượng trong hệ thống, gốc Merkle thay đổi và
 trường "merkleProof" trong receipt.json trở nên cũ. Cổng Chủ sở hữu tự động
 lấy bằng chứng mới trước khi tạo proof — bạn không cần thao tác gì. Trường
-"rootVersion" là dấu hiệu để đối chiếu.
-`;
-
-const BUYER_README = `BỘ HỒ SƠ QUYỀN SỬ DỤNG ĐẤT SAU CHUYỂN NHƯỢNG (BẢN ĐIỆN TỬ)
-==========================================================
-
-Bộ hồ sơ này gồm 2 tệp, cấp cho chủ sử dụng đất MỚI sau khi giao dịch chuyển
-nhượng đã được công bố lên blockchain:
-
-1. receipt.json   — CHIA SẺ ĐƯỢC.
-   Thông tin thửa đất đứng tên commitment của bạn, bằng chứng Merkle theo gốc
-   Merkle hiện hành và chuỗi chứng thư của cơ quan phát hành.
-
-2. certificate.pdf — bản in thông tin kèm mã QR đối chiếu gốc Merkle on-chain.
-
-BỘ HỒ SƠ NÀY KHÔNG CÓ secret.json
----------------------------------
-secret.json của bạn đã được tạo và giao cho bạn TẠI QUẦY khi làm thủ tục chuyển
-nhượng. Hệ thống không bao giờ nhận được tệp đó, nên không thể gửi lại. Hãy đặt
-secret.json đã nhận tại quầy cùng thư mục với receipt.json này: cổng Chủ sở hữu
-cần cả hai để tạo bằng chứng ZK. TUYỆT ĐỐI KHÔNG CHIA SẺ secret.json.
-
-LƯU Ý VỀ TÍNH MỚI CỦA BẰNG CHỨNG MERKLE
----------------------------------------
-Mỗi lần gốc Merkle thay đổi, trường "merkleProof" trong receipt.json trở nên cũ.
-Cổng Chủ sở hữu tự động lấy bằng chứng mới trước khi tạo proof. Trường
 "rootVersion" là dấu hiệu để đối chiếu.
 `;

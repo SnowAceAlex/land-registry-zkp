@@ -14,6 +14,7 @@ describe('ArchiveService (D42)', () => {
   ];
 
   const input = {
+    kind: 'issuance' as const,
     batchId: 3,
     rootVersion: 7,
     txHash: '0xabc',
@@ -54,6 +55,7 @@ describe('ArchiveService (D42)', () => {
     const manifestFile = directory.files.find((f) => f.path === 'manifest.json')!;
 
     expect(JSON.parse((await manifestFile.buffer()).toString())).toEqual({
+      kind: 'issuance',
       batchId: 3,
       rootVersion: 7,
       txHash: '0xabc',

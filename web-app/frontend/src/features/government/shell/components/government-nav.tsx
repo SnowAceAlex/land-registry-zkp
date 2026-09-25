@@ -3,8 +3,8 @@
 /**
  * features/government/shell/components/government-nav.tsx - sidebar on desktop, bottom tab bar on phones.
  *
- * Client-side only because the active item needs the pathname. A nav where all
- * four items render identically regardless of location is the defect this
+ * Client-side only because the active item needs the pathname. A nav where
+ * every item renders identically regardless of location is the defect this
  * fixes; `aria-current` carries the same information to screen readers.
  */
 
@@ -14,6 +14,7 @@ import {
   ArrowRightLeft,
   FileSignature,
   FileUp,
+  FileX2,
   FolderSync,
   Landmark,
   LogOut,
@@ -26,15 +27,15 @@ import { LocaleSwitcher } from '@/i18n/components/locale-switcher';
 
 type NavStrings = Dictionary['govNav'];
 
-/** Slug and UC tag are not translated: they are route and spec identifiers. */
+/** Slugs are not translated: they are route identifiers. */
 const ITEMS = [
-  { slug: 'import', uc: 'UC-2', icon: FileUp, key: 'import' },
-  { slug: 'issuance', uc: 'UC-1', icon: FileSignature, key: 'issuance' },
-  { slug: 'transfers', uc: 'UC-3', icon: ArrowRightLeft, key: 'transfers' },
-  { slug: 'changes', uc: 'UC-4', icon: FolderSync, key: 'changes' },
+  { slug: 'import', icon: FileUp, key: 'import' },
+  { slug: 'issuance', icon: FileSignature, key: 'issuance' },
+  { slug: 'transfers', icon: ArrowRightLeft, key: 'transfers' },
+  { slug: 'revocations', icon: FileX2, key: 'revocations' },
+  { slug: 'changes', icon: FolderSync, key: 'changes' },
 ] as const satisfies ReadonlyArray<{
   slug: string;
-  uc: string;
   icon: typeof FileUp;
   key: keyof NavStrings;
 }>;
@@ -78,7 +79,7 @@ export function GovernmentNav({
           <h2 className="mb-2 px-3 text-xs font-medium tracking-wider text-steel uppercase">
             {t.operations}
           </h2>
-          {ITEMS.map(({ slug, uc, icon: Icon, key }) => {
+          {ITEMS.map(({ slug, icon: Icon, key }) => {
             const href = hrefFor(slug);
             const active = isActive(href);
             return (
@@ -94,7 +95,6 @@ export function GovernmentNav({
               >
                 <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} aria-hidden />
                 <span className="flex-1">{t[key]}</span>
-                <span className="font-mono text-[10px] text-zinc-400">{uc}</span>
               </Link>
             );
           })}
@@ -114,7 +114,8 @@ export function GovernmentNav({
       </aside>
 
       {/* Phones: header + bottom tab bar, so the 250px rail never eats the
-          content column. Four tabs fit a 320px viewport without scrolling. */}
+          content column. Five tabs fit a 320px viewport without scrolling; long
+          labels wrap to two lines. */}
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-whisper bg-white px-4 md:hidden">
         <Link href={`/${lang}`} className="flex items-center gap-2 rounded-lg">
           <Landmark className="h-4 w-4 text-ink" strokeWidth={1.5} aria-hidden />
@@ -135,7 +136,7 @@ export function GovernmentNav({
 
       <nav
         aria-label={t.ariaLabel}
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-whisper bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-whisper bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         {ITEMS.map(({ slug, icon: Icon, key }) => {
           const href = hrefFor(slug);

@@ -9,7 +9,7 @@ import {
 import { DraftStatus, IssuanceBatch, Property } from '@prisma/client';
 import { hashRecord } from '@land-registry/blockchain/shared';
 
-import { ArchiveEntry, ArchiveService } from './archive.service';
+import { ARCHIVE_TTL_DAYS, ArchiveEntry, ArchiveService } from './archive.service';
 import { ChainService } from '../chain/chain.service';
 import { DraftLockService } from '../common/draft-lock.service';
 import { RootService } from '../government/root.service';
@@ -19,9 +19,6 @@ import { NodeStoreService } from '../tree/node-store.service';
 import { sortByPropertyId } from '../tree/tree.service';
 import { toLURRecord } from '../records/record.mapper';
 import { IssuanceService } from './issuance.service';
-
-/** How long the batch archive — and therefore the only copy of the secrets — survives. */
-const ARCHIVE_TTL_DAYS = 7;
 
 /** Summary row for `list()` — deliberately excludes `draftSecrets` and `archiveZip`. */
 export interface IssuanceBatchSummary {
@@ -308,6 +305,7 @@ export class IssuanceBatchService {
     // hand) but persisted inside it, atomically with the write that retires
     // draftSecrets — see the comment on that write below.
     const archiveZip = await this.archive.build({
+      kind: 'issuance',
       batchId: draft.id,
       rootVersion,
       txHash: draft.txHash,

@@ -37,6 +37,10 @@ export class TransferRequestDto {
   @ApiPropertyOptional({ nullable: true, example: null })
   txHash!: string | null;
 
+  /** The change set that publishes this transfer; its archive holds the buyer's bundle (D77). */
+  @ApiPropertyOptional({ nullable: true, example: null })
+  changeSetId!: number | null;
+
   @ApiProperty({ format: 'date-time' })
   createdAt!: Date;
 
@@ -71,6 +75,18 @@ export class TransferApprovalResponseDto {
 export class TransferPreviewResult {
   @ApiProperty({ example: '1' })
   propertyId!: string;
+
+  /**
+   * The buyer's new secret (D77), issued by the registry exactly like an
+   * issuance round's (D14). A private input of transfer.circom; send it back
+   * with the proof to POST /transfers. Nothing is stored until then.
+   */
+  @ApiProperty()
+  newOwnerSecret!: string;
+
+  /** Poseidon([newOwnerSecret]) — the buyer's ownerCommitment once published. */
+  @ApiProperty()
+  newOwnerCommitment!: string;
 
   /** Current on-chain root version the old path was computed against. */
   @ApiProperty({ example: 1 })

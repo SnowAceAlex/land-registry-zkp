@@ -13,7 +13,7 @@ import nextTs from "eslint-config-next/typescript";
  * stack off the logged-out resident pages (DESIGN.md section 10).
  */
 const PORTAL_FEATURES = {
-  government: ["import", "issuance", "transfers", "changes"],
+  government: ["import", "issuance", "transfers", "revocations", "changes"],
   resident: ["lookup", "proof", "verify"],
 };
 

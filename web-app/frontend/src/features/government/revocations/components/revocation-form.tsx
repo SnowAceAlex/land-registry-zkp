@@ -30,7 +30,7 @@ export function RevocationForm({
   t,
   errors,
 }: {
-  t: Dictionary['govChanges'];
+  t: Dictionary['govRevocations'];
   errors: Dictionary['govErrors'];
 }) {
   const queryClient = useQueryClient();
@@ -74,7 +74,7 @@ export function RevocationForm({
   return (
     <form onSubmit={submit} noValidate className="space-y-4 rounded-xl border border-hairline bg-white p-5 sm:p-6">
       <div>
-        <h3 className="font-medium text-ink">{t.revokeTitle}</h3>
+        <h2 className="font-medium text-ink">{t.revokeTitle}</h2>
         <p className="mt-1 max-w-prose text-sm text-steel">{t.revokeBody}</p>
       </div>
 

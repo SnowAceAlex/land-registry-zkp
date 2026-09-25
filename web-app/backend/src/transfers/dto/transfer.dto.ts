@@ -20,12 +20,6 @@ export class TransferPreviewDto {
   @IsString()
   @Matches(DECIMAL_STRING, { message: 'propertyId must be a decimal integer string' })
   propertyId!: string;
-
-  /** Poseidon([newOwnerSecret]) — the buyer computes this in their browser. */
-  @ApiProperty({ example: EXAMPLE_COMMITMENT })
-  @IsString()
-  @Matches(DECIMAL_STRING, { message: 'newOwnerCommitment must be a decimal field element' })
-  newOwnerCommitment!: string;
 }
 
 export class SubmitTransferDto {
@@ -38,6 +32,18 @@ export class SubmitTransferDto {
   @IsString()
   @Matches(DECIMAL_STRING)
   newOwnerCommitment!: string;
+
+  /**
+   * The secret POST /transfers/preview issued for the buyer (D77). Stored with
+   * the request until the change set's archive carries it to the buyer, then
+   * cleared. Must open newOwnerCommitment.
+   */
+  @ApiProperty({
+    example: '142180644374671002705865094078679040625424712395800384724292556060244418588',
+  })
+  @IsString()
+  @Matches(DECIMAL_STRING, { message: 'newOwnerSecret must be a decimal field element' })
+  newOwnerSecret!: string;
 
   /**
    * Groth16 proof as emitted by snarkjs (`pi_a`, `pi_b`, `pi_c`, `protocol`,

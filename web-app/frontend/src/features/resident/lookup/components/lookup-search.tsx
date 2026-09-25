@@ -111,7 +111,7 @@ export function LookupSearch({
                 setValue(event.target.value);
                 setShowInvalid(false);
               }}
-              aria-describedby="property-id-hint"
+              aria-describedby={showInvalid || malformed ? 'property-id-error' : undefined}
               aria-invalid={showInvalid || malformed || undefined}
               className="w-full rounded-lg border border-hairline bg-white px-4 py-2.5 font-mono text-sm text-ink ui-transition placeholder:text-zinc-400 focus:border-authority aria-invalid:border-red-400"
             />
@@ -132,15 +132,11 @@ export function LookupSearch({
           </button>
         </div>
 
-        <p id="property-id-hint" className="text-xs text-steel">
-          {showInvalid || malformed ? (
-            <span role="alert" className="text-red-700">
-              {t.invalidId}
-            </span>
-          ) : (
-            t.hint
-          )}
-        </p>
+        {showInvalid || malformed ? (
+          <p id="property-id-error" role="alert" className="text-xs text-red-700">
+            {t.invalidId}
+          </p>
+        ) : null}
       </form>
 
       {state.status === 'idle' ? (

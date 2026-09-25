@@ -108,6 +108,20 @@ export interface IssuanceBatchSummary {
   propertyCount: number;
 }
 
+/** GET /government/changesets — ChangeSetSummary (D77). */
+export interface ChangeSetSummary {
+  id: number;
+  status: 'DRAFT' | 'PUBLISHED' | 'DISCARDED';
+  newRoot: string;
+  rootVersion: number | null;
+  txHash: string | null;
+  createdAt: string;
+  publishedAt: string | null;
+  archiveExpiresAt: string | null;
+  transferCount: number;
+  revocationCount: number;
+}
+
 export type TransferStatus = 'PENDING' | 'APPROVED' | 'PUBLISHED' | 'REJECTED';
 
 /** GET /transfers — TransferRequestDto. */
@@ -120,6 +134,8 @@ export interface TransferRequest {
   status: TransferStatus;
   rejectReason: string | null;
   txHash: string | null;
+  /** The change set whose archive carries the buyer's bundle (D77). */
+  changeSetId: number | null;
   createdAt: string;
   decidedAt: string | null;
 }
@@ -127,6 +143,9 @@ export interface TransferRequest {
 /** POST /transfers/preview — TransferPreviewResult (D28 step 2). */
 export interface TransferPreview {
   propertyId: string;
+  /** The buyer's secret, issued by the registry (D77) — a private witness input. */
+  newOwnerSecret: string;
+  newOwnerCommitment: string;
   rootVersion: number;
   oldMerkleRoot: string;
   newMerkleRoot: string;

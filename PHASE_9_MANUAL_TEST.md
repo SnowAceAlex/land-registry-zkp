@@ -197,8 +197,12 @@ liệu ra một trang không đăng nhập.
 ### 3.6 UC-6 — bốn mắt xích D30
 
 1. Ở kết quả §3.5, bấm **Thêm receipt.json** và chọn `receipt.json` của bộ hồ sơ.
-2. Mắt xích 1 (`certificate`) phải hiện **icon trung tính** + dòng "chứng chỉ tự ký — chưa kiểm được
-   chuỗi tới CA tin cậy". ⚠️ **Không được là dấu tích xanh.** Đây là chỗ dễ sai nhất của cả trang.
+2. Mắt xích 1 (`certificate`) phải là **dấu tích xanh** + dòng "Do Demo Government Root CA cấp" (D78).
+   Điều kiện: đã chạy `cert:generate` **trước** khi build/khởi động frontend (root được ghim lúc
+   build) và bundle được phát hành **sau** đó. ⚠️ Receipt phát hành với chứng chỉ tự ký cũ phải ra
+   **dấu X đỏ** và kết luận **Không nên chấp nhận** — đó là kết quả đúng. Frontend build khi chưa có
+   `pki/root-ca.cert.pem` phải ra **icon trung tính** + "chưa cấu hình CA gốc tin cậy", không bao giờ
+   là dấu tích xanh.
 3. Mắt xích 2, 3, 4 (`organization`, `signature`, `role`) đều xanh.
 4. Phải thấy dòng xác nhận receipt ghi **đúng** hợp đồng mà trang đang đọc.
 5. Sửa **một ký tự** trong `ethereumAccountSignature` của `receipt.json` → nạp lại → **chỉ** mắt xích
@@ -288,8 +292,9 @@ Kích thước bundle lần tải đầu, đo từ `next build` ngày 18/09/2026
 
 - **Sepolia.** Mọi bước ở đây là localhost. `rpcUrlForChain` có nhánh Sepolia nhưng chưa thử lần
   nào, và public RPC có thể siết `eth_call` của bước kiểm thứ 4.
-- **`@peculiar/x509` với chứng chỉ có chuỗi CA thật.** Chỉ mới thử với chứng chỉ tự ký. Mắt xích 1
-  hiện luôn báo `not-verifiable`; chưa có đường nào cho nó ra `pass`.
+- **Mắt xích 1 trong trình duyệt thật.** Logic chuỗi root → issuer (D78) đã có test đối chiếu
+  browser/Node bằng chứng chỉ openssl, nhưng chưa bấm tay trên trang: dấu tích xanh + tên root, dấu X
+  với receipt tự ký cũ, icon trung tính khi build thiếu root.
 - **Firefox / Safari.** Chỉ thử Chrome. Hai chỗ dễ lệch nhất: WebCrypto `RSASSA-PKCS1-v1_5` và cặp
   Web Worker + WASM.
 - **Điện thoại thật.** Proof vài giây trên desktop có thể là hàng chục giây trên mobile, và hai tệp

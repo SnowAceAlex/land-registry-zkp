@@ -13,7 +13,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { govGet } from './gov-client';
-import type { OpenDraft, RegistryStatus, TransferRequest } from './types';
+import type { OpenDraft, PendingChanges, RegistryStatus, TransferRequest } from './types';
 
 export const govKeys = {
   status: ['gov', 'status'] as const,
@@ -22,6 +22,7 @@ export const govKeys = {
   properties: (status: string, skip: number) => ['gov', 'properties', status, skip] as const,
   issuanceBatches: ['gov', 'issuance-batches'] as const,
   pendingChanges: ['gov', 'pending-changes'] as const,
+  changeSets: ['gov', 'changesets'] as const,
 };
 
 /** GET /government/status — chain identity (D54) and the on-chain root. */
@@ -51,5 +52,17 @@ export function usePendingTransferCount() {
     queryKey: govKeys.transfers('PENDING'),
     queryFn: () => govGet<TransferRequest[]>('/transfers?status=PENDING'),
     select: (transfers) => transfers.length,
+  });
+}
+
+/**
+ * GET /government/pending-changes — what the next change set would publish
+ * (D46), plus the revocation cap (D73). Read by the Changes page (the round)
+ * and the Revocations page (what is already queued), so both share one key.
+ */
+export function usePendingChanges() {
+  return useQuery({
+    queryKey: govKeys.pendingChanges,
+    queryFn: () => govGet<PendingChanges>('/government/pending-changes'),
   });
 }

@@ -10,13 +10,15 @@
  * — the seller's bundle in, a published root out.
  *
  * It walks:
- *   1. both parties state intent           (propertyId + newOwnerCommitment)
- *   2. the registry projects the new tree  → POST /transfers/preview
- *   3. both parties prove, in one session  → POST /transfers
+ *   1. the officer names the plot          (propertyId)
+ *   2. the registry projects the new tree and issues the buyer's secret (D77)
+ *                                          → POST /transfers/preview
+ *   3. both parties prove, in one session  → POST /transfers (buyer secret included)
  *   4. an officer approves the proof       → POST /transfers/:id/approve
  *   5. the officer batches + publishes     → POST /government/changesets,
  *      sign the returned root, POST .../confirm (D44/D46)
- * then re-submits the spent proof to confirm it is rejected.
+ * then points at the change set's archive, which carries the buyer's bundle
+ * (D77), and re-submits the spent proof to confirm it is rejected.
  *
  * D47 — every /transfers route is officer-only now, not just approve, so every
  * call below sends GOV_API_KEY, including preview and the final replay.
@@ -41,7 +43,6 @@
  * nothing in the resident portal can generate one (see the note at the call).
  */
 
-import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -51,7 +52,6 @@ import { ethers } from 'ethers';
 import { buildTransferInput } from '../../shared/circuitInputs';
 import { nowUnixTimestamp } from '../../shared/datetime';
 import { loadDeployment, resolveRpcUrl } from '../../shared/deployments';
-import { poseidonHash } from '../../shared/merkleTree';
 import { OwnerSecretFile, Receipt, receiptToLURRecord } from '../../shared/receipt';
 import { LURRecord } from '../../shared/types';
 import { generateGroth16Proof, getCircuitPaths } from '../../shared/zkpHelper';
@@ -64,8 +64,10 @@ import { BLOCKCHAIN_DIR } from '../lib/paths';
 // Needed from here on for the private key that signs the change-set root.
 dotenv.config({ path: path.resolve(BLOCKCHAIN_DIR, '../.env') });
 
-/** What POST /transfers/preview returns (D28 step 2). */
+/** What POST /transfers/preview returns (D28 step 2), buyer secret included (D77). */
 interface TransferPreview {
+  newOwnerSecret: string;
+  newOwnerCommitment: string;
   oldMerkleRoot: string;
   newMerkleRoot: string;
   oldSiblings: string[];
@@ -125,27 +127,17 @@ async function main(): Promise<void> {
   );
   const propertyId = receipt.propertyId;
 
-  // The buyer picks their own secret and shares only the commitment — the
-  // registry never learns it, which is the whole point of the commitment.
-  const newOwnerSecret =
-    process.env.NEW_OWNER_SECRET !== undefined
-      ? BigInt(process.env.NEW_OWNER_SECRET)
-      : BigInt('0x' + randomBytes(31).toString('hex'));
-  const newOwnerCommitment = await poseidonHash([newOwnerSecret]);
-
   console.log(`\nproperty ${propertyId}`);
   console.log(`  seller commitment  ${receipt.record.ownerCommitment.slice(0, 24)}…`);
-  console.log(`  buyer  commitment  ${newOwnerCommitment.toString().slice(0, 24)}…`);
-  console.log(`\n  ⚠  keep this buyer secret — it is the new owner's only proof of ownership:`);
-  console.log(`     ${newOwnerSecret}\n`);
 
-  // ── Step 2: the registry projects the tree (D47 — now officer-only) ───────
-  const preview = await postJson<TransferPreview>(
-    '/transfers/preview',
-    { propertyId, newOwnerCommitment: newOwnerCommitment.toString() },
-    apiKey,
-  );
+  // ── Step 2: the registry projects the tree and issues the buyer's secret,
+  // like an issuance round's (D77). It is stored only when the proof is
+  // submitted, and reaches the buyer in the change set's archive.
+  const preview = await postJson<TransferPreview>('/transfers/preview', { propertyId }, apiKey);
   if (preview.status >= 400) abort('preview', preview);
+  const newOwnerSecret = BigInt(preview.body.newOwnerSecret);
+  const newOwnerCommitment = BigInt(preview.body.newOwnerCommitment);
+  console.log(`  buyer  commitment  ${newOwnerCommitment.toString().slice(0, 24)}… (issued, D77)`);
   console.log(`preview   old root ${preview.body.oldMerkleRoot.slice(0, 20)}…`);
   console.log(`          new root ${preview.body.newMerkleRoot.slice(0, 20)}…`);
 
@@ -214,6 +206,7 @@ async function main(): Promise<void> {
   const submission = {
     propertyId,
     newOwnerCommitment: newOwnerCommitment.toString(),
+    newOwnerSecret: newOwnerSecret.toString(),
     proof: proof.proof,
     publicSignals: proof.publicSignals,
   };
@@ -255,6 +248,10 @@ async function main(): Promise<void> {
   );
   if (confirm.status >= 400) abort('changeset confirm', confirm);
   console.log(`confirm   root version ${confirm.body.rootVersion}`);
+  console.log(
+    `archive   GET /api/government/changesets/${draft.body.id}/archive — the buyer's bundle, ` +
+      `secret.json included (D77)`,
+  );
 
   // ── The proof is now spent: its oldRoot has stopped being latest ───────────
   const replay = await postJson<{ message?: string }>('/transfers', submission, apiKey);

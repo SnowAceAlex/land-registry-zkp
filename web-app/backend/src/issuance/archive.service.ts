@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 
 import { ZipEntry, ZipService } from './zip.service';
 
+/** How long an archive — and therefore the only copy of its secrets — survives (D42, D77). */
+export const ARCHIVE_TTL_DAYS = 7;
+
 export interface ArchiveEntry {
   propertyId: string;
   certificateSerial: string;
@@ -10,6 +13,8 @@ export interface ArchiveEntry {
 }
 
 export interface ArchiveInput {
+  /** Which round produced it: an issuance batch (D42) or a change set's transfers (D77). */
+  kind: 'issuance' | 'changeset';
   batchId: number;
   rootVersion: number;
   txHash: string | null;
@@ -24,6 +29,10 @@ export interface ArchiveInput {
  * authority and distributed to owners outside the system. This replaces the
  * per-plot one-time claim link of D34.
  *
+ * Since D77 a change set's transfers use it too — one folder per transferred
+ * plot, the same four files — so a buyer's bundle and an issued owner's are
+ * indistinguishable.
+ *
  * The archive contains every owner's secret.json, so the officer holds a copy of
  * all of them until the TTL expires. That is a real privacy cost and it belongs
  * in the thesis Limitations next to D14 — it is not hidden here.
@@ -37,6 +46,7 @@ export class ArchiveService {
 
   async build(input: ArchiveInput): Promise<Buffer> {
     const manifest = {
+      kind: input.kind,
       batchId: input.batchId,
       rootVersion: input.rootVersion,
       txHash: input.txHash,

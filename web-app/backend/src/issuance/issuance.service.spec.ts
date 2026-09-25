@@ -29,7 +29,7 @@ function build() {
   const pdf = { renderCertificate: jest.fn().mockResolvedValue(Buffer.from('%PDF-1.7')) };
   const zipCreate = jest.fn(async (entries: ZipEntry[]) => {
     void entries;
-    return Buffer.from('PK-buyer');
+    return Buffer.from('PK');
   });
   const service = new IssuanceService(
     issuer as never,
@@ -41,67 +41,6 @@ function build() {
 }
 
 describe('IssuanceService', () => {
-  describe('buildBuyerBundle (D51)', () => {
-    it('packs the receipt, the certificate and a README — and no secret.json', async () => {
-      const { service, entries } = build();
-      const property = makeProperty({ propertyId: '1001', ownerCommitment: '777' });
-
-      const { zip } = await service.buildBuyerBundle(
-        { property, merkleProof: merkleProof() },
-        context,
-        new Date('2026-09-14T03:00:00.000Z'),
-      );
-
-      // The buyer's secret was generated at the counter and never reached the
-      // backend; there is nothing to put in a secret.json, and a placeholder
-      // one would be worse than none.
-      expect(entries().map((entry) => entry.name)).toEqual([
-        'receipt.json',
-        'certificate.pdf',
-        'README.txt',
-      ]);
-      expect(zip).toEqual(Buffer.from('PK-buyer'));
-    });
-
-    it('describes the plot under its new owner at the given root', async () => {
-      const { service, entries } = build();
-      const property = makeProperty({ propertyId: '1001', ownerCommitment: '777' });
-
-      const { receipt } = await service.buildBuyerBundle(
-        { property, merkleProof: merkleProof() },
-        context,
-        new Date('2026-09-14T03:00:00.000Z'),
-      );
-
-      expect(receipt).toMatchObject({
-        propertyId: '1001',
-        rootVersion: 9,
-        merkleRoot: '555',
-        leaf: '5',
-        transactionHash: '0xfeed',
-        // The moment the transfer was published, in UTC+7 (D10).
-        issuedOn: '2026-09-14T10:00:00+07:00',
-      });
-      expect(receipt.record.ownerCommitment).toBe('777');
-      expect(JSON.parse(String(entries()[0].content))).toEqual(receipt);
-      expect(Object.keys(receipt)).not.toContain('ownerSecret');
-    });
-
-    it('tells the buyer to pair it with the secret.json handed over at the counter', async () => {
-      const { service, entries } = build();
-
-      await service.buildBuyerBundle(
-        { property: makeProperty({ propertyId: '1001' }), merkleProof: merkleProof() },
-        context,
-        new Date('2026-09-14T03:00:00.000Z'),
-      );
-
-      const readme = String(entries()[2].content);
-      expect(readme).toMatch(/secret\.json/);
-      expect(readme).toMatch(/quầy/);
-    });
-  });
-
   describe('buildBundleFiles — the owner bundle (D31)', () => {
     it('still carries receipt, secret, certificate and README, in that order', async () => {
       const { service, issuer } = build();

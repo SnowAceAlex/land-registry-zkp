@@ -10,17 +10,21 @@
  * ANCHORS the identity (D30): X.509 signatures are RSA-2048 or P-256, neither
  * of which is secp256k1, so checking them on chain would be absurdly expensive.
  *
- *   1. certificate   — parses, and is inside its validity window
+ *   1. certificate   — parses, is inside its validity window, and was issued
+ *                      by the root CA this verifier pins (D78)
  *   2. organization  — keccak256(Subject O) equals authorityInstitute[publisher]
  *   3. signature     — the certificate's key signed the publisher's address
  *   4. role          — the publisher holds STATE_AUTHORITY_ROLE
  *
- * ⚠️ LINK 1 IS NEVER REPORTED AS `pass`. The PoC certificate is self-signed
- *    (`cert:generate`), so there is no chain to a trusted CA to validate, and a
- *    green tick there would be the most load-bearing claim on the page told
- *    wrong. It reports `not-verifiable`, and `trust-summary.ts` downgrades the
- *    overall verdict accordingly. `verifyReceipt.ts` does the same thing on the
- *    Node side, emitting a note rather than a pass.
+ * ⚠️ LINK 1 CHECKS AGAINST A PINNED ROOT, NEVER ONE FROM THE RECEIPT (D78).
+ *    An impostor can ship a CA of their own as easily as a self-signed
+ *    certificate, so only a root the verifier already holds proves anything.
+ *    `trusted-root.ts` supplies it, read at build time. Without one link 1
+ *    reports `not-verifiable` and `trust-summary.ts` downgrades the verdict —
+ *    a green tick there would be the most load-bearing claim on the page told
+ *    wrong. `verifyCertificateIssuedBy` in `blockchain/shared/issuerIdentity.ts`
+ *    applies the same rules on the Node side; `issuer-chain.test.ts` holds the
+ *    two to agreement.
  *
  * @peculiar/x509 is imported DYNAMICALLY so it loads only when a verifier
  * actually supplies a receipt: measured at 194 kB in its own chunk, and the
@@ -74,8 +78,8 @@ export interface IssuerChainReport {
   organizationName?: string;
   notBefore?: Date;
   notAfter?: Date;
-  /** True when Subject equals Issuer — why link 1 is `not-verifiable`. */
-  selfSigned?: boolean;
+  /** CN of the pinned root, when link 1 passed. */
+  issuedBy?: string;
   links: Record<IssuerLink, LinkState>;
   /** Untranslated detail for whichever link failed, when there is one. */
   detail?: string;
@@ -113,6 +117,66 @@ export function issuerSignaturePayload(account: string): Uint8Array<ArrayBuffer>
   return new TextEncoder().encode(issuerSignatureMessage(getAddress(account)));
 }
 
+export type RootCheck =
+  | { ok: true; issuedBy: string; reason?: undefined }
+  | { ok: false; reason: string; issuedBy?: undefined };
+
+/**
+ * Link 1 (D78): was `leafPem` issued by the pinned root `rootPem`?
+ *
+ * Same rules, same order, as `verifyCertificateIssuedBy` on the Node side:
+ * root parses → root is a CA → root in window → leaf in window → leaf's Issuer
+ * DN is the root's Subject DN → the leaf's signature verifies under the root
+ * key. Reasons are untranslated detail, never shown as UI text.
+ */
+export async function checkIssuedByRoot(
+  leafPem: string,
+  rootPem: string,
+  now: Date = new Date(),
+): Promise<RootCheck> {
+  const { X509Certificate, BasicConstraintsExtension } = await loadX509();
+
+  let root: import('@peculiar/x509').X509Certificate;
+  let leaf: import('@peculiar/x509').X509Certificate;
+  try {
+    root = new X509Certificate(rootPem);
+  } catch {
+    return { ok: false, reason: 'the pinned root certificate cannot be parsed' };
+  }
+  try {
+    leaf = new X509Certificate(leafPem);
+  } catch {
+    return { ok: false, reason: 'the issuer certificate cannot be parsed' };
+  }
+
+  const inWindow = (cert: import('@peculiar/x509').X509Certificate) =>
+    now.getTime() >= cert.notBefore.getTime() && now.getTime() <= cert.notAfter.getTime();
+
+  if (!root.getExtension(BasicConstraintsExtension)?.ca) {
+    return { ok: false, reason: 'the pinned root is not a CA certificate' };
+  }
+  if (!inWindow(root)) return { ok: false, reason: 'the pinned root is outside its validity window' };
+  if (!inWindow(leaf)) {
+    return { ok: false, reason: 'the issuer certificate is outside its validity window' };
+  }
+  if (leaf.issuer !== root.subject) {
+    return { ok: false, reason: 'the issuer certificate was not issued by the pinned root' };
+  }
+  const signed = await leaf
+    .verify({ publicKey: root.publicKey, signatureOnly: true })
+    .catch(() => false);
+  if (!signed) {
+    return {
+      ok: false,
+      reason: "the issuer certificate's signature does not verify under the root key",
+    };
+  }
+
+  const [cn] = root.subjectName.getField('CN');
+  const [o] = root.subjectName.getField('O');
+  return { ok: true, issuedBy: cn ?? o ?? root.subject };
+}
+
 /** keccak256 of the organization name, as `registerAuthority` anchored it. */
 export function organizationHash(organizationName: string): Hex {
   return keccak256(toBytes(organizationName));
@@ -122,8 +186,10 @@ export async function verifyIssuerChain(args: {
   issuer: IssuerBlock;
   client: PublicClient;
   registry: Address;
+  /** The root this verifier pins (`trusted-root.ts`); null when none is configured. */
+  trustedRootPem: string | null;
 }): Promise<IssuerChainReport> {
-  const { issuer, client, registry } = args;
+  const { issuer, client, registry, trustedRootPem } = args;
 
   const report: IssuerChainReport = {
     account: issuer.ethereumAccount,
@@ -147,13 +213,21 @@ export async function verifyIssuerChain(args: {
 
   report.notBefore = certificate.notBefore;
   report.notAfter = certificate.notAfter;
-  report.selfSigned = certificate.subject === certificate.issuer;
 
-  const now = Date.now();
-  const inWindow = now >= certificate.notBefore.getTime() && now <= certificate.notAfter.getTime();
-  // Expired is a real failure and is reported as one. A valid window is NOT a
-  // pass, because the CA chain behind it is what a pass would be claiming.
-  report.links.certificate = inWindow ? 'not-verifiable' : 'fail';
+  if (trustedRootPem) {
+    const chained = await checkIssuedByRoot(issuer.IssuerCertificateChain, trustedRootPem);
+    report.links.certificate = chained.ok ? 'pass' : 'fail';
+    if (chained.ok) report.issuedBy = chained.issuedBy;
+    else report.detail = chained.reason;
+  } else {
+    // No pinned root: an expired certificate is still a real failure, but a
+    // valid window is NOT a pass — the CA chain behind it is what a pass would
+    // be claiming, and there is nothing here to check it against.
+    const now = Date.now();
+    const inWindow =
+      now >= certificate.notBefore.getTime() && now <= certificate.notAfter.getTime();
+    report.links.certificate = inWindow ? 'not-verifiable' : 'fail';
+  }
 
   const [org] = certificate.subjectName.getField('O');
   if (org) report.organizationName = org;

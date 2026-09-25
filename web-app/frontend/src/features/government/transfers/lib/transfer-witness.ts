@@ -19,8 +19,7 @@ export interface CounterTransferParams {
   sellerRecord: LURRecord;
   sellerLeaf: bigint;
   sellerSecret: bigint;
-  buyerSecret: bigint;
-  buyerCommitment: bigint;
+  /** Both paths, and the buyer's secret the registry issued with them (D77). */
   preview: TransferPreview;
   currentTimestamp: bigint;
   minRequiredRemainingTerm: bigint;
@@ -37,9 +36,11 @@ export function buildCounterTransferInput(params: CounterTransferParams): ProofI
   return buildTransferInput({
     oldRecord: sellerRecord,
     // Only the owner changes — anything else is unprovable by construction.
-    newRecord: { ...sellerRecord, ownerCommitment: params.buyerCommitment },
+    // The buyer's secret and commitment are the ones the registry issued in
+    // the preview (D77).
+    newRecord: { ...sellerRecord, ownerCommitment: BigInt(preview.newOwnerCommitment) },
     oldOwnerSecret: params.sellerSecret,
-    newOwnerSecret: params.buyerSecret,
+    newOwnerSecret: BigInt(preview.newOwnerSecret),
     oldProof: {
       leaf: params.sellerLeaf,
       siblings: preview.oldSiblings.map((sibling) => BigInt(sibling)),

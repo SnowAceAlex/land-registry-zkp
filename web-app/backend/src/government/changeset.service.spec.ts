@@ -1,4 +1,9 @@
-import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  ConflictException,
+  GoneException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 
 import { ChangeSetService, MAX_REVOCATIONS_PER_CHANGESET } from './changeset.service';
 import { makeProperty } from '../../test/factories';
@@ -53,6 +58,8 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
+      {} as never,
     );
 
     await expect(service.pending()).resolves.toEqual({
@@ -62,6 +69,42 @@ describe('ChangeSetService (D44)', () => {
     });
   });
 
+  it('serves the queue without the buyers’ secrets (D77)', async () => {
+    transferFindMany.mockResolvedValue([
+      {
+        id: 1,
+        propertyId: '1001',
+        newOwnerCommitment: '222',
+        newOwnerSecret: '43',
+        oldRoot: '5',
+        newRoot: '6',
+        proof: {},
+        publicSignals: [],
+        status: 'APPROVED',
+        rejectReason: null,
+        txHash: null,
+        changeSetId: null,
+        createdAt: new Date(),
+        decidedAt: null,
+      },
+    ]);
+    const service = new ChangeSetService(
+      prisma,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    const { transfers } = await service.pending();
+
+    expect(transfers).toHaveLength(1);
+    expect(transfers[0]).not.toHaveProperty('newOwnerSecret');
+  });
+
   it('refuses to draft when there is nothing pending', async () => {
     const service = new ChangeSetService(
       prisma,
@@ -69,6 +112,8 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       { assertNoOpenDraft: jest.fn() } as never,
+      {} as never,
+      {} as never,
       {} as never,
     );
 
@@ -92,6 +137,8 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       { assertNoOpenDraft: jest.fn() } as never,
+      {} as never,
+      {} as never,
       {} as never,
     );
 
@@ -122,6 +169,8 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       { assertNoOpenDraft: jest.fn() } as never,
       {} as never,
+      {} as never,
+      {} as never,
     );
 
     await expect(service.confirm(4)).rejects.toBeInstanceOf(UnprocessableEntityException);
@@ -138,18 +187,19 @@ describe('ChangeSetService (D44)', () => {
    * exactly. Overriding it lets a test simulate the DB having drifted between
    * draft creation and confirm, independently of the chain-root check above it.
    */
-  function buildConfirmScenario(options: { rebuiltRoot?: bigint } = {}) {
-    const { rebuiltRoot = 555n } = options;
+  function buildConfirmScenario(options: { rebuiltRoot?: bigint; secret?: string | null } = {}) {
+    const { rebuiltRoot = 555n, secret = '43' } = options;
     const propertyUpdate = jest.fn();
     const changeSetUpdate = jest.fn().mockResolvedValue(undefined);
     const transaction = jest.fn().mockResolvedValue([]);
+    const transferUpdate = jest.fn();
 
     const draft = {
       id: 9,
       status: 'DRAFT',
       newRoot: '555',
       txHash: null,
-      transfers: [{ id: 1, propertyId: '1001', newOwnerCommitment: '999' }],
+      transfers: [{ id: 1, propertyId: '1001', newOwnerCommitment: '999', newOwnerSecret: secret }],
       revocations: [
         { id: 2, propertyId: '2002', reasonCode: 3, detailText: 'x', detailHash: '0xaa' },
       ],
@@ -162,7 +212,7 @@ describe('ChangeSetService (D44)', () => {
         create: jest.fn(),
         update: changeSetUpdate,
       },
-      transferRequest: { findMany: jest.fn(), update: jest.fn() },
+      transferRequest: { findMany: jest.fn(), update: transferUpdate },
       revocation: { findMany: jest.fn(), update: jest.fn() },
       property: {
         findMany: jest.fn().mockResolvedValue([
@@ -183,10 +233,25 @@ describe('ChangeSetService (D44)', () => {
       // D74 — confirm() always asks the chain itself, never the 2s cache.
       invalidateRootCache: jest.fn(),
       getRootVersion: jest.fn().mockResolvedValue(9),
+      rootRegistryAddress: '0xregistry',
+      explorerTxUrlPrefix: undefined,
     };
     const projectRoot = jest.fn().mockResolvedValue(overlayOf(rebuiltRoot));
     const applyStatements = jest.fn().mockReturnValue(['APPLY_NODES_STMT']);
-    const nodes = { projectRoot, applyStatements };
+    const proofInOverlay = jest.fn().mockResolvedValue({
+      leaf: 1n,
+      siblings: [],
+      pathIndices: [],
+      root: rebuiltRoot,
+    });
+    const nodes = { projectRoot, applyStatements, proofInOverlay };
+    const issuance = {
+      batchContext: jest.fn().mockReturnValue({ issuer: {}, issuedOn: '2026-09-24T10:00:00+07:00' }),
+      buildBundleFiles: jest.fn().mockResolvedValue({
+        files: [{ name: 'receipt.json', content: '{}' }],
+      }),
+    };
+    const archive = { build: jest.fn().mockResolvedValue(Buffer.from('PK-changeset')) };
     const roots = { recordRootStatement: jest.fn().mockReturnValue('RECORD_ROOT_STMT') };
     const events = {
       transferredStatements: jest.fn().mockReturnValue([]),
@@ -200,16 +265,23 @@ describe('ChangeSetService (D44)', () => {
       roots as never,
       { assertNoOpenDraft: jest.fn() } as never,
       events as never,
+      issuance as never,
+      archive as never,
     );
 
     return {
       service,
       propertyUpdate,
+      transferUpdate,
       projectRoot,
       applyStatements,
+      proofInOverlay,
       changeSetUpdate,
       transaction,
       events,
+      issuance,
+      archive,
+      chain,
     };
   }
 
@@ -297,6 +369,8 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       { assertNoOpenDraft: jest.fn() } as never,
       {} as never,
+      {} as never,
+      {} as never,
     );
 
     await expect(service.discard(4)).rejects.toBeInstanceOf(ConflictException);
@@ -323,6 +397,96 @@ describe('ChangeSetService (D44)', () => {
       expect.objectContaining({ txHash: '0xdeadbeef' }),
     );
   });
+  it("confirm archives each transfer's bundle from the projected tree (D77)", async () => {
+    const { service, proofInOverlay, issuance, archive } = buildConfirmScenario();
+
+    await service.confirm(9, '0xfeed');
+
+    // The path comes from the overlay: applyStatements has not run yet, so the
+    // node table still describes the tree BEFORE this round.
+    expect(proofInOverlay).toHaveBeenCalledTimes(1);
+    expect(proofInOverlay.mock.calls[0][0]).toMatchObject({
+      propertyId: '1001',
+      ownerCommitment: '999',
+    });
+    expect(issuance.buildBundleFiles).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerSecret: 43n }),
+      expect.objectContaining({ rootVersion: 9, merkleRoot: 555n, transactionHash: '0xfeed' }),
+      expect.anything(),
+      expect.any(String),
+    );
+    expect(archive.build).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'changeset', batchId: 9, rootVersion: 9 }),
+    );
+  });
+
+  it('confirm writes the archive and clears the secrets in one transaction (D77)', async () => {
+    const { service, changeSetUpdate, transferUpdate, transaction } = buildConfirmScenario();
+
+    await service.confirm(9);
+
+    expect(transferUpdate).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: expect.objectContaining({ status: 'PUBLISHED', newOwnerSecret: null }),
+    });
+    expect(changeSetUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          archiveZip: Buffer.from('PK-changeset'),
+          archiveExpiresAt: expect.any(Date),
+        }),
+      }),
+    );
+    // Both writes are statements of the one $transaction call — the secrets
+    // cannot be cleared unless the archive lands with them.
+    expect(transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('confirm refuses a transfer that carries no secret, before touching the chain (D77)', async () => {
+    const { service, transaction, chain } = buildConfirmScenario({ secret: null });
+
+    await expect(service.confirm(9)).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(chain.getLatestRoot).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('a revocation-only round writes no archive', async () => {
+    changeSetFindUnique.mockResolvedValue({
+      id: 4,
+      status: 'DRAFT',
+      newRoot: '777',
+      txHash: null,
+      transfers: [],
+      revocations: [{ id: 2, propertyId: '2002', reasonCode: 3, detailHash: '0xaa' }],
+    });
+    const archive = { build: jest.fn() };
+    const service = new ChangeSetService(
+      prisma,
+      {
+        projectRoot: jest.fn().mockResolvedValue(overlayOf(777n)),
+        applyStatements: jest.fn().mockReturnValue([]),
+      } as never,
+      {
+        getLatestRoot: jest.fn().mockResolvedValue(777n),
+        invalidateRootCache: jest.fn(),
+        getRootVersion: jest.fn().mockResolvedValue(5),
+      } as never,
+      { recordRootStatement: jest.fn() } as never,
+      {} as never,
+      {
+        transferredStatements: jest.fn().mockReturnValue([]),
+        revokedStatements: jest.fn().mockReturnValue([]),
+      } as never,
+      { batchContext: jest.fn() } as never,
+      archive as never,
+    );
+
+    await service.confirm(4);
+
+    expect(archive.build).not.toHaveBeenCalled();
+    expect(changeSetUpdate.mock.calls[0][0].data).not.toHaveProperty('archiveZip');
+  });
+
   describe('draft discovery (D53) and the revocation cap (D56)', () => {
     const createdAt = new Date('2026-09-14T02:00:00.000Z');
     const revocation = (id: number, propertyId: string) => ({
@@ -335,7 +499,7 @@ describe('ChangeSetService (D44)', () => {
       changeSetId: null,
       createdAt: new Date(Date.UTC(2026, 8, 1, 0, id)),
     });
-    const transfer = { id: 11, propertyId: '5005', newOwnerCommitment: '999' };
+    const transfer = { id: 11, propertyId: '5005', newOwnerCommitment: '999', newOwnerSecret: '43' };
 
     function scenario(pendingRevocations: ReturnType<typeof revocation>[]) {
       const create = jest.fn(async () => ({
@@ -365,6 +529,8 @@ describe('ChangeSetService (D44)', () => {
         {} as never,
         {} as never,
         { assertNoOpenDraft: jest.fn() } as never,
+        {} as never,
+        {} as never,
         {} as never,
       );
       return { service, create, findUnique, count, projectRoot };
@@ -500,6 +666,8 @@ describe('ChangeSetService.createDraft — duplicate queue entries', () => {
       {} as never,
       { assertNoOpenDraft: jest.fn() } as never,
       {} as never,
+      {} as never,
+      {} as never,
     );
   }
 
@@ -604,6 +772,8 @@ describe('ChangeSetService — a transfer may not resurrect a revoked plot (D45/
       { recordRootStatement: jest.fn() } as never,
       { assertNoOpenDraft: jest.fn() } as never,
       { transferredStatements: jest.fn(), revokedStatements: jest.fn() } as never,
+      {} as never,
+      {} as never,
     );
     return { service, create, transaction };
   }
@@ -620,5 +790,98 @@ describe('ChangeSetService — a transfer may not resurrect a revoked plot (D45/
 
     await expect(service.confirm(12)).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChangeSetService — buyer secrets and the archive (D77)', () => {
+  it('createDraft refuses transfers submitted before D77 and names them', async () => {
+    const prisma = {
+      transferRequest: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 5, propertyId: '7', newOwnerCommitment: '1', newOwnerSecret: null },
+        ]),
+      },
+      revocation: { findMany: jest.fn().mockResolvedValue([]) },
+      changeSet: { create: jest.fn() },
+    };
+    const service = new ChangeSetService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      { assertNoOpenDraft: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.createDraft()).rejects.toThrow(/#5/);
+    expect(prisma.changeSet.create).not.toHaveBeenCalled();
+  });
+
+  it('list returns summary columns and counts, never the archive', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      {
+        id: 3,
+        status: 'PUBLISHED',
+        newRoot: '1',
+        rootVersion: 4,
+        txHash: null,
+        createdAt: new Date(),
+        publishedAt: new Date(),
+        archiveExpiresAt: new Date(),
+        _count: { transfers: 2, revocations: 1 },
+      },
+    ]);
+    const service = new ChangeSetService(
+      { changeSet: { findMany } } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    const [row] = await service.list();
+
+    expect(row).toMatchObject({ id: 3, transferCount: 2, revocationCount: 1 });
+    expect(row).not.toHaveProperty('_count');
+    expect(findMany.mock.calls[0][0].select).not.toHaveProperty('archiveZip');
+  });
+
+  it('archiveFor 404s without an archive and 410s + drops it once expired', async () => {
+    const findUnique = jest.fn();
+    const update = jest.fn();
+    const service = new ChangeSetService(
+      { changeSet: { findUnique, update } } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    findUnique.mockResolvedValue({ archiveZip: null, archiveExpiresAt: null });
+    await expect(service.archiveFor(3)).rejects.toBeInstanceOf(NotFoundException);
+
+    findUnique.mockResolvedValue({
+      archiveZip: Buffer.from('PK'),
+      archiveExpiresAt: new Date(Date.now() - 1000),
+    });
+    await expect(service.archiveFor(3)).rejects.toBeInstanceOf(GoneException);
+    expect(update).toHaveBeenCalledWith({ where: { id: 3 }, data: { archiveZip: null } });
+
+    findUnique.mockResolvedValue({
+      archiveZip: Buffer.from('PK'),
+      archiveExpiresAt: new Date(Date.now() + 60_000),
+    });
+    await expect(service.archiveFor(3)).resolves.toEqual({
+      zip: Buffer.from('PK'),
+      filename: 'changeset-3.zip',
+    });
   });
 });

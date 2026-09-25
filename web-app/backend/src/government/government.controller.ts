@@ -271,4 +271,34 @@ export class GovernmentController {
     await this.changeSets.discard(id);
     return { discarded: id };
   }
+
+  @Get('changesets')
+  @ApiOperation({
+    summary: 'List change sets, newest first',
+    description:
+      'Summary columns plus transfer/revocation counts — never archiveZip. Download the ' +
+      'buyers’ archive via GET changesets/:id/archive (D77).',
+  })
+  listChangeSets() {
+    return this.changeSets.list();
+  }
+
+  @Get('changesets/:id/archive')
+  @ApiOperation({
+    summary: 'Download the buyers’ bundles as one ZIP, one folder per transferred plot (D77)',
+    description:
+      'Each folder holds receipt.json, secret.json, certificate.pdf and README.txt — the same ' +
+      'four files as an issuance folder; manifest.json ties the archive to a root version. ' +
+      "Available until the change set's archiveExpiresAt. A round with only revocations has " +
+      'no archive.',
+  })
+  async downloadChangeSetArchive(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    const { zip, filename } = await this.changeSets.archiveFor(id);
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': String(zip.length),
+    });
+    res.end(zip);
+  }
 }

@@ -6,18 +6,18 @@
  *
  *   1. Seller's bundle → shape (lib/bundle) → registry row → seller-check
  *      (leaf recomputes, secret opens the commitment, plot transferable).
- *   2. Buyer's secret, generated here → MUST be downloaded and acknowledged
- *      before anything is submitted (D51): once the change set publishes, a
- *      lost buyer secret makes the plot unprovable forever.
- *   3. Preview → witness from the preview's paths → prove in a Web Worker →
- *      submit. Only the proof and public signals leave this page.
+ *   2. Preview → the registry issues the buyer's secret with both paths (D77)
+ *      → witness → prove in a Web Worker → submit, the buyer's secret
+ *      included. It is saved with the request and reaches the buyer in the
+ *      change set's archive, like an issuance round's secret.
  *
- * Both secrets live only in this component's state and are dropped as soon as
- * the request is submitted or the officer starts over.
+ * The seller's secret lives only in this component's state and is dropped as
+ * soon as the request is submitted or the officer starts over. The buyer's
+ * exists here only for the length of proveAndSubmit().
  */
 
 import { useState } from 'react';
-import { nowUnixTimestamp, poseidonHash } from '@land-registry/blockchain/shared';
+import { nowUnixTimestamp } from '@land-registry/blockchain/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { LoaderCircle } from 'lucide-react';
 
@@ -27,14 +27,12 @@ import { buttonStyles } from '@/components/ui/button';
 import { HashText } from '@/components/ui/hash-text';
 import { Notice } from '@/components/ui/notice';
 import { BundleError, type OwnerBundle, readBundleFiles } from '@/lib/bundle';
-import { downloadBlob } from '@/lib/download';
 import { generateProof } from '@/lib/zkp';
 
 import { type Failure, apiFailure } from '../../api/error-message';
 import { useOpenDraft } from '../../api/hooks';
 import type { PropertyDetail } from '../../api/types';
 import { getPropertyDetail, previewTransfer, submitTransfer } from '../api';
-import { buyerSecretArchive, generateOwnerSecret } from '../lib/buyer-secret';
 import { type SellerCheckIssue, type SellerCheckResult, checkSellerBundle } from '../lib/seller-check';
 import { MAX_TERM_YEARS, parseTermYears, yearsToSeconds } from '@/lib/term';
 import { buildCounterTransferInput } from '../lib/transfer-witness';
@@ -47,13 +45,6 @@ interface Seller {
   check: SellerCheckResult;
 }
 
-interface Buyer {
-  secret: bigint;
-  commitment: bigint;
-  downloadedAs: string | null;
-  acknowledged: boolean;
-}
-
 type Busy = 'checking' | 'previewing' | 'proving' | 'submitting' | null;
 
 export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary['govErrors'] }) {
@@ -62,7 +53,6 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
 
   const [seller, setSeller] = useState<Seller | null>(null);
   const [issues, setIssues] = useState<SellerCheckIssue[]>([]);
-  const [buyer, setBuyer] = useState<Buyer | null>(null);
   const [years, setYears] = useState('0');
   const [busy, setBusy] = useState<Busy>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -72,7 +62,6 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
   function startOver() {
     setSeller(null);
     setIssues([]);
-    setBuyer(null);
     setYears('0');
     setFailure(null);
     setSubmitted(null);
@@ -102,23 +91,6 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
     }
   }
 
-  async function createBuyerSecret() {
-    const secret = generateOwnerSecret();
-    setBuyer({
-      secret,
-      commitment: await poseidonHash([secret]),
-      downloadedAs: null,
-      acknowledged: false,
-    });
-  }
-
-  function downloadBuyerSecret() {
-    if (!seller || !buyer) return;
-    const { bytes, filename } = buyerSecretArchive(seller.property.propertyId, buyer.secret);
-    downloadBlob(new Blob([bytes as BlobPart], { type: 'application/zip' }), filename);
-    setBuyer({ ...buyer, downloadedAs: filename });
-  }
-
   // Shared with the owner's mortgage screen (D70), which feeds the same public
   // signal through the same circuit template. The ceiling matters less here —
   // the buyer is standing at the counter holding the seller's certificate — but
@@ -126,24 +98,20 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
   const parsedYears = parseTermYears(years);
   const yearsError = 'error' in parsedYears ? parsedYears.error : null;
   const yearsValue = 'years' in parsedYears ? parsedYears.years : null;
-  const canSubmit = Boolean(
-    seller && buyer?.downloadedAs && buyer.acknowledged && yearsValue !== null,
-  );
+  const canSubmit = Boolean(seller && yearsValue !== null);
 
   async function proveAndSubmit() {
-    if (!seller || !buyer || !canSubmit || yearsValue === null) return;
+    if (!seller || !canSubmit || yearsValue === null) return;
     const propertyId = seller.property.propertyId;
     setFailure(null);
     try {
       setBusy('previewing');
-      const preview = await previewTransfer(propertyId, buyer.commitment.toString());
+      const preview = await previewTransfer(propertyId);
 
       const input = buildCounterTransferInput({
         sellerRecord: seller.check.record,
         sellerLeaf: seller.check.leaf,
         sellerSecret: BigInt(seller.bundle.secret.ownerSecret),
-        buyerSecret: buyer.secret,
-        buyerCommitment: buyer.commitment,
         preview,
         currentTimestamp: nowUnixTimestamp(),
         minRequiredRemainingTerm: yearsToSeconds(yearsValue),
@@ -161,14 +129,14 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
       setBusy('submitting');
       const request = await submitTransfer({
         propertyId,
-        newOwnerCommitment: buyer.commitment.toString(),
+        newOwnerCommitment: preview.newOwnerCommitment,
+        newOwnerSecret: preview.newOwnerSecret,
         proof: proved.pkg.proof,
         publicSignals: proved.pkg.publicSignals,
       });
 
-      // The request is queued: the secrets have no further use on this page.
+      // The request is queued: the seller's secret has no further use here.
       setSeller(null);
-      setBuyer(null);
       setSubmitted({ id: request.id, durationMs: proved.durationMs });
       await queryClient.invalidateQueries({ queryKey: ['gov', 'transfers'] });
     } catch (error) {
@@ -263,53 +231,6 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
       <Step number={2} title={t.step2} active={Boolean(seller)}>
         {seller ? (
           <div className="space-y-4">
-            <p className="max-w-prose text-sm leading-relaxed text-steel">{t.step2Body}</p>
-            {buyer ? (
-              <>
-                <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[12rem_1fr]">
-                  <dt className="text-steel">{t.buyerCommitment}</dt>
-                  <dd>
-                    <HashText value={buyer.commitment.toString()} head={12} tail={8} />
-                  </dd>
-                </dl>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <button
-                    type="button"
-                    className={buyer.downloadedAs ? buttonStyles.secondary : buttonStyles.primary}
-                    disabled={busy !== null}
-                    onClick={downloadBuyerSecret}
-                  >
-                    {t.downloadSecret}
-                  </button>
-                  {buyer.downloadedAs ? (
-                    <span className="font-mono text-xs text-steel">
-                      {format(t.downloadedSecret, { name: buyer.downloadedAs })}
-                    </span>
-                  ) : null}
-                </div>
-                <label className="flex items-start gap-3 text-sm text-ink">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-4 w-4 accent-authority"
-                    disabled={!buyer.downloadedAs || busy !== null}
-                    checked={buyer.acknowledged}
-                    onChange={(event) => setBuyer({ ...buyer, acknowledged: event.target.checked })}
-                  />
-                  {t.acknowledge}
-                </label>
-              </>
-            ) : (
-              <button type="button" className={buttonStyles.primary} onClick={() => void createBuyerSecret()}>
-                {t.generateSecret}
-              </button>
-            )}
-          </div>
-        ) : null}
-      </Step>
-
-      <Step number={3} title={t.step3} active={Boolean(buyer)}>
-        {seller && buyer ? (
-          <div className="space-y-4">
             <div className="max-w-xs">
               <label htmlFor="transfer-term" className="block text-sm font-medium text-ink">
                 {t.termLabel}
@@ -357,9 +278,6 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
                   t.submit
                 )}
               </button>
-              {!buyer.downloadedAs || !buyer.acknowledged ? (
-                <span className="text-sm text-steel">{t.submitLocked}</span>
-              ) : null}
             </div>
           </div>
         ) : null}

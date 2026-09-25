@@ -11,9 +11,11 @@
  *  - a perfect proof whose issuer's organization hash does not match the
  *    on-chain anchor is `reject`. The proof is fine; the registry that
  *    published its root is not the authority it claims to be (D30);
- *  - a perfect proof with a self-signed issuer certificate is
- *    `accept-with-warning`, never a clean accept, because the PoC has no CA
- *    chain to validate;
+ *  - a perfect proof whose issuer certificate the pinned root did not issue
+ *    is `reject` too (D78) — a self-signed or foreign-CA certificate is exactly
+ *    what an impostor would present;
+ *  - a perfect proof checked by a verifier with NO pinned root is
+ *    `accept-with-warning`, never a clean accept: link 1 could not run;
  *  - an unreachable chain is `unknown`, not `accept`. Half the checks did not
  *    run, and a green tick would be a lie.
  *
@@ -86,9 +88,9 @@ export function summariseTrust(f: TrustFacts): TrustSummary {
     return { verdict: 'accept-with-warning', reasons: ['issuer-not-supplied'] };
   }
 
-  // The PoC's certificate is self-signed, so link 1 is never `pass` and this
-  // deployment can never reach a clean `accept` with a receipt supplied. That
-  // is the honest outcome, and the sentence belongs in the thesis Limitations.
+  // No pinned root (D78): link 1 could not run, so the issuer's identity is
+  // only as good as links 2–4, which an impostor with their own certificate
+  // passes too. Never a clean `accept`.
   if (f.issuer.links.certificate === 'not-verifiable') {
     return { verdict: 'accept-with-warning', reasons: ['issuer-unverified'] };
   }

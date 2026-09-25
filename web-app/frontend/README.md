@@ -32,7 +32,7 @@ src/
 │       ├── layout.tsx               <html lang>, fonts, metadata
 │       ├── page.tsx                 → features/landing
 │       ├── government/              layout mounts wallet + API-key gate + nav
-│       │   └── import | issuance | transfers | changes /page.tsx
+│       │   └── import | issuance | transfers | revocations | changes /page.tsx
 │       └── resident/                layout mounts nav, no wallet
 │           └── lookup | proof | verify /page.tsx
 ├── features/
@@ -46,7 +46,8 @@ src/
 │   │   ├── import/                  UC-2   dry run → import (D52)
 │   │   ├── issuance/                UC-1   pick → draft → sign → confirm → archive
 │   │   ├── transfers/               UC-3   transfer counter (client-side proof) + approval queue
-│   │   └── changes/                 UC-4   change sets + revocation requests
+│   │   ├── revocations/             UC-4   revocation requests + the pending list
+│   │   └── changes/                 UC-4   change sets (publish transfers + revocations, buyers' archive)
 │   └── resident/                    logged-out, no wallet, no provider (D61)
 │       ├── shell/                   portal infra: nav, /public/config cache + hook, error wording
 │       ├── lookup/                  D48    public property history

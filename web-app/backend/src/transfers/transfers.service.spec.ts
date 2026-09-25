@@ -1,11 +1,21 @@
-import { GoneException } from '@nestjs/common';
+// Only the snarkjs-bound calls are faked (they need gitignored artifacts);
+// Poseidon, the tree and the leaf hash stay real — as in proof.service.spec.ts.
+jest.mock('@land-registry/blockchain/shared', () => ({
+  ...jest.requireActual('@land-registry/blockchain/shared'),
+  verifyGroth16Proof: jest.fn().mockResolvedValue(true),
+  assertProofFresh: jest.fn(),
+}));
+
+import { BadRequestException, GoneException } from '@nestjs/common';
 import { Property } from '@prisma/client';
 import {
+  BN254_FIELD_MODULUS,
   TREE_DEPTH,
   applyLeafUpdates,
   buildTree,
   hashRecord,
   overlayReader,
+  poseidonHash,
   proofFrom,
   readerFromTree,
 } from '@land-registry/blockchain/shared';
@@ -21,14 +31,10 @@ describe('TransfersService.requireTransferableProperty (D45/D48)', () => {
       property: { findUnique: jest.fn().mockResolvedValue(revoked) },
     } as never;
 
-    const service = new TransfersService(prisma, {} as never, {} as never);
+    const service = new TransfersService(prisma, {} as never, {} as never, {} as never);
 
-    await expect(
-      service.preview({ propertyId: '1001', newOwnerCommitment: '123' }),
-    ).rejects.toMatchObject({ status: 410 });
-    await expect(
-      service.preview({ propertyId: '1001', newOwnerCommitment: '123' }),
-    ).rejects.toBeInstanceOf(GoneException);
+    await expect(service.preview({ propertyId: '1001' })).rejects.toMatchObject({ status: 410 });
+    await expect(service.preview({ propertyId: '1001' })).rejects.toBeInstanceOf(GoneException);
   });
 });
 
@@ -57,16 +63,26 @@ describe('TransfersService.preview — both Merkle paths (D28, over the node sto
       property: { findUnique: jest.fn().mockResolvedValue(target) },
     } as never;
     const chain = { getRootVersion: jest.fn().mockResolvedValue(4) } as never;
+    // Deterministic stand-in for IssuanceService: the secret is fixed, the
+    // commitment is the real Poseidon hash of it.
+    const issuance = {
+      generateOwnerSecret: () => 43n,
+      commitmentFor: (secret: bigint) => poseidonHash([secret]),
+    } as never;
 
-    return { service: new TransfersService(prisma, nodes as never, chain), tree };
+    return { service: new TransfersService(prisma, nodes as never, chain, issuance), tree };
   }
 
-  it('projects the root a full rebuild with the new owner would produce', async () => {
+  it('issues the buyer secret and projects the root a rebuild with that owner would produce', async () => {
     const registry = ['1', '2', '10'].map((propertyId) => makeProperty({ propertyId }));
     const { service, tree } = await harness(registry, registry[0]);
 
-    const newOwnerCommitment = '424242';
-    const result = await service.preview({ propertyId: '1', newOwnerCommitment });
+    const result = await service.preview({ propertyId: '1' });
+
+    // D77 — the registry issues the buyer's secret, like an issuance round's.
+    expect(result.newOwnerSecret).toBe('43');
+    expect(result.newOwnerCommitment).toBe((await poseidonHash([43n])).toString());
+    const newOwnerCommitment = result.newOwnerCommitment;
 
     // The invariant the counter depends on (D28 step 2 → D46): the witness must
     // commit to the root the registry WOULD produce. If this drifts, a transfer
@@ -91,7 +107,7 @@ describe('TransfersService.preview — both Merkle paths (D28, over the node sto
     const registry = ['1', '2', '10'].map((propertyId) => makeProperty({ propertyId }));
     const { service } = await harness(registry, registry[2]);
 
-    const result = await service.preview({ propertyId: '10', newOwnerCommitment: '999' });
+    const result = await service.preview({ propertyId: '10' });
 
     expect(result.oldSiblings).toHaveLength(TREE_DEPTH);
     expect(result.newSiblings).toHaveLength(TREE_DEPTH);
@@ -99,5 +115,99 @@ describe('TransfersService.preview — both Merkle paths (D28, over the node sto
     // slot, so the old and new leaves sit at the same index and walk the same
     // left/right decisions. transfer.circom relies on it.
     expect(result.newPathIndices).toEqual(result.oldPathIndices);
+  });
+});
+
+describe('TransfersService — the buyer secret at submit and reject (D77)', () => {
+  const property = makeProperty({ propertyId: '1001', ownerCommitment: '111' });
+
+  async function scenario() {
+    const secret = 43n;
+    const commitment = (await poseidonHash([secret])).toString();
+    const create = jest.fn(async ({ data }) => ({
+      id: 1,
+      ...data,
+      status: 'PENDING',
+      rejectReason: null,
+      txHash: null,
+      changeSetId: null,
+      createdAt: new Date(),
+      decidedAt: null,
+    }));
+    const update = jest.fn(async ({ data }) => ({
+      id: 1,
+      propertyId: '1001',
+      newOwnerCommitment: commitment,
+      newOwnerSecret: null,
+      oldRoot: '5',
+      newRoot: '6',
+      proof: {},
+      publicSignals: [],
+      rejectReason: null,
+      txHash: null,
+      changeSetId: null,
+      createdAt: new Date(),
+      ...data,
+    }));
+    const prisma = {
+      property: { findUnique: jest.fn().mockResolvedValue(property) },
+      transferRequest: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn().mockResolvedValue({ id: 1, status: 'PENDING' }),
+        create,
+        update,
+      },
+    };
+    const chain = { getLatestRoot: jest.fn().mockResolvedValue(5n) };
+    const issuance = { commitmentFor: (value: bigint) => poseidonHash([value]) };
+    const service = new TransfersService(
+      prisma as never,
+      {} as never,
+      chain as never,
+      issuance as never,
+    );
+    const signals = ['5', '6', '1001', '111', commitment, '1800000000', '0'];
+    const dto = (newOwnerSecret: string) => ({
+      propertyId: '1001',
+      newOwnerCommitment: commitment,
+      newOwnerSecret,
+      proof: {},
+      publicSignals: signals,
+    });
+    return { service, create, update, dto, secret };
+  }
+
+  it('refuses a secret that does not open the commitment', async () => {
+    const { service, create, dto } = await scenario();
+    await expect(service.submit(dto('44'))).rejects.toBeInstanceOf(BadRequestException);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('refuses a secret outside (0, p)', async () => {
+    const { service, create, dto } = await scenario();
+    await expect(service.submit(dto('0'))).rejects.toBeInstanceOf(BadRequestException);
+    // p reduces to 0 inside Poseidon — the residue, not the number, would open
+    // the commitment, and the owner's later proofs would use the wrong value.
+    await expect(service.submit(dto(BN254_FIELD_MODULUS.toString()))).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('stores the secret in the insert that creates the request, and never returns it', async () => {
+    const { service, create, dto, secret } = await scenario();
+
+    const created = await service.submit(dto(secret.toString()));
+
+    expect(create.mock.calls[0][0].data.newOwnerSecret).toBe('43');
+    expect(created).not.toHaveProperty('newOwnerSecret');
+  });
+
+  it('forgets the secret when the request is rejected', async () => {
+    const { service, update } = await scenario();
+
+    await service.reject(1, 'no');
+
+    expect(update.mock.calls[0][0].data.newOwnerSecret).toBeNull();
   });
 });

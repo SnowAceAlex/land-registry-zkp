@@ -28,8 +28,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { apiErrorCode } from '../../api/error-code';
 import { apiFailure } from '../../api/error-message';
 import { govKeys } from '../../api/hooks';
-import type { TransferRequest, TransferStatus } from '../../api/types';
-import { approveTransfer, downloadBuyerBundle, listTransfers, rejectTransfer } from '../api';
+import type { TransferStatus } from '../../api/types';
+import { approveTransfer, listTransfers, rejectTransfer } from '../api';
 
 const TABS: TransferStatus[] = ['PENDING', 'APPROVED', 'PUBLISHED', 'REJECTED'];
 
@@ -87,18 +87,6 @@ export function TransferQueue({
       setWorking(null);
       setRejecting(null);
       await refresh();
-    }
-  }
-
-  async function download(request: TransferRequest) {
-    setWorking(request.id);
-    setMessage(null);
-    try {
-      await downloadBuyerBundle(request.id);
-    } catch (error) {
-      setMessage({ tone: 'danger', title: t.bundleTitle, detail: apiFailure(error, errors).title });
-    } finally {
-      setWorking(null);
     }
   }
 
@@ -241,14 +229,11 @@ export function TransferQueue({
                     ) : request.status === 'APPROVED' ? (
                       <span className="text-xs text-steel">{t.awaitingPublication}</span>
                     ) : request.status === 'PUBLISHED' ? (
-                      <button
-                        type="button"
-                        className={`${buttonStyles.secondary} px-3 py-1.5 text-xs`}
-                        disabled={working !== null}
-                        onClick={() => download(request)}
-                      >
-                        {t.downloadBundle}
-                      </button>
+                      <span className="text-xs text-steel">
+                        {request.changeSetId !== null
+                          ? format(t.publishedIn, { id: request.changeSetId })
+                          : '—'}
+                      </span>
                     ) : (
                       <span className="text-xs text-steel">{request.rejectReason ?? '—'}</span>
                     )}

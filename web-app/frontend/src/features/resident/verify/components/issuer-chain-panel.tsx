@@ -3,12 +3,11 @@
 /**
  * features/resident/verify/components/issuer-chain-panel.tsx — D30, four links.
  *
- * ⚠️ Link 1 renders with a NEUTRAL icon, never a green tick. The PoC
- *    certificate is self-signed, so "the certificate is genuine" is a claim
- *    this deployment cannot make, and it is the most load-bearing claim on the
- *    page. Saying so plainly — with what IS checked listed next to it — is the
- *    honest presentation, and the same one `verifyReceipt.ts` uses on the Node
- *    side.
+ * ⚠️ Link 1 is a green tick only when the certificate chains to the root CA
+ *    this verifier pins (D78), and the tick names that root. Without a pinned
+ *    root it renders with a NEUTRAL icon: "the certificate is genuine" is then
+ *    a claim this build cannot make, and it is the most load-bearing claim on
+ *    the page. `verifyReceipt.ts` makes the same distinction on the Node side.
  *
  * The receipt input is optional and visibly secondary, with the disclosure
  * warning attached: a receipt reveals the whole certificate, including the term
@@ -20,6 +19,7 @@
 import { Check, CircleHelp, CircleSlash, FileText, X } from 'lucide-react';
 
 import type { Dictionary } from '@/i18n/dictionaries';
+import { format } from '@/i18n/format';
 import { HashText } from '@/components/ui/hash-text';
 import { Notice } from '@/components/ui/notice';
 import { buttonStyles } from '@/components/ui/button';
@@ -106,10 +106,8 @@ export function IssuerChainPanel({
                   <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${tone}`} strokeWidth={2} aria-hidden />
                   <div className="min-w-0">
                     <p className="text-ink">{t[LINKS[link]]}</p>
-                    {link === 'certificate' && state === 'not-verifiable' ? (
-                      <p className="mt-1 text-xs leading-relaxed text-steel">
-                        {t.link_certificateSelfSigned}
-                      </p>
+                    {link === 'certificate' ? (
+                      <CertificateNote state={state} issuedBy={report.issuedBy} t={t} />
                     ) : null}
                   </div>
                 </li>
@@ -128,4 +126,26 @@ export function IssuerChainPanel({
       )}
     </section>
   );
+}
+
+/** Who issued the certificate — or why that could not be said. */
+function CertificateNote({
+  state,
+  issuedBy,
+  t,
+}: {
+  state: LinkState;
+  issuedBy: string | undefined;
+  t: Strings;
+}) {
+  const text =
+    state === 'pass' && issuedBy
+      ? format(t.link_certificateIssuedBy, { issuer: issuedBy })
+      : state === 'fail'
+        ? t.link_certificateRejected
+        : state === 'not-verifiable'
+          ? t.link_certificateNoAnchor
+          : null;
+
+  return text ? <p className="mt-1 text-xs leading-relaxed text-steel">{text}</p> : null;
 }

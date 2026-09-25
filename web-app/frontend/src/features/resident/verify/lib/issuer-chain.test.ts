@@ -1,4 +1,6 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 import { getAddress, keccak256, toBytes } from 'viem';
@@ -6,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   base64ToBytes,
+  checkIssuedByRoot,
   issuerSignaturePayload,
   loadX509,
   organizationHash,
@@ -20,6 +23,7 @@ const KEY_PATH = path.resolve(
   import.meta.dirname,
   '../../../../../../../web-app/backend/certs/issuer.key.pem',
 );
+const ROOT_CERT_PATH = path.resolve(import.meta.dirname, '../../../../../../../pki/root-ca.cert.pem');
 const certsPresent = fs.existsSync(CERT_PATH) && fs.existsSync(KEY_PATH);
 
 const ACCOUNT = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
@@ -143,11 +147,137 @@ describe.skipIf(!certsPresent)('the browser and Node halves of D30 agree', () =>
     expect(valid).toBe(false);
   });
 
-  // The fact that makes link 1 `not-verifiable` rather than `pass`.
-  it('confirms the PoC certificate really is self-signed', async () => {
-    const { X509Certificate } = await loadX509();
-    const certificate = new X509Certificate(fs.readFileSync(CERT_PATH, 'utf8'));
+  // D78: what `cert:generate` wrote is what link 1 will be asked to pass.
+  it.skipIf(!fs.existsSync(ROOT_CERT_PATH))(
+    'the generated issuer certificate chains to pki/root-ca.cert.pem',
+    async () => {
+      const leaf = fs.readFileSync(CERT_PATH, 'utf8');
+      const root = fs.readFileSync(ROOT_CERT_PATH, 'utf8');
+      const { verifyCertificateIssuedBy } = await import(
+        '@land-registry/blockchain/shared/issuerIdentity'
+      );
 
-    expect(certificate.subject).toBe(certificate.issuer);
+      expect(await checkIssuedByRoot(leaf, root)).toMatchObject({ ok: true });
+      expect(verifyCertificateIssuedBy(leaf, root)).toMatchObject({ ok: true });
+    },
+  );
+});
+
+/**
+ * D78 — link 1 is implemented twice, `checkIssuedByRoot` (browser,
+ * @peculiar/x509) and `verifyCertificateIssuedBy` (Node, node:crypto). Every
+ * case runs through BOTH and asserts they reach the same answer: a verifier
+ * that disagrees with `receipt:verify` about who issued a certificate is worse
+ * than either being wrong alone.
+ *
+ * node:crypto cannot create certificates, so the fixtures come from the
+ * openssl CLI — the same tool `cert:generate` uses. Self-skips without it.
+ */
+const opensslAvailable = (() => {
+  try {
+    execFileSync('openssl', ['version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+describe.skipIf(!opensslAvailable)('link 1: issued by the pinned root (D78)', () => {
+  const dir = opensslAvailable ? fs.mkdtempSync(path.join(os.tmpdir(), 'd78-')) : '';
+  const file = (name: string) => path.join(dir, name);
+  const read = (name: string) => fs.readFileSync(file(name), 'utf8');
+
+  /** Self-signed; `ca` decides whether it may sign certificates. */
+  function makeRoot(name: string, ca = true, fileName = name): void {
+    execFileSync('openssl', [
+      'req', '-x509', '-quiet', '-newkey', 'rsa:2048', '-nodes', '-sha256',
+      '-keyout', file(`${fileName}.key`), '-out', file(`${fileName}.pem`), '-days', '30',
+      '-subj', `/C=VN/O=${name}/CN=${name}`,
+      '-addext', `basicConstraints=critical,CA:${ca ? 'TRUE' : 'FALSE'}`,
+      '-addext', 'keyUsage=critical,keyCertSign,cRLSign,digitalSignature',
+    ], { stdio: 'ignore' });
+  }
+
+  /** Issued by `root` — or self-signed when `root` is null. */
+  function makeLeaf(name: string, root: string | null, days = 30): void {
+    execFileSync('openssl', [
+      'req', '-x509', '-quiet', '-newkey', 'rsa:2048', '-nodes', '-sha256',
+      '-keyout', file(`${name}.key`), '-out', file(`${name}.pem`), '-days', String(days),
+      '-subj', '/C=VN/O=So Tai nguyen va Moi truong TP.HCM/CN=land-registry-issuer',
+      ...(root ? ['-CA', file(`${root}.pem`), '-CAkey', file(`${root}.key`)] : []),
+      '-addext', 'basicConstraints=critical,CA:FALSE',
+      '-addext', 'keyUsage=critical,digitalSignature',
+    ], { stdio: 'ignore' });
+  }
+
+  if (opensslAvailable) {
+    makeRoot('Demo Test Root');
+    makeRoot('Impostor Root');
+    makeRoot('Not A CA', false);
+    // Same Subject DN as the real root, different key: the look-alike an
+    // impostor would actually build.
+    makeRoot('Demo Test Root', true, 'twin');
+    makeLeaf('good', 'Demo Test Root');
+    makeLeaf('foreign', 'Impostor Root');
+    makeLeaf('self-signed', null);
+    makeLeaf('from-non-ca', 'Not A CA');
+    makeLeaf('from-twin', 'twin');
+  }
+
+  async function both(leaf: string, root: string, now?: Date) {
+    const { verifyCertificateIssuedBy } = await import(
+      '@land-registry/blockchain/shared/issuerIdentity'
+    );
+    const browser = await checkIssuedByRoot(read(`${leaf}.pem`), read(`${root}.pem`), now);
+    const node = verifyCertificateIssuedBy(read(`${leaf}.pem`), read(`${root}.pem`), now);
+    expect(browser.ok).toBe(node.ok);
+    return { browser, node };
+  }
+
+  it('passes a certificate the pinned root issued, and names the root', async () => {
+    const { browser, node } = await both('good', 'Demo Test Root');
+    expect(browser).toEqual({ ok: true, issuedBy: 'Demo Test Root' });
+    expect(node).toEqual({ ok: true, issuedBy: 'Demo Test Root' });
+  });
+
+  it('fails a self-signed certificate — the pre-D78 kind', async () => {
+    const { browser } = await both('self-signed', 'Demo Test Root');
+    expect(browser.ok).toBe(false);
+  });
+
+  it('fails a certificate another root issued, however real its O field looks', async () => {
+    const { browser } = await both('foreign', 'Demo Test Root');
+    expect(browser.ok).toBe(false);
+  });
+
+  it('fails a certificate from a look-alike root with the same name — only the signature tells', async () => {
+    const { browser, node } = await both('from-twin', 'Demo Test Root');
+    // The DNs match, so the browser gets as far as the signature. Node's
+    // `checkIssued` is OpenSSL's X509_check_issued, which also compares the
+    // Authority/Subject Key Identifiers and so refuses one step earlier. Same
+    // answer, different step — the agreement `both()` asserts is on `ok`.
+    expect(browser.reason).toMatch(/signature/);
+    expect(node.ok).toBe(false);
+  });
+
+  it('fails when the pinned root is not a CA', async () => {
+    const { browser, node } = await both('from-non-ca', 'Not A CA');
+    expect(browser.reason).toMatch(/not a CA/);
+    expect(node.reason).toMatch(/not a CA/);
+  });
+
+  it('fails once the issuer certificate has expired', async () => {
+    const later = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+    const { browser } = await both('good', 'Demo Test Root', later);
+    expect(browser.ok).toBe(false);
+  });
+
+  it('fails a root that is not a certificate at all', async () => {
+    const { verifyCertificateIssuedBy } = await import(
+      '@land-registry/blockchain/shared/issuerIdentity'
+    );
+    const garbage = '-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE-----\n';
+    expect((await checkIssuedByRoot(read('good.pem'), garbage)).ok).toBe(false);
+    expect(verifyCertificateIssuedBy(read('good.pem'), garbage).ok).toBe(false);
   });
 });
