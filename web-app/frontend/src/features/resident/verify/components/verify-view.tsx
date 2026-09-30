@@ -24,7 +24,7 @@
  *     shared module. Chain verification is off-chain on purpose, because
  *     RSA-2048 and P-256 are not secp256k1.
  *  6. Revocation status comes from the chain's own `revocations` mapping (D45),
- *     not from the registry's API.
+ *     not from the registry's API, and is shown through the verdict.
  *  7. Only the disclosed public signals are rendered, beside an explicit list
  *     of what was never revealed. That distinction is the whole point of the
  *     system and a verifier will not infer it.
@@ -43,25 +43,17 @@ export function VerifyView({
   t,
   errors,
   signals,
-  revocation,
   shell,
 }: {
   t: Dictionary['residentVerify'];
   errors: Dictionary['residentErrors'];
   signals: Dictionary['residentSignals'];
-  revocation: Dictionary['residentRevocation'];
   shell: Dictionary['residentShell'];
 }) {
   return (
     <div className="space-y-8">
       <PageHeader title={t.title} description={t.description} />
-      <VerifyWorkbench
-        t={t}
-        errors={errors}
-        signals={signals}
-        revocationStrings={revocation}
-        shell={shell}
-      />
+      <VerifyWorkbench t={t} errors={errors} signals={signals} shell={shell} />
     </div>
   );
 }

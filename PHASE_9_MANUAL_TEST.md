@@ -38,9 +38,9 @@ kiểm tra thứ 4** (on-chain): 3 bước đầu đạt, bước 4 báo `StaleT
 curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"evm_mine","params":[],"id":1}' http://127.0.0.1:8545
 ```
 
-**d) `receipt.json` tiết lộ toàn bộ giấy chứng nhận.** Bước kiểm danh tính D30 (§3.6) cần nó, nên
-trong vai **ngân hàng** thì **không** được đòi file này — trang cũng nói đúng điều đó. Chỉ dùng
-receipt khi đóng vai người mua tại giao dịch chuyển nhượng hoặc cơ quan hậu kiểm.
+**d) `receipt.json` tiết lộ toàn bộ giấy chứng nhận.** Vì vậy trang verify có hai tab: **Xác minh
+thông thường** (người mua, ngân hàng — chỉ `proof.json`) và **Thẩm tra cơ quan phát hành** (bắt buộc
+`proof.json` + `receipt.json` của cùng thửa, thêm bước kiểm danh tính D30 ở §3.6).
 
 **e) `CHAIN_NETWORK` của backend quyết định trang resident đọc chain nào.** Trang lấy `chainId` +
 địa chỉ hợp đồng từ `GET /api/public/config` (D58). Nếu backend đang trỏ `sepolia` mà bạn chạy
@@ -180,10 +180,11 @@ liệu ra một trang không đăng nhập.
 
 ### 3.5 UC-6 — `/vi/resident/verify`, cả ba loại proof
 
-1. Dán `proof-ownership.json` từ §3.2 → **Kiểm tra proof này**.
+1. Ở tab **Xác minh thông thường** (mặc định), dán `proof-ownership.json` từ §3.2 → **Bắt đầu xác minh**.
 2. Bốn ô kiểm tra chạy đúng thứ tự và đều đạt. Mỗi ô phải có một câu giải thích **vì sao** bước đó
    tồn tại — đặc biệt ô đầu (mốc thời gian do người tạo proof chọn).
-3. Kết luận: **Chấp nhận, có lưu ý** (vì chưa nộp receipt).
+3. Kết luận: **Hợp lệ (Chấp nhận)**, banner **xanh**. Tab này không hỏi receipt, không có mục
+   "Đơn vị phát hành", không có khối hướng dẫn theo vai trò hay mục tình trạng thu hồi.
 4. Lặp lại với `proof-mortgage.json`.
 5. Proof transfer — sinh bằng:
    ```bash
@@ -196,7 +197,12 @@ liệu ra một trang không đăng nhập.
 
 ### 3.6 UC-6 — bốn mắt xích D30
 
-1. Ở kết quả §3.5, bấm **Thêm receipt.json** và chọn `receipt.json` của bộ hồ sơ.
+1. Chuyển sang tab **Thẩm tra cơ quan phát hành** (kết quả cũ phải bị xoá). Nút **Bắt đầu xác minh**
+   khoá cho tới khi có **cả** proof lẫn receipt. Dán `proof-ownership.json`, bấm **Chọn tệp
+   receipt.json** và chọn `receipt.json` của **cùng** bộ hồ sơ → **Bắt đầu xác minh**. Mục
+   "4. Đơn vị phát hành" tự chạy sau các ô kiểm tra.
+   - Chọn receipt của **thửa khác** → báo "receipt.json thuộc thửa đất khác…", **không** ô kiểm tra nào chạy.
+   - Chọn nhầm `proof.json` vào ô receipt → báo tệp không phải receipt.json do cơ quan đăng ký cấp.
 2. Mắt xích 1 (`certificate`) phải là **dấu tích xanh** + dòng "Do Demo Government Root CA cấp" (D78).
    Điều kiện: đã chạy `cert:generate` **trước** khi build/khởi động frontend (root được ghim lúc
    build) và bundle được phát hành **sau** đó. ⚠️ Receipt phát hành với chứng chỉ tự ký cũ phải ra
@@ -218,10 +224,10 @@ liệu ra một trang không đăng nhập.
 
 1. Thu hồi thửa đất qua `PHASE_8_MANUAL_TEST.md` §3.5 và publish ChangeSet.
 2. Verify lại proof cũ của chính thửa đó.
-3. Kỳ vọng: ô kiểm tra thứ 3 báo `RootMismatch` **và** panel thu hồi hiện mã lý do, `detailHash`,
-   `rootVersion`, thời điểm thu hồi.
-4. Kết luận phải là **Không nên chấp nhận** với lý do *giấy chứng nhận đã bị thu hồi* — không phải
-   "proof sai". Panel cũng phải nói phần diễn giải chi tiết nằm ngoài chain và phải hỏi cơ quan.
+3. Kỳ vọng: ô kiểm tra thứ 3 báo `RootMismatch`.
+4. Kết luận phải là **Không hợp lệ (Từ chối)** và có dòng *giấy chứng nhận của thửa đất này đã bị
+   thu hồi*. Chi tiết (mã lý do, thời điểm) xem ở `/resident/lookup` — trang verify không còn panel
+   thu hồi riêng.
 
 ### 3.8 UC-6 — các đường thất bại
 

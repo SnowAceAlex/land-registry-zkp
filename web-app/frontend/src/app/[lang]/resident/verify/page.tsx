@@ -15,9 +15,8 @@ export default async function Page({ params }: PageProps<'/[lang]'>) {
       t={dict.residentVerify}
       errors={dict.residentErrors}
       // Sibling features share strings through the route, never through an
-      // import: `proof` and `lookup` use these same two slices (D66).
+      // import: `proof` and `lookup` use this same slice (D66).
       signals={dict.residentSignals}
-      revocation={dict.residentRevocation}
       shell={dict.residentShell}
     />
   );
