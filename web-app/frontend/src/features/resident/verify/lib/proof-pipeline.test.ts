@@ -22,7 +22,12 @@ function facts(
   };
 }
 
-const allPass = { freshness: 'pass', cryptographic: 'pass', rootMatchesChain: 'pass' } as const;
+const allPass = {
+  freshness: 'pass',
+  cryptographic: 'pass',
+  rootMatchesChain: 'pass',
+  ownerNotFrozen: 'pass',
+} as const;
 
 describe('nextVerificationStep (D63)', () => {
   it('asks for a proof before anything else', () => {
@@ -39,6 +44,11 @@ describe('nextVerificationStep (D63)', () => {
       kind: 'run',
       check: 'rootMatchesChain',
     });
+    expect(
+      nextVerificationStep(
+        facts({ freshness: 'pass', cryptographic: 'pass', rootMatchesChain: 'pass' }),
+      ),
+    ).toEqual({ kind: 'run', check: 'ownerNotFrozen' });
     expect(nextVerificationStep(facts(allPass))).toEqual({ kind: 'run', check: 'onChain' });
     expect(nextVerificationStep(facts({ ...allPass, onChain: 'pass' }))).toEqual({ kind: 'done' });
   });
@@ -124,12 +134,44 @@ describe('nextVerificationStep (D63)', () => {
 
   it('skips past an unavailable check instead of stopping on it', () => {
     expect(
-      nextVerificationStep(facts({ freshness: 'pass', cryptographic: 'unavailable', rootMatchesChain: 'pass', onChain: 'unavailable' })),
+      nextVerificationStep(facts({ freshness: 'pass', cryptographic: 'unavailable', rootMatchesChain: 'pass', ownerNotFrozen: 'unavailable', onChain: 'unavailable' })),
     ).toEqual({ kind: 'done' });
   });
 
   it('starts every check pending', () => {
     expect(Object.values(initialChecks()).every((state) => state === 'pending')).toBe(true);
     expect(Object.keys(initialChecks()).sort()).toEqual([...CHECK_ORDER].sort());
+  });
+
+  /** D79/D81 — a proof whose owner a pending procedure froze. */
+  it('reports OwnerFrozen once the root has matched, and before the contract is asked', () => {
+    expect(
+      nextVerificationStep(
+        facts({
+          freshness: 'pass',
+          cryptographic: 'pass',
+          rootMatchesChain: 'pass',
+          ownerNotFrozen: 'fail',
+        }),
+      ),
+    ).toEqual({ kind: 'rejected', reason: 'OwnerFrozen', at: 'ownerNotFrozen' });
+  });
+
+  it('treats a skipped check — a transfer proof — as resolved', () => {
+    expect(nextVerificationStep(facts({ ...allPass, ownerNotFrozen: 'skipped' }))).toEqual({
+      kind: 'run',
+      check: 'onChain',
+    });
+  });
+
+  it('blocks the freeze check too when the chain cannot be reached', () => {
+    expect(
+      nextVerificationStep(
+        facts(
+          { freshness: 'pass', cryptographic: 'pass', rootMatchesChain: 'unavailable' },
+          { chainReachable: false },
+        ),
+      ),
+    ).toEqual({ kind: 'blocked', check: 'ownerNotFrozen', why: 'chain-unavailable' });
   });
 });

@@ -11,6 +11,7 @@
  *
  * It walks:
  *   1. the officer names the plot          (propertyId)
+ *   1b. the officer freezes the seller      → RootRegistry.freezeOwners (D80)
  *   2. the registry projects the new tree and issues the buyer's secret (D77)
  *                                          → POST /transfers/preview
  *   3. both parties prove, in one session  → POST /transfers (buyer secret included)
@@ -129,6 +130,11 @@ async function main(): Promise<void> {
 
   console.log(`\nproperty ${propertyId}`);
   console.log(`  seller commitment  ${receipt.record.ownerCommitment.slice(0, 24)}…`);
+
+  // ── Step 1b: freeze the seller BEFORE anything is recorded (D80) — the
+  // backend refuses the submit otherwise (409 OwnerNotFrozen).
+  const freezeTx = await freezeSeller(propertyId, receipt.record.ownerCommitment);
+  console.log(freezeTx ? `freeze    seller frozen, tx ${freezeTx}` : 'freeze    seller already frozen');
 
   // ── Step 2: the registry projects the tree and issues the buyer's secret,
   // like an issuance round's (D77). It is stored only when the proof is
@@ -270,18 +276,16 @@ async function main(): Promise<void> {
 }
 
 /**
- * Sign and publish the change set's projected root directly against
- * RootRegistry — the step a browser wallet performs in the real government
- * portal (D43/D46). This script has no browser, so it plays the officer's
- * wallet with the deployer/authority private key instead; that substitution
- * is the whole reason this function exists rather than living in the backend.
+ * RootRegistry connected with the authority key, after checking its role.
+ * This script has no browser, so it plays the officer's wallet (D43) — for
+ * the freeze at the counter (D80) and for the change-set root at the end.
  */
-async function publishChangeSetRoot(draft: ChangeSetDraft): Promise<string> {
+async function authorityRegistry() {
   const network = process.env.CHAIN_NETWORK ?? 'localhost';
   const privateKey = process.env.AUTHORITY_PRIVATE_KEY ?? process.env.PRIVATE_KEY;
   if (!privateKey) {
     throw new Error(
-      'AUTHORITY_PRIVATE_KEY (or PRIVATE_KEY) must be set to sign the change-set root — see ' +
+      'AUTHORITY_PRIVATE_KEY (or PRIVATE_KEY) must be set to sign for the registry — see ' +
         '.env.example (Hardhat account #0 for local dev). This stands in for the officer’s ' +
         'Metamask signature (D43).',
     );
@@ -301,12 +305,35 @@ async function publishChangeSetRoot(draft: ChangeSetDraft): Promise<string> {
   if (!(await registry.hasRole(role, signer.address))) {
     throw new Error(
       `${signer.address} does not hold STATE_AUTHORITY_ROLE on ${network}, so it cannot ` +
-        `publish a root. The authority for this deployment is ${deployment.authority.address}. ` +
+        `sign for the registry. The authority for this deployment is ${deployment.authority.address}. ` +
         `Set AUTHORITY_PRIVATE_KEY to that account's key (on a local node it is Hardhat ` +
         `account #0) — PRIVATE_KEY alone is usually the testnet deployer, which is a ` +
         `different account.`,
     );
   }
+  return registry;
+}
+
+/**
+ * Freeze the seller before anything is recorded (D80). Returns the tx hash,
+ * or null when the chain already freezes exactly this owner (a re-run).
+ */
+async function freezeSeller(propertyId: string, ownerCommitment: string): Promise<string | null> {
+  const registry = await authorityRegistry();
+  if ((await registry.frozenOwner(BigInt(propertyId))) === BigInt(ownerCommitment)) return null;
+
+  const tx = await registry.freezeOwners([BigInt(propertyId)], [BigInt(ownerCommitment)]);
+  const receipt = await tx.wait();
+  return receipt!.hash;
+}
+
+/**
+ * Sign and publish the change set's projected root directly against
+ * RootRegistry — the step a browser wallet performs in the real government
+ * portal (D43/D46).
+ */
+async function publishChangeSetRoot(draft: ChangeSetDraft): Promise<string> {
+  const registry = await authorityRegistry();
 
   const newRoot = ethers.toBeHex(BigInt(draft.newRoot), 32);
   const { propertyIds, reasonCodes, detailHashes } = draft.revocationCalldata;

@@ -68,10 +68,13 @@ const ROOT_CACHE_TTL_MS = 10_000;
  */
 const ROOT_CACHE_STALE_MS = 60_000;
 
+/** How many ids one RootRegistry.frozenOwnersOf() eth_call carries (D80). */
+const FROZEN_READ_CHUNK = 1000;
+
 /** A LandRegistryVerifier rejection, decoded from its typed revert (D33). */
 export class ProofRejectedError extends Error {
   constructor(
-    readonly reason: 'InvalidProof' | 'RootMismatch' | 'StaleTimestamp' | 'Unknown',
+    readonly reason: 'InvalidProof' | 'RootMismatch' | 'StaleTimestamp' | 'OwnerFrozen' | 'Unknown',
     message: string,
     readonly details?: Record<string, string>,
   ) {
@@ -125,6 +128,15 @@ export class ChainService implements OnModuleInit {
     );
 
     await this.warnIfNotAuthority();
+
+    // F12: an old RootRegistry deployment has no freeze register (D79) — say so early.
+    try {
+      await this.registry.frozenOwnersOf([]);
+    } catch (error) {
+      this.logger.error(
+        `RootRegistry has no freeze register (D79) — redeploy the contracts: ${(error as Error)?.message}`,
+      );
+    }
   }
 
   /**
@@ -235,6 +247,22 @@ export class ChainService implements OnModuleInit {
   }
 
   /**
+   * RootRegistry.frozenOwner for many plots (D80) — not cached, unlike the root (D74).
+   * @returns propertyId → frozen commitment; 0n when the plot is not frozen.
+   */
+  async getFrozenOwners(propertyIds: string[]): Promise<Map<string, bigint>> {
+    const frozen = new Map<string, bigint>();
+    for (let i = 0; i < propertyIds.length; i += FROZEN_READ_CHUNK) {
+      const chunk = propertyIds.slice(i, i + FROZEN_READ_CHUNK);
+      const values = await this.asServiceUnavailable(() =>
+        this.registry.frozenOwnersOf(chunk.map((id) => BigInt(id))),
+      );
+      chunk.forEach((id, index) => frozen.set(id, values[index]));
+    }
+    return frozen;
+  }
+
+  /**
    * Force the next root read to go to the chain.
    *
    * ⚠️ Must be called at the START of every confirm(), before reading
@@ -339,6 +367,14 @@ export class ChainService implements OnModuleInit {
           'StaleTimestamp',
           'The proof timestamp is outside the ±10 minute tolerance of chain time',
           { claimed: claimed.toString(), blockTime: blockTime.toString() },
+        );
+      }
+      case 'OwnerFrozen': {
+        const [propertyId] = parsed.args as unknown as [bigint];
+        return new ProofRejectedError(
+          'OwnerFrozen',
+          'The owner of this property is frozen by a pending transfer or revocation (D79)',
+          { propertyId: propertyId.toString() },
         );
       }
       default:

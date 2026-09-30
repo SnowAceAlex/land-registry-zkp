@@ -20,7 +20,7 @@
  * refines three codes whose meaning is resident-specific.
  */
 
-import { ApiError } from '@/lib/api-client';
+import { ApiError, type ApiReason } from '@/lib/api-client';
 
 export type ApiErrorCode =
   | 'bad-request'
@@ -33,14 +33,18 @@ export type ApiErrorCode =
   | 'root-mismatch'
   | 'stale-timestamp'
   | 'invalid-proof'
+  | 'owner-frozen'
+  | 'owner-not-frozen'
   | 'unreachable'
   | 'unknown';
 
-const REASON_CODES = {
+const REASON_CODES: Record<ApiReason, ApiErrorCode> = {
   RootMismatch: 'root-mismatch',
   StaleTimestamp: 'stale-timestamp',
   InvalidProof: 'invalid-proof',
-} as const;
+  OwnerFrozen: 'owner-frozen',
+  OwnerNotFrozen: 'owner-not-frozen',
+};
 
 const STATUS_CODES: Record<number, ApiErrorCode> = {
   400: 'bad-request',

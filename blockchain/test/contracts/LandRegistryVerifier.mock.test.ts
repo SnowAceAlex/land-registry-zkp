@@ -156,6 +156,76 @@ describe('contracts/LandRegistryVerifier — mock verifiers (Phase 4)', () => {
     });
   }
 
+  describe('owner freeze (D79)', () => {
+    // signalsFor() puts 42n in every slot it does not name, so a proof's
+    // propertyId and ownerCommitment (indices 1 and 2) are both 42n here.
+    const PROPERTY_ID = 42n;
+    const COMMITMENT = 42n;
+
+    for (const circuit of ['ownership', 'mortgage'] as const) {
+      const fn = VERIFY_FN[circuit];
+
+      it(`${fn} reverts OwnerFrozen while the proof's owner is frozen`, async () => {
+        const { verifier, registry, authority } = await loadFixture(deployFixture);
+        await registry.connect(authority).freezeOwners([PROPERTY_ID], [COMMITMENT]);
+        const now = BigInt(await time.latest());
+
+        await expect(verifier[fn](...DUMMY_PROOF, signalsFor(circuit, PUBLISHED_ROOT, now)))
+          .to.be.revertedWithCustomError(verifier, 'OwnerFrozen')
+          .withArgs(PROPERTY_ID);
+      });
+
+      it(`${fn} passes for a different owner of the same plot — the buyer after publish`, async () => {
+        const { verifier, registry, authority } = await loadFixture(deployFixture);
+        await registry.connect(authority).freezeOwners([PROPERTY_ID], [999n]);
+        const now = BigInt(await time.latest());
+
+        expect(
+          await verifier[fn](...DUMMY_PROOF, signalsFor(circuit, PUBLISHED_ROOT, now)),
+        ).to.equal(true);
+      });
+
+      it(`${fn} passes again once the freeze is lifted`, async () => {
+        const { verifier, registry, authority } = await loadFixture(deployFixture);
+        await registry.connect(authority).freezeOwners([PROPERTY_ID], [COMMITMENT]);
+        await registry.connect(authority).unfreezeOwners([PROPERTY_ID]);
+        const now = BigInt(await time.latest());
+
+        expect(
+          await verifier[fn](...DUMMY_PROOF, signalsFor(circuit, PUBLISHED_ROOT, now)),
+        ).to.equal(true);
+      });
+
+      it(`${fn}: the earlier rules still win over OwnerFrozen`, async () => {
+        const { verifier, registry, authority, mock } = await loadFixture(deployFixture);
+        await registry.connect(authority).freezeOwners([PROPERTY_ID], [COMMITMENT]);
+        const now = BigInt(await time.latest());
+
+        await expect(
+          verifier[fn](...DUMMY_PROOF, signalsFor(circuit, 99_999n, now)),
+        ).to.be.revertedWithCustomError(verifier, 'RootMismatch');
+        await expect(
+          verifier[fn](...DUMMY_PROOF, signalsFor(circuit, PUBLISHED_ROOT, now - 10_000n)),
+        ).to.be.revertedWithCustomError(verifier, 'StaleTimestamp');
+        await mock.setResult(false);
+        await expect(
+          verifier[fn](...DUMMY_PROOF, signalsFor(circuit, PUBLISHED_ROOT, now)),
+        ).to.be.revertedWithCustomError(verifier, 'InvalidProof');
+      });
+    }
+
+    it('verifyTransfer ignores the freeze — approve() runs after the plot is frozen', async () => {
+      const { verifier, registry, authority } = await loadFixture(deployFixture);
+      // In a transfer's signals propertyId and oldOwnerCommitment are 42n too.
+      await registry.connect(authority).freezeOwners([PROPERTY_ID], [COMMITMENT]);
+      const now = BigInt(await time.latest());
+
+      expect(
+        await verifier.verifyTransfer(...DUMMY_PROOF, signalsFor('transfer', PUBLISHED_ROOT, now)),
+      ).to.equal(true);
+    });
+  });
+
   it('verifyTransfer ignores newMerkleRoot — it need not be published yet (§3 two-step flow)', async () => {
     const { verifier, registry } = await loadFixture(deployFixture);
     const now = BigInt(await time.latest());

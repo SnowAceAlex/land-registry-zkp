@@ -24,20 +24,32 @@ export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localh
  */
 export const GOV_API_KEY_HEADER = 'x-gov-api-key';
 
-/** The typed verifier rejections (D33), shared by the contract and the backend. */
-export type ProofRejectionReason = 'InvalidProof' | 'RootMismatch' | 'StaleTimestamp';
-const PROOF_REJECTION_REASONS: readonly string[] = ['InvalidProof', 'RootMismatch', 'StaleTimestamp'];
+/** The typed verifier rejections (D33 + D79), shared by the contract and the backend. */
+export type ProofRejectionReason = 'InvalidProof' | 'RootMismatch' | 'StaleTimestamp' | 'OwnerFrozen';
+
+/**
+ * Every `reason` a screen may branch on: the proof rejections above, plus the
+ * 409 a government gate throws when a procedure's freeze is missing (D80).
+ */
+export type ApiReason = ProofRejectionReason | 'OwnerNotFrozen';
+const API_REASONS: readonly string[] = [
+  'InvalidProof',
+  'RootMismatch',
+  'StaleTimestamp',
+  'OwnerFrozen',
+  'OwnerNotFrozen',
+];
 
 /**
  * A non-2xx response. `detail` is the backend's own explanation (English, kept
- * verbatim for the detail line); `reason` is set only for a D33 proof rejection,
- * which is what a screen branches on — never on the text.
+ * verbatim for the detail line); `reason` is set only for a D33/D79/D80
+ * rejection, which is what a screen branches on — never on the text.
  */
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly detail: string,
-    readonly reason?: ProofRejectionReason,
+    readonly reason?: ApiReason,
     readonly details?: Record<string, string>,
   ) {
     super(`API ${status}: ${detail}`);
@@ -60,8 +72,8 @@ export function parseApiError(status: number, body: unknown, statusText = ''): A
         : undefined;
     if (message !== undefined) {
       const reason =
-        typeof record.reason === 'string' && PROOF_REJECTION_REASONS.includes(record.reason)
-          ? (record.reason as ProofRejectionReason)
+        typeof record.reason === 'string' && API_REASONS.includes(record.reason)
+          ? (record.reason as ApiReason)
           : undefined;
       const details =
         record.details && typeof record.details === 'object'

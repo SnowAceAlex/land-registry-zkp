@@ -107,12 +107,13 @@ export class ProofController {
   @ApiOperation({
     summary: 'Verify a Groth16 proof off-chain (and optionally on-chain)',
     description:
-      'Applies the same three rules LandRegistryVerifier applies on chain, and rejects with the ' +
-      'same names (D33): the proof must be cryptographically valid (InvalidProof), its ' +
+      'Applies the same four rules LandRegistryVerifier applies on chain, and rejects with the ' +
+      'same names (D33/D81): the proof must be cryptographically valid (InvalidProof), its ' +
       '`currentTimestamp` must be within ±10 minutes of now (StaleTimestamp — D26: a proof ' +
-      'dated back to when an expired title was still valid verifies perfectly), and its root ' +
-      'must be the current on-chain root (RootMismatch). The circuit type is inferred from the ' +
-      'number of public signals when not given.',
+      'dated back to when an expired title was still valid verifies perfectly), its root ' +
+      'must be the current on-chain root (RootMismatch), and — ownership/mortgage only — the ' +
+      'owner must not be frozen by an open procedure (OwnerFrozen). The circuit type is inferred ' +
+      'from the number of public signals when not given.',
   })
   @ApiOkResponse({ type: VerifyProofResponseDto })
   @ApiBadRequestResponse({ description: 'Malformed body, or circuitType contradicts the signals' })

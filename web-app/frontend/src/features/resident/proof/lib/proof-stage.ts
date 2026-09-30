@@ -46,6 +46,9 @@
  * one never issued (D39), and neither is a network problem a retry could fix —
  * the leaf is not in the tree, so no Merkle proof exists to fetch.
  *
+ * A fourth, `owner-frozen` (D81): a pending transfer/revocation froze this owner on chain,
+ * so every verifier rejects its proofs with OwnerFrozen until the change set publishes.
+ *
  * ⚠️ ORDERING BUG THIS FIXES. `refreshedRoot === null` used to be tested before
  *    `chainReachable`, so ANY failed refresh — revoked, unissued, 503, node
  *    down — left the machine at `refreshing` for good: a spinner that never
@@ -69,6 +72,7 @@ export type ProofStage =
   | 'chain-unavailable'
   | 'root-not-published'
   | 'superseded'
+  | 'owner-frozen'
   | 'ready'
   | 'proving'
   | 'done';
@@ -92,6 +96,13 @@ export interface ProofStageFacts {
    * same Poseidon output, so there is no formatting to reconcile.
    */
   registryLeaf: string | null;
+  /**
+   * RootRegistry.frozenOwner for this plot, decimal (D79); null when not
+   * frozen, undefined while the read is in flight.
+   */
+  frozenOwner: string | null | undefined;
+  /** Decimal owner commitment from the bundle's own record; null until parsed. */
+  bundleOwnerCommitment: string | null;
   /**
    * The registry answered definitively that no proof can exist for this plot:
    * revoked (410) or never issued (400). Distinct from `chainReachable: false`
@@ -144,6 +155,17 @@ export function nextProofStage(f: ProofStageFacts): ProofStage {
   // tell an owner their certificate was superseded.
   if (f.bundleLeaf !== null && f.registryLeaf !== null && f.bundleLeaf !== f.registryLeaf) {
     return 'superseded';
+  }
+
+  // D81: after superseded, so a freeze is only claimed once both roots and
+  // both leaves already agree that it is about THIS owner of THIS leaf.
+  if (f.frozenOwner === undefined) return 'refreshing';
+  if (
+    f.frozenOwner !== null &&
+    f.bundleOwnerCommitment !== null &&
+    f.frozenOwner === f.bundleOwnerCommitment
+  ) {
+    return 'owner-frozen';
   }
 
   if (f.busy === 'proving') return 'proving';

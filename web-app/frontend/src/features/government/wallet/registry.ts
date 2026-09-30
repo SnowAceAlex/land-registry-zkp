@@ -16,7 +16,7 @@
 import type { Hex } from 'viem';
 
 import { rootToBytes32 } from '@/lib/contracts';
-import type { OpenDraft } from '../api/types';
+import type { FreezeCalldata, OpenDraft } from '../api/types';
 
 export { bytes32ToDecimal, rootRegistryAbi, rootToBytes32 } from '@/lib/contracts';
 
@@ -49,12 +49,43 @@ export function publishCallFor(draft: OpenDraft): PublishCall {
   return { functionName: 'publishRoot', args: [newRoot] };
 }
 
+/** Plots per freezeOwners/unfreezeOwners call — mirrors the backend's constant of the same name. */
+export const MAX_FREEZES_PER_TX = 200;
+
+export type FreezeCall =
+  | { functionName: 'freezeOwners'; args: readonly [readonly bigint[], readonly bigint[]] }
+  | { functionName: 'unfreezeOwners'; args: readonly [readonly bigint[]] };
+
+/** The transactions a freeze or an unfreeze takes (D79/D80), one per MAX_FREEZES_PER_TX plots. */
+export function freezeCallsFor(mode: 'freeze' | 'unfreeze', calldata: FreezeCalldata): FreezeCall[] {
+  const calls: FreezeCall[] = [];
+  for (let i = 0; i < calldata.propertyIds.length; i += MAX_FREEZES_PER_TX) {
+    const ids = calldata.propertyIds.slice(i, i + MAX_FREEZES_PER_TX).map((id) => BigInt(id));
+    calls.push(
+      mode === 'freeze'
+        ? {
+            functionName: 'freezeOwners',
+            args: [
+              ids,
+              calldata.ownerCommitments
+                .slice(i, i + MAX_FREEZES_PER_TX)
+                .map((commitment) => BigInt(commitment)),
+            ],
+          }
+        : { functionName: 'unfreezeOwners', args: [ids] },
+    );
+  }
+  return calls;
+}
+
 export type WalletErrorCode =
   | 'rejected'
   | 'duplicate-root'
   | 'no-role'
   | 'already-revoked'
   | 'invalid-revocation'
+  | 'not-frozen'
+  | 'invalid-freeze'
   | 'unknown';
 
 const REVERT_CODES: Record<string, WalletErrorCode> = {
@@ -63,6 +94,9 @@ const REVERT_CODES: Record<string, WalletErrorCode> = {
   AlreadyRevoked: 'already-revoked',
   InvalidReasonCode: 'invalid-revocation',
   RevocationArrayLengthMismatch: 'invalid-revocation',
+  NotFrozen: 'not-frozen',
+  ZeroOwnerCommitment: 'invalid-freeze',
+  FreezeArrayLengthMismatch: 'invalid-freeze',
 };
 
 /**

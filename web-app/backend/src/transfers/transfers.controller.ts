@@ -89,7 +89,8 @@ export class TransfersController {
   @ApiConflictResponse({
     description:
       'A transfer for this property is already pending, or already approved and waiting to be ' +
-      'published in a change set (D46)',
+      'published in a change set (D46); OwnerNotFrozen if the chain has not frozen the seller ' +
+      'yet (D80); or the plot has an open revocation (one procedure per plot, D80)',
   })
   submit(@Body() dto: SubmitTransferDto) {
     return this.transfers.submit(dto);
@@ -125,7 +126,11 @@ export class TransfersController {
       'Typed rejection from LandRegistryVerifier (D33): InvalidProof, RootMismatch (the registry ' +
       'moved on — the request is auto-rejected), or StaleTimestamp',
   })
-  @ApiConflictResponse({ description: 'Request was already approved or rejected' })
+  @ApiConflictResponse({
+    description:
+      'Request was already approved or rejected, or OwnerNotFrozen if the seller\'s freeze fell ' +
+      'off chain since submit (D80)',
+  })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid x-gov-api-key header' })
   approve(@Param('id', ParseIntPipe) id: number) {
     return this.transfers.approve(id);

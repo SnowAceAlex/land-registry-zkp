@@ -17,6 +17,7 @@
  *     transfer's proof has gone stale against a newer root.
  *  5. The buyer's secret is generated at the counter and must be downloaded
  *     before submit; the buyer's receipt is downloaded once PUBLISHED (D51).
+ *  6. D80: freeze the seller on chain before proving/submitting; lift it from the Rejected tab.
  */
 import type { Dictionary } from '@/i18n/dictionaries';
 import { PageHeader } from '@/components/ui/page-header';
@@ -27,9 +28,11 @@ import { TransferQueue } from './transfer-queue';
 export function TransfersView({
   t,
   errors,
+  freezeT,
 }: {
   t: Dictionary['govTransfers'];
   errors: Dictionary['govErrors'];
+  freezeT: Dictionary['govFreeze'];
 }) {
   return (
     <div className="space-y-10">
@@ -39,14 +42,14 @@ export function TransfersView({
         <h2 id="transfer-counter" className="text-lg font-semibold tracking-tight">
           {t.counterTitle}
         </h2>
-        <TransferCounter t={t} errors={errors} />
+        <TransferCounter t={t} errors={errors} freezeT={freezeT} />
       </section>
 
       <section aria-labelledby="transfer-queue" className="space-y-4">
         <h2 id="transfer-queue" className="text-lg font-semibold tracking-tight">
           {t.queueTitle}
         </h2>
-        <TransferQueue t={t} errors={errors} />
+        <TransferQueue t={t} errors={errors} freezeT={freezeT} />
       </section>
     </div>
   );

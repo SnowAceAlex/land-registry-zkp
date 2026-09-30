@@ -71,4 +71,12 @@ describe('decodeVerifierRevert (D33)', () => {
       'execution reverted',
     );
   });
+
+  it('names OwnerFrozen — a proof whose owner a pending procedure froze (D81)', () => {
+    const error = Object.assign(new Error('reverted'), {
+      cause: { data: { errorName: 'OwnerFrozen', args: [1001n] } },
+    });
+
+    expect(decodeVerifierRevert(error)).toMatchObject({ name: 'OwnerFrozen', args: [1001n] });
+  });
 });

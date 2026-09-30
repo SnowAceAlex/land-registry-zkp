@@ -16,6 +16,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBody,
+  ApiConflictResponse,
   ApiConsumes,
   ApiOkResponse,
   ApiOperation,
@@ -30,6 +31,8 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { ApiKeyGuard, GOV_API_KEY_HEADER, GOV_API_KEY_SECURITY } from '../common/api-key.guard';
 import { parsePageQuery } from '../common/pagination';
 import { ChangeSetService } from './changeset.service';
+import { FreezeService } from '../freeze/freeze.service';
+import { FreezeStatusDto } from '../freeze/dto/freeze-status.dto';
 import { GovernmentService, parsePropertyStatus } from './government.service';
 import { ImportService } from '../import/import.service';
 import { ImportResult } from '../import/dto/import.response.dto';
@@ -62,6 +65,7 @@ export class GovernmentController {
     private readonly revocations: RevocationService,
     private readonly changeSets: ChangeSetService,
     private readonly openDrafts: OpenDraftService,
+    private readonly freezes: FreezeService,
   ) {}
 
   @Get('status')
@@ -225,8 +229,28 @@ export class GovernmentController {
 
   @Post('revocations')
   @ApiOperation({ summary: 'Request revocation of an issued certificate' })
+  @ApiConflictResponse({
+    description:
+      'OwnerNotFrozen if the chain has not frozen the owner yet (D80), or the plot has an open ' +
+      'transfer (one procedure per plot, D80)',
+  })
   async requestRevocation(@Body() dto: CreateRevocationDto) {
     return this.revocations.request(dto);
+  }
+
+  @Get('freezes/:propertyId')
+  @ApiOperation({
+    summary: 'Whether the current owner of a plot is frozen on chain (D79/D80)',
+    description:
+      'Call before recording a transfer or a revocation. If `frozenOnChain` is false, sign ' +
+      '`freezeOwners(freezeCalldata.propertyIds, freezeCalldata.ownerCommitments)` first — the ' +
+      'backend refuses to record the procedure otherwise (409 OwnerNotFrozen). ' +
+      '`unfreezeAllowed` says whether `unfreezeOwners([propertyId])` may be signed: only when ' +
+      'no procedure is open on the plot.',
+  })
+  @ApiOkResponse({ type: FreezeStatusDto })
+  freezeStatus(@Param('propertyId') propertyId: string) {
+    return this.freezes.status(propertyId);
   }
 
   @Get('pending-changes')
@@ -248,6 +272,11 @@ export class GovernmentController {
       'TransferRequest or Revocation row is modified until confirm. Sign the returned newRoot ' +
       '(and, when the round includes any revocations, the revocationCalldata for ' +
       'publishRootWithRevocations) with Metamask, then call confirm.',
+  })
+  @ApiConflictResponse({
+    description:
+      'OwnerNotFrozen if any queued plot is not frozen on chain (D80) — sign pending().unfrozen ' +
+      'first, or another draft is already open (D44)',
   })
   async createChangeSetDraft() {
     return this.changeSets.createDraft();

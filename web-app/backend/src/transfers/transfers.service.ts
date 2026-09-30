@@ -20,6 +20,7 @@ import {
 
 import { ChainService, ProofRejectedError } from '../chain/chain.service';
 import { blockchainDir } from '../common/paths';
+import { FreezeService } from '../freeze/freeze.service';
 import { IssuanceService } from '../issuance/issuance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeStoreService } from '../tree/node-store.service';
@@ -52,6 +53,7 @@ import { toTransferRequestDto } from './transfer-request.serializer';
 const OLD_ROOT = 0;
 const NEW_ROOT = 1;
 const PROPERTY_ID = 2;
+const OLD_OWNER_COMMITMENT = 3;
 const NEW_OWNER_COMMITMENT = 4;
 
 @Injectable()
@@ -63,6 +65,7 @@ export class TransfersService {
     private readonly nodes: NodeStoreService,
     private readonly chain: ChainService,
     private readonly issuance: IssuanceService,
+    private readonly freezes: FreezeService,
   ) {}
 
   /**
@@ -149,6 +152,22 @@ export class TransfersService {
       );
     }
 
+    // D80: one open procedure per plot — a pending revocation freezes the same
+    // owner a transfer would, so this must be checked before the freeze below.
+    const revocation = await this.prisma.revocation.findFirst({
+      where: { propertyId: property.propertyId, status: 'PENDING' },
+    });
+    if (revocation) {
+      throw new ConflictException(
+        `Property ${property.propertyId} has a pending revocation (#${revocation.id}) and ` +
+          `cannot be transferred while it is open`,
+      );
+    }
+
+    // D80: freeze first, record second. The seller's commitment comes from the
+    // proof, which binds it to the leaf in latestRoot.
+    await this.freezes.assertFrozen(property.propertyId, publicSignals[OLD_OWNER_COMMITMENT]);
+
     const created = await this.prisma.transferRequest.create({
       data: {
         propertyId: dto.propertyId,
@@ -222,6 +241,10 @@ export class TransfersService {
       }
       throw error;
     }
+
+    // D80: re-checked rather than assumed — an unfreeze signed from another
+    // session must not let an APPROVED transfer wait unfrozen for the change set.
+    await this.freezes.assertFrozen(request.propertyId, publicSignals[OLD_OWNER_COMMITMENT]);
 
     const updated = await this.prisma.transferRequest.update({
       where: { id },

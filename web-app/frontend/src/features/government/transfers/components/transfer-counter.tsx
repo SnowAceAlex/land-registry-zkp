@@ -14,6 +14,9 @@
  * The seller's secret lives only in this component's state and is dropped as
  * soon as the request is submitted or the officer starts over. The buyer's
  * exists here only for the length of proveAndSubmit().
+ *
+ *   1b. Freeze the seller on chain (D80) — before anything is proved or
+ *      recorded; the backend refuses the submit until the chain shows it.
  */
 
 import { useState } from 'react';
@@ -30,8 +33,12 @@ import { BundleError, type OwnerBundle, readBundleFiles } from '@/lib/bundle';
 import { generateProof } from '@/lib/zkp';
 
 import { type Failure, apiFailure } from '../../api/error-message';
+import { getFreezeStatus } from '../../api/freezes';
 import { useOpenDraft } from '../../api/hooks';
-import type { PropertyDetail } from '../../api/types';
+import type { FreezeStatus, PropertyDetail } from '../../api/types';
+import { openProcedureMessage } from '../../publishing/open-procedure-message';
+import { FreezeStep } from '../../publishing/components/freeze-step';
+import { UnfreezeAction } from '../../publishing/components/unfreeze-action';
 import { getPropertyDetail, previewTransfer, submitTransfer } from '../api';
 import { type SellerCheckIssue, type SellerCheckResult, checkSellerBundle } from '../lib/seller-check';
 import { MAX_TERM_YEARS, parseTermYears, yearsToSeconds } from '@/lib/term';
@@ -47,7 +54,15 @@ interface Seller {
 
 type Busy = 'checking' | 'previewing' | 'proving' | 'submitting' | null;
 
-export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary['govErrors'] }) {
+export function TransferCounter({
+  t,
+  errors,
+  freezeT,
+}: {
+  t: Strings;
+  errors: Dictionary['govErrors'];
+  freezeT: Dictionary['govFreeze'];
+}) {
   const queryClient = useQueryClient();
   const openDraft = useOpenDraft();
 
@@ -58,6 +73,7 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
   const [failure, setFailure] = useState<Failure | null>(null);
   const [submitted, setSubmitted] = useState<{ id: number; durationMs: number } | null>(null);
   const [inputKey, setInputKey] = useState(0);
+  const [freeze, setFreeze] = useState<FreezeStatus | null>(null);
 
   function startOver() {
     setSeller(null);
@@ -66,6 +82,16 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
     setFailure(null);
     setSubmitted(null);
     setInputKey((key) => key + 1);
+    setFreeze(null);
+  }
+
+  /** Re-read the seller's freeze — after the bundle checks out, and after signing. */
+  async function refreshFreeze(propertyId: string) {
+    try {
+      setFreeze(await getFreezeStatus(propertyId));
+    } catch (error) {
+      setFailure(apiFailure(error, errors));
+    }
   }
 
   async function loadBundle(files: FileList | null) {
@@ -79,6 +105,7 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
         setIssues(check.issues);
       } else {
         setSeller({ bundle, property, check });
+        await refreshFreeze(property.propertyId);
       }
     } catch (error) {
       setFailure(
@@ -98,7 +125,14 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
   const parsedYears = parseTermYears(years);
   const yearsError = 'error' in parsedYears ? parsedYears.error : null;
   const yearsValue = 'years' in parsedYears ? parsedYears.years : null;
-  const canSubmit = Boolean(seller && yearsValue !== null);
+  // Freeze first, record second (D80): the proof is generated only once the
+  // chain freezes this seller, so the submit cannot be refused for it.
+  const canSubmit = Boolean(
+    seller &&
+      yearsValue !== null &&
+      freeze?.frozenOnChain &&
+      freeze.openProcedure === null,
+  );
 
   async function proveAndSubmit() {
     if (!seller || !canSubmit || yearsValue === null) return;
@@ -228,7 +262,48 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
         )}
       </Step>
 
-      <Step number={2} title={t.step2} active={Boolean(seller)}>
+      <Step number={2} title={t.stepFreeze} active={Boolean(seller)}>
+        {seller && freeze ? (
+          freeze.openProcedure ? (
+            <div className="space-y-3">
+              <Notice tone="danger" title={openProcedureMessage(freezeT, freeze.openProcedure)} />
+              {!freeze.frozenOnChain ? (
+                <FreezeStep
+                  mode="freeze"
+                  calldata={freeze.freezeCalldata}
+                  t={freezeT}
+                  errors={errors}
+                  label={format(freezeT.freezePlot, { id: seller.property.propertyId })}
+                  onDone={() => refreshFreeze(seller.property.propertyId)}
+                />
+              ) : null}
+            </div>
+          ) : freeze.frozenOnChain ? (
+            <div className="space-y-3">
+              <Notice tone="success" title={freezeT.frozenDone} />
+              <UnfreezeAction
+                propertyId={seller.property.propertyId}
+                t={freezeT}
+                errors={errors}
+                label={t.abandonAndUnfreeze}
+                disabled={busy !== null}
+                onDone={startOver}
+              />
+            </div>
+          ) : (
+            <FreezeStep
+              mode="freeze"
+              calldata={freeze.freezeCalldata}
+              t={freezeT}
+              errors={errors}
+              label={format(freezeT.freezePlot, { id: seller.property.propertyId })}
+              onDone={() => refreshFreeze(seller.property.propertyId)}
+            />
+          )
+        ) : null}
+      </Step>
+
+      <Step number={3} title={t.step2} active={Boolean(seller && freeze?.frozenOnChain)}>
         {seller ? (
           <div className="space-y-4">
             <div className="max-w-xs">

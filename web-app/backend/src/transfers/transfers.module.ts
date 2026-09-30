@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { ChainModule } from '../chain/chain.module';
+import { FreezeModule } from '../freeze/freeze.module';
 import { IssuanceModule } from '../issuance/issuance.module';
 import { TransfersController } from './transfers.controller';
 import { TransfersService } from './transfers.service';
@@ -21,9 +22,11 @@ import { TreeModule } from '../tree/tree.module';
  *
  * IssuanceModule is imported for the buyer's secret (D77): it is issued by the
  * same IssuanceService.generateOwnerSecret() as an issuance round's.
+ *
+ * FreezeModule gates submit and approve on the on-chain freeze (D80).
  */
 @Module({
-  imports: [ChainModule, TreeModule, IssuanceModule],
+  imports: [ChainModule, TreeModule, IssuanceModule, FreezeModule],
   controllers: [TransfersController],
   providers: [TransfersService],
 })

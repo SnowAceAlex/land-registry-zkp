@@ -34,16 +34,18 @@ export function ChangesView({
   t,
   draftT,
   errors,
+  freezeT,
 }: {
   lang: Locale;
   t: Dictionary['govChanges'];
   draftT: Dictionary['govDraft'];
   errors: Dictionary['govErrors'];
+  freezeT: Dictionary['govFreeze'];
 }) {
   return (
     <div className="space-y-8">
       <PageHeader title={t.title} description={t.description} />
-      <ChangesWorkbench lang={lang} t={t} draftT={draftT} errors={errors} />
+      <ChangesWorkbench lang={lang} t={t} draftT={draftT} errors={errors} freezeT={freezeT} />
     </div>
   );
 }

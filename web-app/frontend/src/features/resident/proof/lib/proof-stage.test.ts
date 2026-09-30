@@ -15,6 +15,8 @@ function facts(overrides: Partial<ProofStageFacts> = {}): ProofStageFacts {
     refreshRejected: false,
     bundleLeaf: LEAF,
     registryLeaf: LEAF,
+    frozenOwner: null,
+    bundleOwnerCommitment: '111',
     refreshedRoot: ROOT,
     refreshedInSync: true,
     chainRoot: ROOT,
@@ -202,6 +204,29 @@ describe('nextProofStage (D64)', () => {
       expect(
         nextProofStage(facts({ titleExpired: true, integrityIssues: ['secret-mismatch'] })),
       ).toBe('integrity-failed');
+    });
+  });
+
+  /** D81 — a pending transfer or revocation froze this owner on chain. */
+  describe('owner-frozen (D81)', () => {
+    it('stops when the chain freezes exactly this bundle’s owner', () => {
+      expect(nextProofStage(facts({ frozenOwner: '111' }))).toBe('owner-frozen');
+    });
+
+    it('does not fire for a freeze of a different owner', () => {
+      expect(nextProofStage(facts({ frozenOwner: '999' }))).toBe('ready');
+    });
+
+    it('waits while the freeze read is in flight', () => {
+      expect(nextProofStage(facts({ frozenOwner: undefined }))).toBe('refreshing');
+    });
+
+    /** Same reasoning as `superseded`: only claim it once evidence agrees. */
+    it('yields to root-not-published and superseded', () => {
+      expect(nextProofStage(facts({ frozenOwner: '111', chainRoot: '8888' }))).toBe(
+        'root-not-published',
+      );
+      expect(nextProofStage(facts({ frozenOwner: '111', registryLeaf: '6666' }))).toBe('superseded');
     });
   });
 });

@@ -27,8 +27,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 import { apiErrorCode } from '../../api/error-code';
 import { apiFailure } from '../../api/error-message';
+import { getFreezeStatus } from '../../api/freezes';
 import { govKeys } from '../../api/hooks';
-import type { TransferStatus } from '../../api/types';
+import type { FreezeStatus, TransferStatus } from '../../api/types';
+import { FreezeStep } from '../../publishing/components/freeze-step';
+import { UnfreezeAction } from '../../publishing/components/unfreeze-action';
 import { approveTransfer, listTransfers, rejectTransfer } from '../api';
 
 const TABS: TransferStatus[] = ['PENDING', 'APPROVED', 'PUBLISHED', 'REJECTED'];
@@ -38,15 +41,19 @@ type Message = { tone: 'success' | 'danger'; title: string; detail?: string; hin
 export function TransferQueue({
   t,
   errors,
+  freezeT,
 }: {
   t: Dictionary['govTransfers'];
   errors: Dictionary['govErrors'];
+  freezeT: Dictionary['govFreeze'];
 }) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<TransferStatus>('PENDING');
   const [working, setWorking] = useState<number | null>(null);
   const [rejecting, setRejecting] = useState<{ id: number; reason: string } | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
+  // F2: offered when approve fails because the seller's freeze fell off chain.
+  const [refreeze, setRefreeze] = useState<{ id: number; status: FreezeStatus } | null>(null);
 
   const transfers = useQuery({
     queryKey: govKeys.transfers(tab),
@@ -71,21 +78,43 @@ export function TransferQueue({
           ? t.rootMismatchHint
           : code === 'stale-timestamp'
             ? t.staleTimestampHint
-            : undefined,
+            : code === 'owner-not-frozen'
+              ? t.ownerNotFrozenHint
+              : undefined,
     };
   }
 
-  async function run(id: number, action: () => Promise<unknown>, success: string) {
+  async function run(id: number, action: () => Promise<unknown>, success: string, detail?: string) {
     setWorking(id);
     setMessage(null);
+    setRefreeze(null);
     try {
       await action();
-      setMessage({ tone: 'success', title: success });
+      setMessage({ tone: 'success', title: success, detail });
     } catch (error) {
       setMessage(failureMessage(error));
     } finally {
       setWorking(null);
       setRejecting(null);
+      await refresh();
+    }
+  }
+
+  async function runApprove(id: number, propertyId: string) {
+    setWorking(id);
+    setMessage(null);
+    setRefreeze(null);
+    try {
+      await approveTransfer(id);
+      setMessage({ tone: 'success', title: format(t.approvedTitle, { id }) });
+    } catch (error) {
+      setMessage(failureMessage(error));
+      if (apiErrorCode(error) === 'owner-not-frozen') {
+        const status = await getFreezeStatus(propertyId);
+        if (!status.frozenOnChain) setRefreeze({ id, status });
+      }
+    } finally {
+      setWorking(null);
       await refresh();
     }
   }
@@ -120,6 +149,19 @@ export function TransferQueue({
           {message.detail}
           {message.hint ? <p className="mt-2 font-medium">{message.hint}</p> : null}
         </Notice>
+      ) : null}
+
+      {refreeze ? (
+        <FreezeStep
+          mode="freeze"
+          calldata={refreeze.status.freezeCalldata}
+          t={freezeT}
+          errors={errors}
+          onDone={async () => {
+            setRefreeze(null);
+            await refresh();
+          }}
+        />
       ) : null}
 
       {transfers.isPending ? (
@@ -179,6 +221,7 @@ export function TransferQueue({
                                   request.id,
                                   () => rejectTransfer(request.id, rejecting.reason.trim() || undefined),
                                   format(t.rejectedTitle, { id: request.id }),
+                                  t.rejectedStillFrozen,
                                 )
                               }
                             >
@@ -199,13 +242,7 @@ export function TransferQueue({
                             type="button"
                             className={`${buttonStyles.primary} px-3 py-1.5 text-xs`}
                             disabled={working !== null}
-                            onClick={() =>
-                              run(
-                                request.id,
-                                () => approveTransfer(request.id),
-                                format(t.approvedTitle, { id: request.id }),
-                              )
-                            }
+                            onClick={() => void runApprove(request.id, request.propertyId)}
                           >
                             {working === request.id ? (
                               <>
@@ -235,7 +272,16 @@ export function TransferQueue({
                           : '—'}
                       </span>
                     ) : (
-                      <span className="text-xs text-steel">{request.rejectReason ?? '—'}</span>
+                      <div className="space-y-2">
+                        <span className="text-xs text-steel">{request.rejectReason ?? '—'}</span>
+                        {/* D80: a rejected request leaves its seller frozen until lifted here. */}
+                        <UnfreezeAction
+                          propertyId={request.propertyId}
+                          t={freezeT}
+                          errors={errors}
+                          onDone={refresh}
+                        />
+                      </div>
                     )}
                   </td>
                 </tr>

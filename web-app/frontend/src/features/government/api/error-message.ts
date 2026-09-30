@@ -35,6 +35,8 @@ const API_TITLES: Record<ApiErrorCode, keyof ErrorStrings> = {
   'root-mismatch': 'rootMismatch',
   'stale-timestamp': 'staleTimestamp',
   'invalid-proof': 'invalidProof',
+  'owner-frozen': 'ownerFrozen',
+  'owner-not-frozen': 'ownerNotFrozen',
   unreachable: 'unreachable',
   unknown: 'unknown',
 };
@@ -45,6 +47,8 @@ const WALLET_TITLES: Record<WalletErrorCode, keyof ErrorStrings> = {
   'no-role': 'walletNoRole',
   'already-revoked': 'walletAlreadyRevoked',
   'invalid-revocation': 'walletInvalidRevocation',
+  'not-frozen': 'walletNotFrozen',
+  'invalid-freeze': 'walletInvalidFreeze',
   unknown: 'walletUnknown',
 };
 

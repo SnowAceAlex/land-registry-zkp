@@ -20,6 +20,12 @@ const propertyRow = (over: Record<string, unknown> = {}) =>
 /** The shape `NodeStoreService.projectRoot` returns. */
 const overlayOf = (root: bigint) => ({ root, touched: new Map<string, bigint>(), removed: [] });
 
+// D80 — a queue whose every plot is frozen: the default for tests about
+// something else. A plain function, not a jest.fn, so clearAllMocks() can't strip it.
+const allFrozen = {
+  unfrozenAmong: async () => ({ propertyIds: [], ownerCommitments: [] }),
+};
+
 describe('ChangeSetService (D44)', () => {
   const transferFindMany = jest.fn();
   const revocationFindMany = jest.fn();
@@ -60,12 +66,14 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       {} as never,
+      allFrozen as never,
     );
 
     await expect(service.pending()).resolves.toEqual({
       transfers: [],
       revocations: [],
       revocationCap: MAX_REVOCATIONS_PER_CHANGESET,
+      unfrozen: { propertyIds: [], ownerCommitments: [] },
     });
   });
 
@@ -97,6 +105,7 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       {} as never,
+      allFrozen as never,
     );
 
     const { transfers } = await service.pending();
@@ -115,6 +124,7 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       {} as never,
+      allFrozen as never,
     );
 
     await expect(service.createDraft()).rejects.toBeInstanceOf(ConflictException);
@@ -140,6 +150,7 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       {} as never,
+      allFrozen as never,
     );
 
     const draft = await service.createDraft();
@@ -171,6 +182,7 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       {} as never,
+      allFrozen as never,
     );
 
     await expect(service.confirm(4)).rejects.toBeInstanceOf(UnprocessableEntityException);
@@ -267,6 +279,7 @@ describe('ChangeSetService (D44)', () => {
       events as never,
       issuance as never,
       archive as never,
+      allFrozen as never,
     );
 
     return {
@@ -371,6 +384,7 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       {} as never,
+      allFrozen as never,
     );
 
     await expect(service.discard(4)).rejects.toBeInstanceOf(ConflictException);
@@ -479,6 +493,7 @@ describe('ChangeSetService (D44)', () => {
       } as never,
       { batchContext: jest.fn() } as never,
       archive as never,
+      allFrozen as never,
     );
 
     await service.confirm(4);
@@ -532,6 +547,7 @@ describe('ChangeSetService (D44)', () => {
         {} as never,
         {} as never,
         {} as never,
+        allFrozen as never,
       );
       return { service, create, findUnique, count, projectRoot };
     }
@@ -668,6 +684,7 @@ describe('ChangeSetService.createDraft — duplicate queue entries', () => {
       {} as never,
       {} as never,
       {} as never,
+      allFrozen as never,
     );
   }
 
@@ -774,6 +791,7 @@ describe('ChangeSetService — a transfer may not resurrect a revoked plot (D45/
       { transferredStatements: jest.fn(), revokedStatements: jest.fn() } as never,
       {} as never,
       {} as never,
+      allFrozen as never,
     );
     return { service, create, transaction };
   }
@@ -813,6 +831,7 @@ describe('ChangeSetService — buyer secrets and the archive (D77)', () => {
       {} as never,
       {} as never,
       {} as never,
+      allFrozen as never,
     );
 
     await expect(service.createDraft()).rejects.toThrow(/#5/);
@@ -842,6 +861,7 @@ describe('ChangeSetService — buyer secrets and the archive (D77)', () => {
       {} as never,
       {} as never,
       {} as never,
+      allFrozen as never,
     );
 
     const [row] = await service.list();
@@ -863,6 +883,7 @@ describe('ChangeSetService — buyer secrets and the archive (D77)', () => {
       {} as never,
       {} as never,
       {} as never,
+      allFrozen as never,
     );
 
     findUnique.mockResolvedValue({ archiveZip: null, archiveExpiresAt: null });
@@ -883,5 +904,68 @@ describe('ChangeSetService — buyer secrets and the archive (D77)', () => {
       zip: Buffer.from('PK'),
       filename: 'changeset-3.zip',
     });
+  });
+});
+
+describe('ChangeSetService — the queue must be frozen on chain (D80)', () => {
+  function withQueue(unfrozen: string[]) {
+    const prisma = {
+      transferRequest: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 1,
+            propertyId: '7',
+            newOwnerCommitment: '111',
+            newOwnerSecret: '43',
+            status: 'APPROVED',
+          },
+        ]),
+      },
+      revocation: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { id: 2, propertyId: '8', reasonCode: 1, detailHash: '0xaa', detailText: 'x' },
+          ]),
+      },
+      changeSet: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+      property: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+      $transaction: jest.fn(),
+    };
+    const unfrozenAmong = jest.fn().mockResolvedValue({
+      propertyIds: unfrozen,
+      ownerCommitments: unfrozen.map(() => '1'),
+    });
+    const service = new ChangeSetService(
+      prisma as never,
+      { projectRoot: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      { assertNoOpenDraft: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      { unfrozenAmong } as never,
+    );
+    return { service, prisma, unfrozenAmong };
+  }
+
+  it('lists the queued plots whose owner is not frozen', async () => {
+    const { service, unfrozenAmong } = withQueue(['8']);
+
+    const pending = await service.pending();
+
+    expect(unfrozenAmong).toHaveBeenCalledWith(['7', '8']);
+    expect(pending.unfrozen.propertyIds).toEqual(['8']);
+  });
+
+  it('refuses to draft while any queued plot is unfrozen, and creates nothing', async () => {
+    const { service, prisma } = withQueue(['8']);
+
+    await expect(service.createDraft()).rejects.toMatchObject({
+      status: 409,
+      response: { reason: 'OwnerNotFrozen', details: { propertyIds: '8' } },
+    });
+    expect(prisma.changeSet.create).not.toHaveBeenCalled();
   });
 });

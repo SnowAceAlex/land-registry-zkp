@@ -14,7 +14,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
  *
  * Access Control:
  *  - DEFAULT_ADMIN_ROLE (OZ built-in): can grant / revoke roles
- *  - STATE_AUTHORITY_ROLE: can call publishRoot()
+ *  - STATE_AUTHORITY_ROLE: can call publishRoot*(), freezeOwners(), unfreezeOwners()
  */
 contract RootRegistry is AccessControl {
     // -------------------------------------------------------------------------
@@ -71,6 +71,10 @@ contract RootRegistry is AccessControl {
     /// @notice propertyId => revocation entry. A zero reasonCode means "not revoked".
     mapping(uint256 => Revocation) public revocations;
 
+    /// @notice propertyId => the owner commitment frozen by a pending procedure (D79).
+    ///         0 = not frozen. LandRegistryVerifier refuses proof with matching commitment.
+    mapping(uint256 => uint256) public frozenOwner;
+
     // -------------------------------------------------------------------------
     // Events
     // -------------------------------------------------------------------------
@@ -91,6 +95,10 @@ contract RootRegistry is AccessControl {
         bytes32 detailHash,
         uint256 rootVersion
     );
+
+    event Frozen(uint256 indexed propertyId, uint256 ownerCommitment);
+
+    event Unfrozen(uint256 indexed propertyId, uint256 ownerCommitment);
 
     // -------------------------------------------------------------------------
     // Errors
@@ -113,6 +121,15 @@ contract RootRegistry is AccessControl {
     /// @notice publishRootWithRevocations() for a propertyId already revoked —
     ///         also catches a duplicate propertyId within the same call.
     error AlreadyRevoked(uint256 propertyId);
+
+    /// @notice freezeOwners() with propertyIds/ownerCommitments of different lengths.
+    error FreezeArrayLengthMismatch();
+
+    /// @notice freezeOwners() with a zero commitment — 0 is the "not frozen" sentinel.
+    error ZeroOwnerCommitment();
+
+    /// @notice unfreezeOwners() for a property that is not frozen.
+    error NotFrozen(uint256 propertyId);
 
     // -------------------------------------------------------------------------
     // Constructor
@@ -214,5 +231,41 @@ contract RootRegistry is AccessControl {
         authorityInstitute[account] = instituteHash;
 
         emit AuthorityRegistered(account, instituteHash);
+    }
+
+    /// @notice Freeze the current owner while a procedure is open (D79).
+    ///         Overwrites existing entry; zero commitment not allowed.
+    function freezeOwners(
+        uint256[] calldata propertyIds,
+        uint256[] calldata ownerCommitments
+    ) external onlyRole(STATE_AUTHORITY_ROLE) {
+        if (propertyIds.length != ownerCommitments.length) revert FreezeArrayLengthMismatch();
+
+        for (uint256 i = 0; i < propertyIds.length; i++) {
+            if (ownerCommitments[i] == 0) revert ZeroOwnerCommitment();
+            frozenOwner[propertyIds[i]] = ownerCommitments[i];
+            emit Frozen(propertyIds[i], ownerCommitments[i]);
+        }
+    }
+
+    /// @notice Lift a freeze — rejected transfer or dossier abandoned.
+    ///         Reverts if property is not frozen (bugs must not be silent).
+    function unfreezeOwners(uint256[] calldata propertyIds) external onlyRole(STATE_AUTHORITY_ROLE) {
+        for (uint256 i = 0; i < propertyIds.length; i++) {
+            uint256 commitment = frozenOwner[propertyIds[i]];
+            if (commitment == 0) revert NotFrozen(propertyIds[i]);
+            delete frozenOwner[propertyIds[i]];
+            emit Unfrozen(propertyIds[i], commitment);
+        }
+    }
+
+    /// @notice Read frozenOwner for many properties in one call (D80).
+    function frozenOwnersOf(
+        uint256[] calldata propertyIds
+    ) external view returns (uint256[] memory out) {
+        out = new uint256[](propertyIds.length);
+        for (uint256 i = 0; i < propertyIds.length; i++) {
+            out[i] = frozenOwner[propertyIds[i]];
+        }
     }
 }

@@ -22,6 +22,11 @@ describe('apiErrorCode', () => {
     expect(apiErrorCode(new ApiError(422, 'x', 'InvalidProof'))).toBe('invalid-proof');
   });
 
+  it('names the two freeze reasons (D79/D80)', () => {
+    expect(apiErrorCode(new ApiError(422, 'x', 'OwnerFrozen'))).toBe('owner-frozen');
+    expect(apiErrorCode(new ApiError(409, 'x', 'OwnerNotFrozen'))).toBe('owner-not-frozen');
+  });
+
   it('treats a failed fetch as the API being unreachable, not as a wrong request', () => {
     // fetch() rejects with a TypeError when the backend is down or CORS fails.
     expect(apiErrorCode(new TypeError('Failed to fetch'))).toBe('unreachable');

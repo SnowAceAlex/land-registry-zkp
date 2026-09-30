@@ -1,5 +1,5 @@
 /**
- * features/resident/verify/lib/proof-pipeline.ts — the four checks, in order (D63).
+ * features/resident/verify/lib/proof-pipeline.ts — the five checks, in order (D63, D81).
  *
  * A pure function from known facts to the next action, in the shape of
  * `features/government/publishing/next-draft-step.ts`. Pure because the ORDER
@@ -8,13 +8,16 @@
  *
  * THE ORDER IS THE CONTRACT'S OWN (D33), AND FRESHNESS COMES FIRST (D26):
  *
- *   StaleTimestamp → InvalidProof → RootMismatch → (the same, on chain)
+ *   StaleTimestamp → InvalidProof → RootMismatch → OwnerFrozen → (the same, on chain)
  *
  * Freshness first is not tidiness. `currentTimestamp` is a public input the
  * PROVER chooses, so a proof dated back to when an expired title was still
  * valid is cryptographically perfect — ordering is the only thing that catches
  * a replay. And `RootMismatch` is only reachable after the cryptographic check
  * has passed, so a garbage proof is never reported as merely stale-rooted.
+ *
+ * OwnerFrozen (D79: owner frozen by a pending procedure) comes after the root check, as on chain.
+ * Transfer proofs mark it `skipped` — verifyTransfer is exempt.
  *
  * BLOCKED IS NOT REJECTED. An unreachable chain or a missing verifying key
  * leaves checks `unavailable` and the verdict `unknown`. That is what the
@@ -24,25 +27,32 @@
 
 import type { ProofRejectionReason } from '@/lib/api-client';
 
-export type CheckName = 'freshness' | 'cryptographic' | 'rootMatchesChain' | 'onChain';
+export type CheckName =
+  | 'freshness'
+  | 'cryptographic'
+  | 'rootMatchesChain'
+  | 'ownerNotFrozen'
+  | 'onChain';
 
 export const CHECK_ORDER: readonly CheckName[] = [
   'freshness',
   'cryptographic',
   'rootMatchesChain',
+  'ownerNotFrozen',
   'onChain',
 ];
 
-export type CheckState = 'pending' | 'running' | 'pass' | 'fail' | 'unavailable';
+export type CheckState = 'pending' | 'running' | 'pass' | 'fail' | 'unavailable' | 'skipped';
 
 /** Which checks cannot run without the chain. */
-const NEEDS_CHAIN: readonly CheckName[] = ['rootMatchesChain', 'onChain'];
+const NEEDS_CHAIN: readonly CheckName[] = ['rootMatchesChain', 'ownerNotFrozen', 'onChain'];
 
 /** The contract's name for a failure of each check, when none is decoded. */
 const REASON_FOR: Record<CheckName, ProofRejectionReason> = {
   freshness: 'StaleTimestamp',
   cryptographic: 'InvalidProof',
   rootMatchesChain: 'RootMismatch',
+  ownerNotFrozen: 'OwnerFrozen',
   onChain: 'InvalidProof',
 };
 
@@ -74,7 +84,7 @@ export function nextVerificationStep(f: PipelineFacts): PipelineStep {
 
     // Resolved one way or another — move on. `unavailable` is deliberately
     // skipped rather than blocking: the later checks still carry information.
-    if (state === 'pass' || state === 'unavailable') continue;
+    if (state === 'pass' || state === 'unavailable' || state === 'skipped') continue;
 
     // Short circuit: nothing after a failure runs, so the verifier is told the
     // FIRST rule that was broken rather than the last.
@@ -108,6 +118,7 @@ export function initialChecks(): Record<CheckName, CheckState> {
     freshness: 'pending',
     cryptographic: 'pending',
     rootMatchesChain: 'pending',
+    ownerNotFrozen: 'pending',
     onChain: 'pending',
   };
 }

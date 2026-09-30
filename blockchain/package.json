@@ -24,6 +24,8 @@
     "chain:smoke:sepolia": "hardhat run scripts/chain/smokeDeployment.ts --network sepolia",
     "sign:root": "hardhat run scripts/tools/signRoot.ts --network localhost",
     "sign:root:sepolia": "hardhat run scripts/tools/signRoot.ts --network sepolia",
+    "sign:freeze": "hardhat run scripts/tools/signFreeze.ts --network localhost",
+    "sign:freeze:sepolia": "hardhat run scripts/tools/signFreeze.ts --network sepolia",
     "circuits:compile": "ts-node scripts/circuits/compile.ts",
     "circuits:setup": "ts-node scripts/circuits/setupAll.ts",
     "circuits:smoke": "ts-node scripts/circuits/smokeOwnership.ts",
@@ -35,7 +37,8 @@
     "owner:smoke": "ts-node scripts/tools/ownerSmoke.ts",
     "proof:bodies": "ts-node scripts/tools/proofBodies.ts",
     "bench:proof-load": "ts-node scripts/bench/proofLoad.ts",
-    "bench:prove": "ts-node scripts/bench/proveBench.ts"
+    "bench:prove": "ts-node scripts/bench/proveBench.ts",
+    "bench:freeze-gas": "hardhat run scripts/bench/freezeGas.ts --network hardhat"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.2",

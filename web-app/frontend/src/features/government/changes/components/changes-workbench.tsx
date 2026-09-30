@@ -29,6 +29,7 @@ import { type Failure, apiFailure } from '../../api/error-message';
 import { govKeys, useOpenDraft, usePendingChanges, usePendingTransferCount } from '../../api/hooks';
 import type { ChangeSetDraftDetail, PendingChanges } from '../../api/types';
 import { type DraftOutcome, DraftPanel } from '../../publishing/components/draft-panel';
+import { FreezeStep } from '../../publishing/components/freeze-step';
 import { confirmChangeSetDraft, createChangeSetDraft, discardChangeSetDraft } from '../api';
 import { ChangeSetHistory } from './changeset-history';
 
@@ -43,11 +44,13 @@ export function ChangesWorkbench({
   t,
   draftT,
   errors,
+  freezeT,
 }: {
   lang: Locale;
   t: Strings;
   draftT: Dictionary['govDraft'];
   errors: Dictionary['govErrors'];
+  freezeT: Dictionary['govFreeze'];
 }) {
   const queryClient = useQueryClient();
   const openDraft = useOpenDraft();
@@ -173,6 +176,9 @@ export function ChangesWorkbench({
             t={t}
             creating={creating}
             onCreate={create}
+            freezeT={freezeT}
+            errors={errors}
+            onFrozen={refresh}
           />
         )}
       </div>
@@ -225,14 +231,23 @@ function PendingQueue({
   t,
   creating,
   onCreate,
+  freezeT,
+  errors,
+  onFrozen,
 }: {
   lang: Locale;
   pending: PendingChanges;
   t: Strings;
   creating: boolean;
   onCreate: () => void;
+  freezeT: Dictionary['govFreeze'];
+  errors: Dictionary['govErrors'];
+  onFrozen: () => Promise<void>;
 }) {
   const { transfers, revocations, revocationCap } = pending;
+  // D80: createDraft() refuses unfrozen plots, so sign the missing freezes here first.
+  const unfrozen = pending.unfrozen;
+  const hasGaps = unfrozen.propertyIds.length > 0;
 
   if (transfers.length === 0 && revocations.length === 0) {
     return <EmptyState icon={FolderSync} title={t.emptyTitle} description={t.emptyBody} />;
@@ -247,7 +262,12 @@ function PendingQueue({
             <p className="mt-1 text-sm text-steel">{format(t.capNote, { cap: revocationCap })}</p>
           ) : null}
         </div>
-        <button type="button" className={buttonStyles.primary} disabled={creating} onClick={onCreate}>
+        <button
+          type="button"
+          className={buttonStyles.primary}
+          disabled={creating || hasGaps}
+          onClick={onCreate}
+        >
           {creating ? (
             <>
               <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
@@ -258,6 +278,24 @@ function PendingQueue({
           )}
         </button>
       </div>
+
+      {hasGaps ? (
+        <div className="space-y-3">
+          <Notice
+            tone="warning"
+            title={format(freezeT.unfrozenQueueTitle, { count: unfrozen.propertyIds.length })}
+          >
+            {freezeT.unfrozenQueueBody}
+          </Notice>
+          <FreezeStep
+            mode="freeze"
+            calldata={unfrozen}
+            t={freezeT}
+            errors={errors}
+            onDone={onFrozen}
+          />
+        </div>
+      ) : null}
 
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-ink">{t.transfersTitle}</h3>

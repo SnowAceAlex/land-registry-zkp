@@ -25,7 +25,7 @@ import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { buttonStyles } from '@/components/ui/button';
 import { BundleError, type BundleErrorCode, type OwnerBundle, readBundleFiles } from '@/lib/bundle';
-import { readChainRoot } from '@/lib/registry-reads';
+import { readChainRoot, readFrozenOwner } from '@/lib/registry-reads';
 import { parseTermYears } from '@/lib/term';
 import { generateProof } from '@/lib/zkp';
 
@@ -63,6 +63,7 @@ export function ProofWorkbench({
   const [titleExpired, setTitleExpired] = useState(false);
   const [refreshed, setRefreshed] = useState<MerkleProofResponse | null>(null);
   const [chainRoot, setChainRoot] = useState<string | undefined>(undefined);
+  const [frozenOwner, setFrozenOwner] = useState<string | null | undefined>(undefined);
   const [chainFailed, setChainFailed] = useState(false);
   /** The registry said no proof can exist for this plot — revoked or unissued. */
   const [refreshRejected, setRefreshRejected] = useState(false);
@@ -118,6 +119,7 @@ export function ProofWorkbench({
     setTitleExpired(false);
     setRefreshed(null);
     setChainRoot(undefined);
+    setFrozenOwner(undefined);
     setChainFailed(false);
     setRefreshRejected(false);
     setResult(null);
@@ -143,12 +145,14 @@ export function ProofWorkbench({
       setRefreshRejected(false);
       try {
         const { config, client } = await loadChainConfig();
-        const [proof, root] = await Promise.all([
+        const [proof, root, frozen] = await Promise.all([
           refreshMerkleProof(propertyId),
           readChainRoot(client, config.contracts.RootRegistry),
+          readFrozenOwner(client, config.contracts.RootRegistry, BigInt(propertyId)),
         ]);
         setRefreshed(proof);
         setChainRoot(root.root);
+        setFrozenOwner(frozen);
       } catch (error) {
         // `true`: on this route 410 means revoked and 400 means not issued yet,
         // which read very differently to an owner than a generic failure.
@@ -237,6 +241,8 @@ export function ProofWorkbench({
     refreshRejected,
     bundleLeaf: record?.leaf.toString() ?? null,
     registryLeaf: refreshed?.leaf ?? null,
+    frozenOwner,
+    bundleOwnerCommitment: record ? record.record.ownerCommitment.toString() : null,
     refreshedRoot: refreshed?.merkleRoot ?? null,
     refreshedInSync: refreshed?.inSync ?? false,
     chainRoot,
@@ -248,13 +254,16 @@ export function ProofWorkbench({
   });
 
   /**
-   * The two dead ends show the reason and nothing else — no record card, no
+   * The dead ends show the reason and nothing else — no record card, no
    * check list, no refresh note. Printing a certificate that the registry has
    * replaced invites the owner to argue with it, and the four green ticks would
    * be read as permission when what they mean is only "the file is intact".
    */
   const deadEnd =
-    stage === 'superseded' || stage === 'title-expired' || stage === 'no-proof-possible';
+    stage === 'superseded' ||
+    stage === 'title-expired' ||
+    stage === 'no-proof-possible' ||
+    stage === 'owner-frozen';
 
   return (
     <div className="space-y-8">
@@ -300,6 +309,12 @@ export function ProofWorkbench({
       {stage === 'superseded' ? (
         <Notice tone="danger" title={t.supersededTitle}>
           {t.supersededBody}
+        </Notice>
+      ) : null}
+
+      {stage === 'owner-frozen' ? (
+        <Notice tone="danger" title={t.ownerFrozenTitle}>
+          {t.ownerFrozenBody}
         </Notice>
       ) : null}
 

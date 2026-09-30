@@ -242,6 +242,19 @@ liệu ra một trang không đăng nhập.
    nào trong lần tải đầu.
 4. `pnpm --filter frontend run lint` phải xanh — đó mới là thứ cưỡng chế ranh giới này.
 
+### 3.10 D81 — hai case của 28/09/2026
+
+1. **Case chuyển nhượng:** sau bước 3 ở `PHASE_8_MANUAL_TEST.md` §3.8 (APPROVED, chưa publish),
+   người bán mở `/resident/proof` với bundle cũ → ngõ cụt "Giấy chứng nhận đang bị ngăn chặn giao
+   dịch". Sinh mortgage proof bằng `pnpm --filter blockchain run proof:bodies <unzipped-bundle-dir>
+   [out-dir]` (ghi ra body dán thẳng được; `owner:smoke` chỉ in ra màn hình) — hoặc proof lưu từ
+   trước khi freeze, còn trong 10 phút — → dán vào `/resident/verify` → check 4 "Chủ sở hữu không
+   bị ngăn chặn" **fail**, lý do `OwnerFrozen`; `POST /api/proof/verify` → 422 `OwnerFrozen`.
+2. **Case thu hồi:** sau bước 4 ở §3.8 (revocation PENDING), chủ bị thu hồi → như case 1.
+3. Sau khi change set confirm: người mua prove → pass cả 5 check; người bán cũ → `superseded`
+   (UC-5) / `RootMismatch` (UC-6).
+4. Transfer proof dán vào UC-6 → check 4 hiện "Không áp dụng".
+
 ---
 
 ## 4. Kết quả mong đợi (DoD)
@@ -259,6 +272,7 @@ liệu ra một trang không đăng nhập.
 | Tra được lịch sử thửa đất (D48) | 3.1 |
 | **Tab Network không có `ownerSecret` / private field** | 3.2 |
 | Không có ví / wagmi trên trang resident | 3.9 |
+| D81: check thứ 5 + ngõ cụt `owner-frozen` đúng cả hai case (chuyển nhượng, thu hồi) | 3.10 |
 
 ---
 

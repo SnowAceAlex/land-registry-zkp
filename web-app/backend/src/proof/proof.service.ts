@@ -164,9 +164,10 @@ export class ProofService {
    * public input the PROVER chooses, so a proof dated back to when an expired
    * title was still valid verifies perfectly (D26), and a proof made against a
    * superseded root proves membership in a tree the registry has abandoned.
-   * The three checks below are exactly the three LandRegistryVerifier applies
-   * on-chain, and they reject with the same names (D33) so a portal can show
-   * one reason regardless of which layer answered.
+   * The four checks below are exactly the four LandRegistryVerifier applies
+   * on-chain (the fourth, D79, to ownership and mortgage only), and they
+   * reject with the same names (D33) so a portal can show one reason
+   * regardless of which layer answered.
    */
   async verify(dto: VerifyProofDto): Promise<VerifyProofResponseDto> {
     const circuitType = this.resolveCircuitType(dto);
@@ -205,7 +206,25 @@ export class ProofService {
       );
     }
 
-    // 4. Optionally let the contract answer for itself.
+    // 4. Owner must not be frozen (D79). Ownership/mortgage only — approve()
+    //    verifies a transfer proof AFTER freezing, so it is exempt (D81).
+    let ownerNotFrozen: boolean | null = null;
+    if (circuitType !== 'transfer') {
+      const propertyId = publicSignals[publicSignalIndex(circuitType, 'propertyId')];
+      const commitment = BigInt(publicSignals[publicSignalIndex(circuitType, 'ownerCommitment')]);
+      const frozen = (await this.chain.getFrozenOwners([propertyId])).get(propertyId) ?? 0n;
+      if (frozen !== 0n && frozen === commitment) {
+        throw this.rejection(
+          'OwnerFrozen',
+          `The owner of property ${propertyId} is frozen by a pending transfer or revocation — ` +
+            'this certificate cannot back a proof until the registry publishes or lifts the procedure',
+          { propertyId },
+        );
+      }
+      ownerNotFrozen = true;
+    }
+
+    // 5. Optionally let the contract answer for itself.
     let onChain: boolean | null = null;
     if (dto.onChain) {
       try {
@@ -221,7 +240,13 @@ export class ProofService {
     return {
       valid: true,
       circuitType,
-      checks: { cryptographic: true, freshness: true, rootMatchesChain: true, onChain },
+      checks: {
+        cryptographic: true,
+        freshness: true,
+        rootMatchesChain: true,
+        ownerNotFrozen,
+        onChain,
+      },
       disclosed: describePublicSignals(circuitType, publicSignals),
     };
   }

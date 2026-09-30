@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { keccak256, toUtf8Bytes } from 'ethers';
 
+import { FreezeService } from '../freeze/freeze.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRevocationDto } from './dto/revocation.dto';
 
@@ -26,10 +27,15 @@ export const REASON_CODES: Record<number, string> = {
  * order — would otherwise be public and permanent, which is a materially
  * different proposition from a revoked diploma. The hash still lets the registry
  * prove the reason on demand.
+ *
+ * Since D80 a request is recorded only once the chain freezes the plot's current owner.
  */
 @Injectable()
 export class RevocationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly freezes: FreezeService,
+  ) {}
 
   async request(dto: CreateRevocationDto) {
     if (!REASON_CODES[dto.reasonCode]) {
@@ -56,6 +62,20 @@ export class RevocationService {
         `Property ${dto.propertyId} already has a pending revocation (#${pending.id})`,
       );
     }
+
+    // D80: one open procedure per plot.
+    const transfer = await this.prisma.transferRequest.findFirst({
+      where: { propertyId: dto.propertyId, status: { in: ['PENDING', 'APPROVED'] } },
+    });
+    if (transfer) {
+      throw new ConflictException(
+        `Property ${dto.propertyId} has an open transfer (#${transfer.id}, ${transfer.status}) — ` +
+          `resolve it before requesting a revocation`,
+      );
+    }
+
+    // D80: freeze first, record second.
+    await this.freezes.assertFrozen(dto.propertyId, property.ownerCommitment);
 
     const created = await this.prisma.revocation.create({
       data: {

@@ -32,7 +32,12 @@ import type { Receipt } from '@land-registry/blockchain/shared/receipt';
 import { Notice } from '@/components/ui/notice';
 import { buttonStyles } from '@/components/ui/button';
 import { ProofFileError, parseProofFile } from '@/lib/proof-file';
-import { type RevocationEntry, readChainRoot, readRevocation } from '@/lib/registry-reads';
+import {
+  type RevocationEntry,
+  readChainRoot,
+  readFrozenOwner,
+  readRevocation,
+} from '@/lib/registry-reads';
 import { ArtifactMissingError, verifyProofOffChain } from '@/lib/zkp';
 
 import { CheckList } from './check-list';
@@ -104,7 +109,7 @@ export function VerifyWorkbench({
     setFailure(null);
   }
 
-  /** Run all four checks, stopping at the first that fails (D63). */
+  /** Run all five checks, stopping at the first that fails (D63). */
   async function runChecks(parsed: ProofPackage) {
     const { circuitType, publicSignals, proof } = parsed;
 
@@ -148,6 +153,7 @@ export function VerifyWorkbench({
     } catch (error) {
       setChainReachable(false);
       set('rootMatchesChain', 'unavailable');
+      set('ownerNotFrozen', 'unavailable');
       set('onChain', 'unavailable');
       setFailure(residentFailure(error, errors));
       return;
@@ -156,16 +162,16 @@ export function VerifyWorkbench({
     // 3. The root it proves against must be the published one. For a transfer
     // that is `oldMerkleRoot` — exactly what verifyTransfer compares.
     set('rootMatchesChain', 'running');
+    const propertyId = BigInt(publicSignals[publicSignalIndex(circuitType, 'propertyId')]);
+    let frozenOwner: string | null = null;
     try {
-      const [chain, entry] = await Promise.all([
+      const [chain, entry, frozen] = await Promise.all([
         readChainRoot(client, config.contracts.RootRegistry),
-        readRevocation(
-          client,
-          config.contracts.RootRegistry,
-          BigInt(publicSignals[publicSignalIndex(circuitType, 'propertyId')]),
-        ),
+        readRevocation(client, config.contracts.RootRegistry, propertyId),
+        readFrozenOwner(client, config.contracts.RootRegistry, propertyId),
       ]);
       setRevocation(entry);
+      frozenOwner = frozen;
 
       const claimedRoot = publicSignals[publicSignalIndex(circuitType, rootSignalName(circuitType))];
       if (claimedRoot !== chain.root) {
@@ -176,12 +182,27 @@ export function VerifyWorkbench({
       set('rootMatchesChain', 'pass');
     } catch (error) {
       set('rootMatchesChain', 'unavailable');
+      set('ownerNotFrozen', 'unavailable');
       set('onChain', 'unavailable');
       setFailure(residentFailure(error, errors));
       return;
     }
 
-    // 4. The contract's own opinion.
+    // 4. D79: owner must not be frozen by a pending procedure (read from chain, not backend).
+    // Transfer proofs are exempt, like verifyTransfer.
+    if (circuitType === 'transfer') {
+      set('ownerNotFrozen', 'skipped');
+    } else {
+      const commitment = publicSignals[publicSignalIndex(circuitType, 'ownerCommitment')];
+      if (frozenOwner !== null && BigInt(frozenOwner) === BigInt(commitment)) {
+        set('ownerNotFrozen', 'fail');
+        setRejection('OwnerFrozen');
+        return;
+      }
+      set('ownerNotFrozen', 'pass');
+    }
+
+    // 5. The contract's own opinion.
     set('onChain', 'running');
     const result = await verifyOnChain(client, config.contracts.LandRegistryVerifier, parsed);
     if (result.ok) {

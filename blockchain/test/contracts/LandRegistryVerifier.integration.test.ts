@@ -202,6 +202,25 @@ describe('contracts/LandRegistryVerifier — real proofs (integration, Phase 4)'
         }
       });
 
+      if (circuit !== 'transfer') {
+        it('rejects a real proof while its owner is frozen, and accepts it once lifted (D79)', async () => {
+          const { registry, dispatcher, authority } = await deployStack();
+          const { a, b, c } = toSolidityCalldata(pkg.proof);
+          await registry.connect(authority).publishRoot(asRoot(pkg.publicSignals[rootIndex]));
+
+          const propertyId = BigInt(pkg.publicSignals[order.indexOf('propertyId')]);
+          const commitment = BigInt(pkg.publicSignals[order.indexOf('ownerCommitment')]);
+          await registry.connect(authority).freezeOwners([propertyId], [commitment]);
+
+          await expect(dispatcher[fn](a, b, c, pkg.publicSignals))
+            .to.be.revertedWithCustomError(dispatcher, 'OwnerFrozen')
+            .withArgs(propertyId);
+
+          await registry.connect(authority).unfreezeOwners([propertyId]);
+          expect(await dispatcher[fn](a, b, c, pkg.publicSignals)).to.equal(true);
+        });
+      }
+
       if (circuit === 'transfer') {
         it('two-step flow (§3): verify BEFORE publishRoot(newRoot); afterwards the proof is spent', async () => {
           const { registry, dispatcher, authority } = await deployStack();

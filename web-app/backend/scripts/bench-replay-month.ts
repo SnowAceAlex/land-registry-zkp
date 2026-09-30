@@ -34,6 +34,8 @@
  */
 import { execFileSync } from 'child_process';
 import * as fs from 'fs';
+import * as http from 'http';
+import * as os from 'os';
 import * as path from 'path';
 
 import { Prisma, PrismaClient } from '@prisma/client';
@@ -70,6 +72,11 @@ const SIGN_SCRIPT = (process.env.CHAIN_NETWORK ?? 'localhost') === 'sepolia'
   ? 'sign:root:sepolia'
   : 'sign:root';
 
+/** Which `sign:freeze` variant to run — same reasoning as SIGN_SCRIPT above. */
+const FREEZE_SCRIPT = (process.env.CHAIN_NETWORK ?? 'localhost') === 'sepolia'
+  ? 'sign:freeze:sepolia'
+  : 'sign:freeze';
+
 interface DayResult {
   day: number;
   transfers: number;
@@ -79,6 +86,10 @@ interface DayResult {
   draftMs: number;
   signMs: number;
   confirmMs: number;
+  /** D80 — the day's freezes, signed before anything was queued. */
+  freezeMs: number;
+  freezeTxs: number;
+  freezeGasUsed: string;
   gasUsed: string;
   rootVersion: number;
   /**
@@ -101,24 +112,50 @@ interface DayResult {
  * an answer and is never retried: a 409 means the queue is wrong and repeating
  * it would only hide that.
  */
-async function call<T>(method: 'GET' | 'POST' | 'DELETE', route: string, body?: unknown): Promise<T> {
-  const send = async (): Promise<Response> =>
-    fetch(`${API_BASE}${route}`, {
-      method,
-      headers: { 'content-type': 'application/json', 'x-gov-api-key': API_KEY },
-      ...(method === 'GET' ? {} : { body: JSON.stringify(body ?? {}) }),
+async function call<T>(
+  method: 'GET' | 'POST' | 'DELETE',
+  route: string,
+  body?: unknown,
+): Promise<T> {
+  // node:http, not fetch: fetch gives up after 300s without headers, and a D77
+  // confirm of ~3,000 transfers takes longer than that.
+  const send = (): Promise<{ status: number; text: string }> =>
+    new Promise((resolve, reject) => {
+      const payload = method === 'GET' ? undefined : JSON.stringify(body ?? {});
+      const req = http.request(
+        `${API_BASE}${route}`,
+        {
+          method,
+          headers: {
+            'content-type': 'application/json',
+            'x-gov-api-key': API_KEY,
+            ...(payload ? { 'content-length': Buffer.byteLength(payload) } : {}),
+          },
+        },
+        (res) => {
+          let text = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk) => (text += chunk));
+          res.on('end', () => resolve({ status: res.statusCode ?? 0, text }));
+          res.on('error', reject);
+        },
+      );
+      req.on('error', reject);
+      if (payload) req.write(payload);
+      req.end();
     });
 
-  let res: Response;
+  let res: { status: number; text: string };
   try {
     res = await send();
   } catch {
     res = await send();
   }
 
-  const text = await res.text();
-  if (!res.ok) throw new Error(`${method} ${route} → ${res.status} ${text.slice(0, 400)}`);
-  return (text ? JSON.parse(text) : undefined) as T;
+  if (res.status < 200 || res.status >= 300) {
+    throw new Error(`${method} ${route} → ${res.status} ${res.text.slice(0, 400)}`);
+  }
+  return (res.text ? JSON.parse(res.text) : undefined) as T;
 }
 
 const api = <T>(route: string, body?: unknown): Promise<T> => call<T>('POST', route, body);
@@ -186,6 +223,31 @@ function signRoot(
   return JSON.parse(line.slice('BENCH_RESULT '.length));
 }
 
+/**
+ * Freeze the day's plots with `sign:freeze` before any of them is queued (D80).
+ * The list goes through a file: a Windows env block caps out at 32,767 chars.
+ */
+function signFreeze(
+  plots: { propertyId: string; ownerCommitment: string }[],
+): { txCount: number; gasUsed: string; txHashes: string[] } {
+  const file = path.join(os.tmpdir(), `bench-freeze-${process.pid}.json`);
+  fs.writeFileSync(file, JSON.stringify(plots));
+  try {
+    const out = execFileSync('pnpm', ['--filter', 'blockchain', 'run', FREEZE_SCRIPT], {
+      env: { ...process.env, FREEZE_FILE: file },
+      encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
+      // See signRoot(): `pnpm` is a .cmd shim on Windows.
+      shell: true,
+    });
+    const line = out.split('\n').find((l) => l.startsWith('BENCH_RESULT '));
+    if (!line) throw new Error(`sign:freeze printed no BENCH_RESULT line:\n${out}`);
+    return JSON.parse(line.slice('BENCH_RESULT '.length));
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
+}
+
 async function main(): Promise<void> {
   if (!API_KEY) throw new Error('GOV_API_KEY is required — every government route is guarded');
 
@@ -234,6 +296,17 @@ async function main(): Promise<void> {
       (day + 1) * perDayRevocations,
     );
     if (todayTransfers.length === 0 && todayRevocations.length === 0) break;
+
+    // ── D80: freeze first, record second — as the counter does ────────────────
+    // Batched per day here; the counter signs one per procedure.
+    const freezeStart = Date.now();
+    const frozen = signFreeze(
+      [...todayTransfers, ...todayRevocations].map(({ propertyId, ownerCommitment }) => ({
+        propertyId,
+        ownerCommitment: ownerCommitment!,
+      })),
+    );
+    const freezeMs = Date.now() - freezeStart;
 
     // ── Queue the day's paperwork ────────────────────────────────────────────
     const queueStart = Date.now();
@@ -308,6 +381,9 @@ async function main(): Promise<void> {
       draftMs,
       signMs,
       confirmMs,
+      freezeMs,
+      freezeTxs: frozen.txCount,
+      freezeGasUsed: frozen.gasUsed,
       gasUsed: signed.gasUsed,
       rootVersion: signed.rootVersion,
       txHash: signed.txHash,
@@ -316,23 +392,28 @@ async function main(): Promise<void> {
     console.log(
       `  day ${day + 1}/${DAYS}: ${todayTransfers.length} transfer, ${calldata.length} revoke ` +
         `(${draft.deferredRevocations} deferred) — draft ${draftMs}ms, confirm ${confirmMs}ms, ` +
-        `gas ${signed.gasUsed}`,
+        `gas ${signed.gasUsed}, freeze ${frozen.txCount} tx / gas ${frozen.gasUsed}`,
     );
   }
 
   const totalGas = days.reduce((sum, d) => sum + BigInt(d.gasUsed), 0n);
+  const totalFreezeGas = days.reduce((sum, d) => sum + BigInt(d.freezeGasUsed), 0n);
+  const freezeTxs = days.reduce((sum, d) => sum + d.freezeTxs, 0);
   const report = {
     kind: 'month' as const,
     at: new Date().toISOString(),
     assumptions: [
       'every mutation modelled as a transfer (conservative upper bound)',
       'transfer proofs measured separately by bench:prove, not generated here',
+      'plots frozen per day in batches of 200 (D80) — the counter signs one freeze per procedure, which costs one 21,000 base per plot more',
     ],
     transfers: TRANSFERS,
     revocations: REVOCATIONS,
     days: DAYS,
     publishes: days.length,
     totalGas: totalGas.toString(),
+    totalFreezeGas: totalFreezeGas.toString(),
+    freezeTxs,
     peakRssMb: Math.round(peakRssMb),
     perDay: days,
     machine: {
@@ -361,6 +442,7 @@ async function main(): Promise<void> {
   console.log('');
   console.log(`  publishes : ${days.length}`);
   console.log(`  total gas : ${totalGas.toLocaleString('en-US')}`);
+  console.log(`  freeze    : ${freezeTxs} tx, ${totalFreezeGas.toLocaleString('en-US')} gas (D80)`);
   console.log(
     `  confirm   : p50 ${confirmTimes[Math.floor(confirmTimes.length * 0.5)]}ms, ` +
       `max ${confirmTimes[confirmTimes.length - 1]}ms`,

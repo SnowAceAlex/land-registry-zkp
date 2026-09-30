@@ -3,7 +3,7 @@
  *
  * Every function here is a `view` call, so this is `eth_call` only: no gas, no
  * wallet, no connector (D61). Promoted to shared code because UC-5 needs the
- * current root and UC-6 needs all four, and sibling features must not import
+ * current root and UC-6 needs all five, and sibling features must not import
  * each other (D66).
  *
  * Roots come back as DECIMAL STRINGS, not hex. That is the form the API, the
@@ -82,6 +82,24 @@ export async function readRevocation(
     rootVersion: Number(rootVersion),
     revokedAt,
   };
+}
+
+/**
+ * D79: owner commitment frozen by a pending transfer/revocation, or null (0 = not frozen).
+ * Decimal string, the same form as a proof's publicSignals.
+ */
+export async function readFrozenOwner(
+  client: PublicClient,
+  registry: Address,
+  propertyId: bigint,
+): Promise<string | null> {
+  const frozen = (await client.readContract({
+    address: registry,
+    abi: rootRegistryAbi,
+    functionName: 'frozenOwner',
+    args: [propertyId],
+  })) as bigint;
+  return frozen === 0n ? null : frozen.toString();
 }
 
 export interface AuthorityAnchor {

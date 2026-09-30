@@ -31,6 +31,7 @@ export type VerifierRevert =
   | 'InvalidProof'
   | 'RootMismatch'
   | 'StaleTimestamp'
+  | 'OwnerFrozen'
   | 'ZeroAddressDependency'
   /** Nothing decodable — NOT a verdict. See the note in decodeVerifierRevert. */
   | 'Unknown';
@@ -52,6 +53,7 @@ const KNOWN: readonly string[] = [
   'InvalidProof',
   'RootMismatch',
   'StaleTimestamp',
+  'OwnerFrozen',
   'ZeroAddressDependency',
 ];
 

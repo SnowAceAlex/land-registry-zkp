@@ -19,6 +19,8 @@ import { NodeStoreService } from '../tree/node-store.service';
 import { toLURRecord } from '../records/record.mapper';
 import { TransferRequestDto } from '../transfers/dto/transfer.response.dto';
 import { toTransferRequestDto } from '../transfers/transfer-request.serializer';
+import { FreezeService, ownerNotFrozen } from '../freeze/freeze.service';
+import { FreezeCalldataDto } from '../freeze/dto/freeze-status.dto';
 import { RootService } from './root.service';
 
 /**
@@ -79,6 +81,12 @@ export interface ChangeSetDraftDetail {
   deferredRevocations: number;
 }
 
+/** Every plot the queue touches, transfers first — what D80's freeze check reads. */
+const queuedPlots = (transfers: TransferRequest[], revocations: Revocation[]): string[] => [
+  ...transfers.map((transfer) => transfer.propertyId),
+  ...revocations.map((revocation) => revocation.propertyId),
+];
+
 /**
  * ChangeSetService — one publishing round of approved transfers and revocations (D44/D46).
  *
@@ -124,23 +132,27 @@ export class ChangeSetService {
     private readonly events: PropertyEventService,
     private readonly issuance: IssuanceService,
     private readonly archive: ArchiveService,
+    private readonly freezes: FreezeService,
   ) {}
 
   /**
    * Everything eligible for the next change set, as the portal sees it, plus
    * the cap (D73). Transfers go through toTransferRequestDto: the rows hold the
-   * buyers' secrets until a change set archives them (D77).
+   * buyers' secrets until a change set archives them (D77). Plus the queued
+   * plots the chain does not freeze (D80).
    */
   async pending(): Promise<{
     transfers: TransferRequestDto[];
     revocations: Revocation[];
     revocationCap: number;
+    unfrozen: FreezeCalldataDto;
   }> {
     const { transfers, revocations } = await this.queue();
     return {
       transfers: transfers.map(toTransferRequestDto),
       revocations,
       revocationCap: MAX_REVOCATIONS_PER_CHANGESET,
+      unfrozen: await this.freezes.unfrozenAmong(queuedPlots(transfers, revocations)),
     };
   }
 
@@ -233,6 +245,11 @@ export class ChangeSetService {
           `secret — they were submitted before D77. Reject them and redo the transfers at the counter.`,
       );
     }
+
+    // D80 — nothing is published for a plot the chain does not freeze, deferred
+    // revocations included: those are open procedures too.
+    const unfrozen = await this.freezes.unfrozenAmong(queuedPlots(transfers, pendingRevocations));
+    if (unfrozen.propertyIds.length > 0) throw ownerNotFrozen(unfrozen.propertyIds);
 
     // D56 — oldest first (queue() orders by createdAt), the rest wait.
     const revocations = pendingRevocations.slice(0, MAX_REVOCATIONS_PER_CHANGESET);

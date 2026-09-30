@@ -62,6 +62,8 @@ const TITLES: Record<ResidentErrorCode, keyof ErrorStrings> = {
   'root-mismatch': 'rootMismatch',
   'stale-timestamp': 'staleTimestamp',
   'invalid-proof': 'invalidProof',
+  'owner-frozen': 'ownerFrozen',
+  'owner-not-frozen': 'ownerNotFrozen',
   unreachable: 'unreachable',
   unknown: 'unknown',
   revoked: 'revoked',

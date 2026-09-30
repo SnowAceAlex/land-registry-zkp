@@ -166,11 +166,32 @@ export interface RevocationRow {
   createdAt: string;
 }
 
+/** A freezeOwners / unfreezeOwners argument list (D79), decimal strings. */
+export interface FreezeCalldata {
+  propertyIds: string[];
+  ownerCommitments: string[];
+}
+
+/** GET /government/freezes/:propertyId — FreezeStatusDto (D80). */
+export interface FreezeStatus {
+  propertyId: string;
+  ownerCommitment: string;
+  frozenOnChain: boolean;
+  openProcedure:
+    | null
+    | { kind: 'transfer'; id: number; status: 'PENDING' | 'APPROVED' }
+    | { kind: 'revocation'; id: number };
+  freezeCalldata: FreezeCalldata;
+  unfreezeAllowed: boolean;
+}
+
 /** GET /government/pending-changes. */
 export interface PendingChanges {
   transfers: TransferRequest[];
   revocations: RevocationRow[];
   revocationCap: number;
+  /** Queued plots the chain does not freeze (D80) — signed before drafting. */
+  unfrozen: FreezeCalldata;
 }
 
 /** POST /government/import — ImportResult (D52). */

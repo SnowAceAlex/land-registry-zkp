@@ -19,7 +19,10 @@ import {
  *              TIMESTAMP_TOLERANCE_SECONDS of block.timestamp (D9/D26) — the
  *              timestamp is a prover-chosen public input, so without this check
  *              a proof generated back when an expired title was still valid
- *              verifies perfectly.
+ *              verifies perfectly,
+ *           4. (ownership and mortgage only) requires the proof's owner not to
+ *              be frozen by a pending transfer or revocation (D79) — the check
+ *              that closes the window between the counter and the change set.
  *         On success it returns true; on any failure it reverts with a typed
  *         error so callers can tell WHY a proof was rejected.
  *
@@ -61,6 +64,10 @@ contract LandRegistryVerifier {
     uint256 internal constant MORTGAGE_TIMESTAMP_INDEX = 3;
     uint256 internal constant TRANSFER_OLD_ROOT_INDEX = 0;
     uint256 internal constant TRANSFER_TIMESTAMP_INDEX = 5;
+    uint256 internal constant OWNERSHIP_PROPERTY_ID_INDEX = 1;
+    uint256 internal constant OWNERSHIP_COMMITMENT_INDEX = 2;
+    uint256 internal constant MORTGAGE_PROPERTY_ID_INDEX = 1;
+    uint256 internal constant MORTGAGE_COMMITMENT_INDEX = 2;
 
     // -------------------------------------------------------------------------
     // Errors
@@ -72,6 +79,8 @@ contract LandRegistryVerifier {
     error RootMismatch(bytes32 expected, bytes32 actual);
     /// @notice The proof's currentTimestamp is outside the tolerance window (replay guard).
     error StaleTimestamp(uint256 claimed, uint256 blockTime);
+    /// @notice D79: the proof's owner is frozen by a transfer/revocation not yet published.
+    error OwnerFrozen(uint256 propertyId);
     /// @notice A constructor dependency was the zero address.
     error ZeroAddressDependency();
 
@@ -121,6 +130,10 @@ contract LandRegistryVerifier {
         if (!ownershipVerifier.verifyProof(a, b, c, pubSignals)) revert InvalidProof();
         _requireLatestRoot(pubSignals[OWNERSHIP_ROOT_INDEX]);
         _requireFreshTimestamp(pubSignals[OWNERSHIP_TIMESTAMP_INDEX]);
+        _requireNotFrozen(
+            pubSignals[OWNERSHIP_PROPERTY_ID_INDEX],
+            pubSignals[OWNERSHIP_COMMITMENT_INDEX]
+        );
         return true;
     }
 
@@ -140,6 +153,10 @@ contract LandRegistryVerifier {
         if (!mortgageVerifier.verifyProof(a, b, c, pubSignals)) revert InvalidProof();
         _requireLatestRoot(pubSignals[MORTGAGE_ROOT_INDEX]);
         _requireFreshTimestamp(pubSignals[MORTGAGE_TIMESTAMP_INDEX]);
+        _requireNotFrozen(
+            pubSignals[MORTGAGE_PROPERTY_ID_INDEX],
+            pubSignals[MORTGAGE_COMMITMENT_INDEX]
+        );
         return true;
     }
 
@@ -186,5 +203,12 @@ contract LandRegistryVerifier {
         if (drift > TIMESTAMP_TOLERANCE_SECONDS) {
             revert StaleTimestamp(claimed, block.timestamp);
         }
+    }
+
+    /// @dev Last check (D79: owner frozen by a pending procedure). Not used by verifyTransfer —
+    ///      approve() verifies a transfer after its plot is frozen.
+    function _requireNotFrozen(uint256 propertyId, uint256 ownerCommitment) internal view {
+        uint256 frozen = registry.frozenOwner(propertyId);
+        if (frozen != 0 && frozen == ownerCommitment) revert OwnerFrozen(propertyId);
     }
 }
