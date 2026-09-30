@@ -13,12 +13,16 @@
  * The checks run in the order `nextVerificationStep` dictates (D63), one at a
  * time, driven from the handler rather than an effect: the work is caused by
  * the verifier pressing a button, not by rendering.
+ *
+ * Two tabs: standard (buyer, bank — proof.json only, the receipt would disclose
+ * term and encumbrance) and agency (proof.json + receipt.json, adds the D30 issuer chain).
  */
 
-import { FileText, LoaderCircle } from 'lucide-react';
+import { FileCheck2, FileText, LoaderCircle } from 'lucide-react';
 import { useState } from 'react';
 
 import type { Dictionary } from '@/i18n/dictionaries';
+import { format } from '@/i18n/format';
 import type { ProofPackage } from '@land-registry/blockchain/shared/types';
 import {
   isTimestampFresh,
@@ -38,8 +42,12 @@ import { ArtifactMissingError, verifyProofOffChain } from '@/lib/zkp';
 import { CheckList } from './check-list';
 import { DisclosurePanel } from './disclosure-panel';
 import { IssuerChainPanel } from './issuer-chain-panel';
-import { RevocationPanel } from './revocation-panel';
 import { type IssuerChainReport, verifyIssuerChain } from '../lib/issuer-chain';
+import {
+  ReceiptFileError,
+  assertReceiptMatchesProof,
+  parseReceiptFile,
+} from '../lib/receipt-file';
 import { TRUSTED_ROOT_CA_PEM } from '../lib/trusted-root';
 import { verifyOnChain } from '../lib/on-chain-verify';
 import {
@@ -62,20 +70,24 @@ const VERDICT_KEYS = {
   unknown: 'verdict_unknown',
 } as const;
 
+type Mode = 'standard' | 'agency';
+const MODES: readonly Mode[] = ['standard', 'agency'];
+
 export function VerifyWorkbench({
   t,
   errors,
   signals,
-  revocationStrings,
   shell,
 }: {
   t: Strings;
   errors: Dictionary['residentErrors'];
   signals: Dictionary['residentSignals'];
-  revocationStrings: Dictionary['residentRevocation'];
   shell: Dictionary['residentShell'];
 }) {
+  const [mode, setMode] = useState<Mode>('standard');
   const [text, setText] = useState('');
+  const [receiptFile, setReceiptFile] = useState<{ name: string; text: string } | null>(null);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
   const [pkg, setPkg] = useState<ProofPackage | null>(null);
   const [proofError, setProofError] = useState<string | null>(null);
   const [checks, setChecks] = useState<Record<CheckName, CheckState>>(initialChecks());
@@ -94,6 +106,7 @@ export function VerifyWorkbench({
   function reset() {
     setPkg(null);
     setProofError(null);
+    setReceiptError(null);
     setChecks(initialChecks());
     setRejection(undefined);
     setChainReachable(undefined);
@@ -203,11 +216,20 @@ export function VerifyWorkbench({
     setBusy(true);
     try {
       const parsed = parseProofFile(text);
+      // Agency tab: refuse a bad or mismatched receipt before any check runs.
+      let receipt: Receipt | null = null;
+      if (mode === 'agency' && receiptFile) {
+        receipt = parseReceiptFile(receiptFile.text);
+        assertReceiptMatchesProof(receipt, parsed.circuitType, parsed.publicSignals);
+      }
       setPkg(parsed);
       await runChecks(parsed);
+      if (receipt) await checkIssuer(receipt);
     } catch (error) {
       if (error instanceof ProofFileError) {
         setProofError(t[`proof_${error.code}` as keyof Strings]);
+      } else if (error instanceof ReceiptFileError) {
+        setReceiptError(t[`receipt_${error.code}` as keyof Strings]);
       } else {
         setFailure(residentFailure(error, errors));
       }
@@ -221,12 +243,16 @@ export function VerifyWorkbench({
     if (file) onText(await file.text());
   }
 
-  /** The optional receipt — the D30 identity chain, and nothing else. */
-  async function loadReceipt(files: File[]) {
+  async function chooseReceipt(files: File[]) {
+    const file = files[0];
+    if (!file) return;
+    setReceiptFile({ name: file.name, text: await file.text() });
+    setReceiptError(null);
+  }
+
+  /** The D30 identity chain from the receipt's issuer block, and nothing else. */
+  async function checkIssuer(receipt: Receipt) {
     try {
-      const raw = await files[0]?.text();
-      if (!raw) return;
-      const receipt = JSON.parse(raw) as Receipt;
       const { config, client } = await loadChainConfig();
 
       setContractMatches(
@@ -253,10 +279,49 @@ export function VerifyWorkbench({
     rejection,
   });
 
-  const trust = summariseTrust({ step, revocation, issuer, chainReachable });
+  const trust = summariseTrust({
+    step,
+    revocation,
+    issuer,
+    issuerRequired: mode === 'agency',
+    chainReachable,
+  });
+
+  function switchMode(next: Mode) {
+    if (next === mode) return;
+    reset();
+    setMode(next);
+  }
 
   return (
     <div className="space-y-8">
+      <div className="space-y-3">
+        <div
+          role="tablist"
+          aria-label={t.tablistLabel}
+          className="flex flex-wrap gap-1 border-b border-whisper"
+        >
+          {MODES.map((value) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={mode === value}
+              disabled={busy}
+              onClick={() => switchMode(value)}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ui-transition ${
+                mode === value
+                  ? 'border-authority text-ink'
+                  : 'border-transparent text-steel hover:text-ink'
+              }`}
+            >
+              {t[`tab_${value}`]}
+            </button>
+          ))}
+        </div>
+        <p className="max-w-3xl text-xs leading-relaxed text-steel">{t[`modeBody_${mode}`]}</p>
+      </div>
+
       <section className="space-y-3">
         <h2 className="text-sm font-medium tracking-tight text-ink">{t.inputTitle}</h2>
         <p className="max-w-3xl text-xs leading-relaxed text-steel">{t.inputBody}</p>
@@ -294,10 +359,29 @@ export function VerifyWorkbench({
             />
           </label>
 
+          {mode === 'agency' ? (
+            <label className={`${buttonStyles.secondary} cursor-pointer`}>
+              <span className="inline-flex items-center gap-2">
+                <FileCheck2 className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+                {t.chooseReceipt}
+              </span>
+              <input
+                type="file"
+                accept=".json,application/json"
+                className="sr-only"
+                onChange={(event) => {
+                  const files = [...(event.target.files ?? [])];
+                  event.target.value = '';
+                  void chooseReceipt(files);
+                }}
+              />
+            </label>
+          ) : null}
+
           <button
             type="button"
             className={buttonStyles.primary}
-            disabled={busy || text.trim() === ''}
+            disabled={busy || text.trim() === '' || (mode === 'agency' && receiptFile === null)}
             onClick={checkProof}
           >
             {busy ? (
@@ -317,9 +401,21 @@ export function VerifyWorkbench({
           ) : null}
         </div>
 
+        {mode === 'agency' ? (
+          <p className="text-xs text-steel">
+            {receiptFile ? format(t.receiptLoaded, { name: receiptFile.name }) : t.receiptMissing}
+          </p>
+        ) : null}
+
         {proofError ? (
           <Notice tone="danger" title={t.proofProblem}>
             {proofError}
+          </Notice>
+        ) : null}
+
+        {receiptError ? (
+          <Notice tone="danger" title={t.receiptProblem}>
+            {receiptError}
           </Notice>
         ) : null}
       </section>
@@ -373,25 +469,14 @@ export function VerifyWorkbench({
             signals={signals}
           />
 
-          <RevocationPanel entry={revocation} t={t} revocation={revocationStrings} />
-
-          <IssuerChainPanel
-            report={issuer}
-            contractMatches={contractMatches}
-            onChooseReceipt={() => document.getElementById('receipt-json')?.click()}
-            t={t}
-          />
-          <input
-            id="receipt-json"
-            type="file"
-            accept=".json,application/json"
-            className="sr-only"
-            onChange={(event) => {
-              const files = [...(event.target.files ?? [])];
-              event.target.value = '';
-              void loadReceipt(files);
-            }}
-          />
+          {mode === 'agency' ? (
+            <IssuerChainPanel
+              report={issuer}
+              contractMatches={contractMatches}
+              pending={busy}
+              t={t}
+            />
+          ) : null}
         </>
       ) : null}
     </div>
