@@ -17,7 +17,6 @@
 import { Check, CircleHelp, CircleSlash, LoaderCircle, X } from 'lucide-react';
 
 import type { Dictionary } from '@/i18n/dictionaries';
-import { format } from '@/i18n/format';
 import { HashText } from '@/components/ui/hash-text';
 import { Notice } from '@/components/ui/notice';
 
@@ -102,7 +101,7 @@ export function IssuerChainPanel({
                   <div className="min-w-0">
                     <p className="text-ink">{t[LINKS[link]]}</p>
                     {link === 'certificate' ? (
-                      <CertificateNote state={state} issuedBy={report.issuedBy} t={t} />
+                      <CertificateNote state={state} t={t} />
                     ) : null}
                   </div>
                 </li>
@@ -126,21 +125,17 @@ export function IssuerChainPanel({
 /** Who issued the certificate — or why that could not be said. */
 function CertificateNote({
   state,
-  issuedBy,
   t,
 }: {
   state: LinkState;
-  issuedBy: string | undefined;
   t: Strings;
 }) {
   const text =
-    state === 'pass' && issuedBy
-      ? format(t.link_certificateIssuedBy, { issuer: issuedBy })
-      : state === 'fail'
-        ? t.link_certificateRejected
-        : state === 'not-verifiable'
-          ? t.link_certificateNoAnchor
-          : null;
+    state === 'fail'
+      ? t.link_certificateRejected
+      : state === 'not-verifiable'
+        ? t.link_certificateNoAnchor
+        : null;
 
   return text ? <p className="mt-1 text-xs leading-relaxed text-steel">{text}</p> : null;
 }
