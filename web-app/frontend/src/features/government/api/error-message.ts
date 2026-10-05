@@ -47,8 +47,6 @@ const WALLET_TITLES: Record<WalletErrorCode, keyof ErrorStrings> = {
   'no-role': 'walletNoRole',
   'already-revoked': 'walletAlreadyRevoked',
   'invalid-revocation': 'walletInvalidRevocation',
-  'not-frozen': 'walletNotFrozen',
-  'invalid-freeze': 'walletInvalidFreeze',
   unknown: 'walletUnknown',
 };
 

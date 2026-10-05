@@ -15,8 +15,8 @@
  * soon as the request is submitted or the officer starts over. The buyer's
  * exists here only for the length of proveAndSubmit().
  *
- *   1b. Freeze the seller on chain (D80) — before anything is proved or
- *      recorded; the backend refuses the submit until the chain shows it.
+ * No wallet step: the submit itself is the lock — from that insert on, the
+ * seller gets no status attestation and so no accepted proof (D82).
  */
 
 import { useState } from 'react';
@@ -33,14 +33,14 @@ import { BundleError, type OwnerBundle, readBundleFiles } from '@/lib/bundle';
 import { generateProof } from '@/lib/zkp';
 
 import { type Failure, apiFailure } from '../../api/error-message';
-import { getFreezeStatus } from '../../api/freezes';
 import { useOpenDraft } from '../../api/hooks';
-import type { FreezeStatus, PropertyDetail } from '../../api/types';
-import { openProcedureMessage } from '../../publishing/open-procedure-message';
-import { FreezeStep } from '../../publishing/components/freeze-step';
-import { UnfreezeAction } from '../../publishing/components/unfreeze-action';
+import type { PropertyDetail } from '../../api/types';
 import { getPropertyDetail, previewTransfer, submitTransfer } from '../api';
-import { type SellerCheckIssue, type SellerCheckResult, checkSellerBundle } from '../lib/seller-check';
+import {
+  type SellerCheckIssue,
+  type SellerCheckResult,
+  checkSellerBundle,
+} from '../lib/seller-check';
 import { MAX_TERM_YEARS, parseTermYears, yearsToSeconds } from '@/lib/term';
 import { buildCounterTransferInput } from '../lib/transfer-witness';
 
@@ -54,15 +54,7 @@ interface Seller {
 
 type Busy = 'checking' | 'previewing' | 'proving' | 'submitting' | null;
 
-export function TransferCounter({
-  t,
-  errors,
-  freezeT,
-}: {
-  t: Strings;
-  errors: Dictionary['govErrors'];
-  freezeT: Dictionary['govFreeze'];
-}) {
+export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary['govErrors'] }) {
   const queryClient = useQueryClient();
   const openDraft = useOpenDraft();
 
@@ -73,7 +65,6 @@ export function TransferCounter({
   const [failure, setFailure] = useState<Failure | null>(null);
   const [submitted, setSubmitted] = useState<{ id: number; durationMs: number } | null>(null);
   const [inputKey, setInputKey] = useState(0);
-  const [freeze, setFreeze] = useState<FreezeStatus | null>(null);
 
   function startOver() {
     setSeller(null);
@@ -82,16 +73,6 @@ export function TransferCounter({
     setFailure(null);
     setSubmitted(null);
     setInputKey((key) => key + 1);
-    setFreeze(null);
-  }
-
-  /** Re-read the seller's freeze — after the bundle checks out, and after signing. */
-  async function refreshFreeze(propertyId: string) {
-    try {
-      setFreeze(await getFreezeStatus(propertyId));
-    } catch (error) {
-      setFailure(apiFailure(error, errors));
-    }
   }
 
   async function loadBundle(files: FileList | null) {
@@ -105,7 +86,6 @@ export function TransferCounter({
         setIssues(check.issues);
       } else {
         setSeller({ bundle, property, check });
-        await refreshFreeze(property.propertyId);
       }
     } catch (error) {
       setFailure(
@@ -125,14 +105,7 @@ export function TransferCounter({
   const parsedYears = parseTermYears(years);
   const yearsError = 'error' in parsedYears ? parsedYears.error : null;
   const yearsValue = 'years' in parsedYears ? parsedYears.years : null;
-  // Freeze first, record second (D80): the proof is generated only once the
-  // chain freezes this seller, so the submit cannot be refused for it.
-  const canSubmit = Boolean(
-    seller &&
-      yearsValue !== null &&
-      freeze?.frozenOnChain &&
-      freeze.openProcedure === null,
-  );
+  const canSubmit = Boolean(seller && yearsValue !== null);
 
   async function proveAndSubmit() {
     if (!seller || !canSubmit || yearsValue === null) return;
@@ -156,7 +129,10 @@ export function TransferCounter({
       try {
         proved = await generateProof('transfer', input);
       } catch (error) {
-        setFailure({ title: t.proveFailed, detail: error instanceof Error ? error.message : String(error) });
+        setFailure({
+          title: t.proveFailed,
+          detail: error instanceof Error ? error.message : String(error),
+        });
         return;
       }
 
@@ -208,7 +184,10 @@ export function TransferCounter({
       <Step number={1} title={t.step1} active>
         {seller ? (
           <div className="space-y-4">
-            <Notice tone="success" title={format(t.sellerVerified, { id: seller.property.propertyId })} />
+            <Notice
+              tone="success"
+              title={format(t.sellerVerified, { id: seller.property.propertyId })}
+            />
             <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[12rem_1fr]">
               <dt className="text-steel">{t.fieldAddress}</dt>
               <dd>{seller.property.address}</dd>
@@ -223,7 +202,12 @@ export function TransferCounter({
                 <HashText value={seller.property.ownerCommitment ?? ''} head={12} tail={8} />
               </dd>
             </dl>
-            <button type="button" className={buttonStyles.secondary} disabled={busy !== null} onClick={startOver}>
+            <button
+              type="button"
+              className={buttonStyles.secondary}
+              disabled={busy !== null}
+              onClick={startOver}
+            >
               {t.changeBundle}
             </button>
           </div>
@@ -262,48 +246,7 @@ export function TransferCounter({
         )}
       </Step>
 
-      <Step number={2} title={t.stepFreeze} active={Boolean(seller)}>
-        {seller && freeze ? (
-          freeze.openProcedure ? (
-            <div className="space-y-3">
-              <Notice tone="danger" title={openProcedureMessage(freezeT, freeze.openProcedure)} />
-              {!freeze.frozenOnChain ? (
-                <FreezeStep
-                  mode="freeze"
-                  calldata={freeze.freezeCalldata}
-                  t={freezeT}
-                  errors={errors}
-                  label={format(freezeT.freezePlot, { id: seller.property.propertyId })}
-                  onDone={() => refreshFreeze(seller.property.propertyId)}
-                />
-              ) : null}
-            </div>
-          ) : freeze.frozenOnChain ? (
-            <div className="space-y-3">
-              <Notice tone="success" title={freezeT.frozenDone} />
-              <UnfreezeAction
-                propertyId={seller.property.propertyId}
-                t={freezeT}
-                errors={errors}
-                label={t.abandonAndUnfreeze}
-                disabled={busy !== null}
-                onDone={startOver}
-              />
-            </div>
-          ) : (
-            <FreezeStep
-              mode="freeze"
-              calldata={freeze.freezeCalldata}
-              t={freezeT}
-              errors={errors}
-              label={format(freezeT.freezePlot, { id: seller.property.propertyId })}
-              onDone={() => refreshFreeze(seller.property.propertyId)}
-            />
-          )
-        ) : null}
-      </Step>
-
-      <Step number={3} title={t.step2} active={Boolean(seller && freeze?.frozenOnChain)}>
+      <Step number={2} title={t.step2} active={Boolean(seller)}>
         {seller ? (
           <div className="space-y-4">
             <div className="max-w-xs">
@@ -321,7 +264,9 @@ export function TransferCounter({
                 disabled={busy !== null}
                 onChange={(event) => setYears(event.target.value)}
                 aria-invalid={yearsError === null ? undefined : true}
-                aria-describedby={yearsError === null ? 'transfer-term-hint' : 'transfer-term-error'}
+                aria-describedby={
+                  yearsError === null ? 'transfer-term-hint' : 'transfer-term-error'
+                }
                 className="mt-2 w-full rounded-lg border border-hairline bg-white px-3.5 py-2.5 font-mono text-sm ui-transition focus:border-authority"
               />
               {yearsError === null ? (

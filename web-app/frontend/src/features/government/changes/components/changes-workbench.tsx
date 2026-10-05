@@ -29,7 +29,6 @@ import { type Failure, apiFailure } from '../../api/error-message';
 import { govKeys, useOpenDraft, usePendingChanges, usePendingTransferCount } from '../../api/hooks';
 import type { ChangeSetDraftDetail, PendingChanges } from '../../api/types';
 import { type DraftOutcome, DraftPanel } from '../../publishing/components/draft-panel';
-import { FreezeStep } from '../../publishing/components/freeze-step';
 import { confirmChangeSetDraft, createChangeSetDraft, discardChangeSetDraft } from '../api';
 import { ChangeSetHistory } from './changeset-history';
 
@@ -44,13 +43,11 @@ export function ChangesWorkbench({
   t,
   draftT,
   errors,
-  freezeT,
 }: {
   lang: Locale;
   t: Strings;
   draftT: Dictionary['govDraft'];
   errors: Dictionary['govErrors'];
-  freezeT: Dictionary['govFreeze'];
 }) {
   const queryClient = useQueryClient();
   const openDraft = useOpenDraft();
@@ -176,9 +173,6 @@ export function ChangesWorkbench({
             t={t}
             creating={creating}
             onCreate={create}
-            freezeT={freezeT}
-            errors={errors}
-            onFrozen={refresh}
           />
         )}
       </div>
@@ -206,7 +200,8 @@ function DraftSummary({ draft, t }: { draft: ChangeSetDraftDetail; t: Strings })
           <ul className="mt-1 space-y-0.5 text-xs text-steel">
             {propertyIds.map((propertyId, index) => (
               <li key={propertyId}>
-                <span className="font-mono text-ink">{propertyId}</span> — {reasonLabel(t, reasonCodes[index])}
+                <span className="font-mono text-ink">{propertyId}</span> —{' '}
+                {reasonLabel(t, reasonCodes[index])}
               </li>
             ))}
           </ul>
@@ -231,23 +226,14 @@ function PendingQueue({
   t,
   creating,
   onCreate,
-  freezeT,
-  errors,
-  onFrozen,
 }: {
   lang: Locale;
   pending: PendingChanges;
   t: Strings;
   creating: boolean;
   onCreate: () => void;
-  freezeT: Dictionary['govFreeze'];
-  errors: Dictionary['govErrors'];
-  onFrozen: () => Promise<void>;
 }) {
   const { transfers, revocations, revocationCap } = pending;
-  // D80: createDraft() refuses unfrozen plots, so sign the missing freezes here first.
-  const unfrozen = pending.unfrozen;
-  const hasGaps = unfrozen.propertyIds.length > 0;
 
   if (transfers.length === 0 && revocations.length === 0) {
     return <EmptyState icon={FolderSync} title={t.emptyTitle} description={t.emptyBody} />;
@@ -265,7 +251,7 @@ function PendingQueue({
         <button
           type="button"
           className={buttonStyles.primary}
-          disabled={creating || hasGaps}
+          disabled={creating}
           onClick={onCreate}
         >
           {creating ? (
@@ -279,24 +265,6 @@ function PendingQueue({
         </button>
       </div>
 
-      {hasGaps ? (
-        <div className="space-y-3">
-          <Notice
-            tone="warning"
-            title={format(freezeT.unfrozenQueueTitle, { count: unfrozen.propertyIds.length })}
-          >
-            {freezeT.unfrozenQueueBody}
-          </Notice>
-          <FreezeStep
-            mode="freeze"
-            calldata={unfrozen}
-            t={freezeT}
-            errors={errors}
-            onDone={onFrozen}
-          />
-        </div>
-      ) : null}
-
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-ink">{t.transfersTitle}</h3>
         {transfers.length === 0 ? (
@@ -306,10 +274,18 @@ function PendingQueue({
             <table className="w-full min-w-[36rem] text-left text-sm">
               <thead className="border-b border-hairline text-xs text-steel">
                 <tr>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colRequest}</th>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colProperty}</th>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colBuyer}</th>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colApproved}</th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colRequest}
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colProperty}
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colBuyer}
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colApproved}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-whisper">
@@ -348,11 +324,21 @@ function PendingQueue({
             <table className="w-full min-w-[48rem] text-left text-sm">
               <thead className="border-b border-hairline text-xs text-steel">
                 <tr>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colProperty}</th>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colReason}</th>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colDetail}</th>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colDetailHash}</th>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colRequested}</th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colProperty}
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colReason}
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colDetail}
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colDetailHash}
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colRequested}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-whisper">
@@ -360,7 +346,9 @@ function PendingQueue({
                   <tr key={revocation.id} className="align-top">
                     <td className="px-4 py-2 font-mono text-xs">{revocation.propertyId}</td>
                     <td className="px-4 py-2">{reasonLabel(t, revocation.reasonCode)}</td>
-                    <td className="max-w-[16rem] px-4 py-2 break-words text-ink">{revocation.detailText}</td>
+                    <td className="max-w-[16rem] px-4 py-2 break-words text-ink">
+                      {revocation.detailText}
+                    </td>
                     <td className="px-4 py-2">
                       <HashText value={revocation.detailHash} />
                     </td>

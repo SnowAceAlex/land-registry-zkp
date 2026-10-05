@@ -19,16 +19,14 @@ import { RevocationForm } from './revocation-form';
 export function RevocationsView({
   t,
   errors,
-  freezeT,
 }: {
   t: Dictionary['govRevocations'];
   errors: Dictionary['govErrors'];
-  freezeT: Dictionary['govFreeze'];
 }) {
   return (
     <div className="space-y-8">
       <PageHeader title={t.title} description={t.description} />
-      <RevocationForm t={t} errors={errors} freezeT={freezeT} />
+      <RevocationForm t={t} errors={errors} />
       <PendingRevocations t={t} />
     </div>
   );

@@ -27,11 +27,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 import { apiErrorCode } from '../../api/error-code';
 import { apiFailure } from '../../api/error-message';
-import { getFreezeStatus } from '../../api/freezes';
 import { govKeys } from '../../api/hooks';
-import type { FreezeStatus, TransferStatus } from '../../api/types';
-import { FreezeStep } from '../../publishing/components/freeze-step';
-import { UnfreezeAction } from '../../publishing/components/unfreeze-action';
+import type { TransferStatus } from '../../api/types';
 import { approveTransfer, listTransfers, rejectTransfer } from '../api';
 
 const TABS: TransferStatus[] = ['PENDING', 'APPROVED', 'PUBLISHED', 'REJECTED'];
@@ -41,19 +38,15 @@ type Message = { tone: 'success' | 'danger'; title: string; detail?: string; hin
 export function TransferQueue({
   t,
   errors,
-  freezeT,
 }: {
   t: Dictionary['govTransfers'];
   errors: Dictionary['govErrors'];
-  freezeT: Dictionary['govFreeze'];
 }) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<TransferStatus>('PENDING');
   const [working, setWorking] = useState<number | null>(null);
   const [rejecting, setRejecting] = useState<{ id: number; reason: string } | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
-  // F2: offered when approve fails because the seller's freeze fell off chain.
-  const [refreeze, setRefreeze] = useState<{ id: number; status: FreezeStatus } | null>(null);
 
   const transfers = useQuery({
     queryKey: govKeys.transfers(tab),
@@ -78,16 +71,13 @@ export function TransferQueue({
           ? t.rootMismatchHint
           : code === 'stale-timestamp'
             ? t.staleTimestampHint
-            : code === 'owner-not-frozen'
-              ? t.ownerNotFrozenHint
-              : undefined,
+            : undefined,
     };
   }
 
   async function run(id: number, action: () => Promise<unknown>, success: string, detail?: string) {
     setWorking(id);
     setMessage(null);
-    setRefreeze(null);
     try {
       await action();
       setMessage({ tone: 'success', title: success, detail });
@@ -100,19 +90,14 @@ export function TransferQueue({
     }
   }
 
-  async function runApprove(id: number, propertyId: string) {
+  async function runApprove(id: number) {
     setWorking(id);
     setMessage(null);
-    setRefreeze(null);
     try {
       await approveTransfer(id);
       setMessage({ tone: 'success', title: format(t.approvedTitle, { id }) });
     } catch (error) {
       setMessage(failureMessage(error));
-      if (apiErrorCode(error) === 'owner-not-frozen') {
-        const status = await getFreezeStatus(propertyId);
-        if (!status.frozenOnChain) setRefreeze({ id, status });
-      }
     } finally {
       setWorking(null);
       await refresh();
@@ -121,7 +106,11 @@ export function TransferQueue({
 
   return (
     <div className="space-y-4">
-      <div role="tablist" aria-label={t.queueTitle} className="flex flex-wrap gap-1 border-b border-whisper">
+      <div
+        role="tablist"
+        aria-label={t.queueTitle}
+        className="flex flex-wrap gap-1 border-b border-whisper"
+      >
         {TABS.map((status) => (
           <button
             key={status}
@@ -151,19 +140,6 @@ export function TransferQueue({
         </Notice>
       ) : null}
 
-      {refreeze ? (
-        <FreezeStep
-          mode="freeze"
-          calldata={refreeze.status.freezeCalldata}
-          t={freezeT}
-          errors={errors}
-          onDone={async () => {
-            setRefreeze(null);
-            await refresh();
-          }}
-        />
-      ) : null}
-
       {transfers.isPending ? (
         <Skeleton className="h-24 w-full" />
       ) : transfers.error ? (
@@ -175,12 +151,24 @@ export function TransferQueue({
           <table className="w-full min-w-[46rem] text-left text-sm">
             <thead className="border-b border-hairline text-xs text-steel">
               <tr>
-                <th scope="col" className="px-4 py-2 font-medium">{t.colRequest}</th>
-                <th scope="col" className="px-4 py-2 font-medium">{t.colProperty}</th>
-                <th scope="col" className="px-4 py-2 font-medium">{t.colBuyer}</th>
-                <th scope="col" className="px-4 py-2 font-medium">{t.colCreated}</th>
-                <th scope="col" className="px-4 py-2 font-medium">{t.colDecided}</th>
-                <th scope="col" className="px-4 py-2 font-medium">{t.colAction}</th>
+                <th scope="col" className="px-4 py-2 font-medium">
+                  {t.colRequest}
+                </th>
+                <th scope="col" className="px-4 py-2 font-medium">
+                  {t.colProperty}
+                </th>
+                <th scope="col" className="px-4 py-2 font-medium">
+                  {t.colBuyer}
+                </th>
+                <th scope="col" className="px-4 py-2 font-medium">
+                  {t.colCreated}
+                </th>
+                <th scope="col" className="px-4 py-2 font-medium">
+                  {t.colDecided}
+                </th>
+                <th scope="col" className="px-4 py-2 font-medium">
+                  {t.colAction}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-whisper">
@@ -201,14 +189,19 @@ export function TransferQueue({
                     {request.status === 'PENDING' ? (
                       rejecting?.id === request.id ? (
                         <div className="flex min-w-[16rem] flex-col gap-2">
-                          <label htmlFor={`reject-${request.id}`} className="text-xs font-medium text-ink">
+                          <label
+                            htmlFor={`reject-${request.id}`}
+                            className="text-xs font-medium text-ink"
+                          >
                             {format(t.rejectReason, { id: request.id })}
                           </label>
                           <input
                             id={`reject-${request.id}`}
                             maxLength={500}
                             value={rejecting.reason}
-                            onChange={(event) => setRejecting({ id: request.id, reason: event.target.value })}
+                            onChange={(event) =>
+                              setRejecting({ id: request.id, reason: event.target.value })
+                            }
                             className="w-full rounded-lg border border-hairline px-3 py-2 text-sm ui-transition focus:border-authority"
                           />
                           <div className="flex gap-2">
@@ -219,9 +212,12 @@ export function TransferQueue({
                               onClick={() =>
                                 run(
                                   request.id,
-                                  () => rejectTransfer(request.id, rejecting.reason.trim() || undefined),
+                                  () =>
+                                    rejectTransfer(
+                                      request.id,
+                                      rejecting.reason.trim() || undefined,
+                                    ),
                                   format(t.rejectedTitle, { id: request.id }),
-                                  t.rejectedStillFrozen,
                                 )
                               }
                             >
@@ -242,7 +238,7 @@ export function TransferQueue({
                             type="button"
                             className={`${buttonStyles.primary} px-3 py-1.5 text-xs`}
                             disabled={working !== null}
-                            onClick={() => void runApprove(request.id, request.propertyId)}
+                            onClick={() => void runApprove(request.id)}
                           >
                             {working === request.id ? (
                               <>
@@ -272,16 +268,7 @@ export function TransferQueue({
                           : '—'}
                       </span>
                     ) : (
-                      <div className="space-y-2">
-                        <span className="text-xs text-steel">{request.rejectReason ?? '—'}</span>
-                        {/* D80: a rejected request leaves its seller frozen until lifted here. */}
-                        <UnfreezeAction
-                          propertyId={request.propertyId}
-                          t={freezeT}
-                          errors={errors}
-                          onDone={refresh}
-                        />
-                      </div>
+                      <span className="text-xs text-steel">{request.rejectReason ?? '—'}</span>
                     )}
                   </td>
                 </tr>

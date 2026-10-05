@@ -163,9 +163,7 @@
     "fieldArea": "Area",
     "fieldTenure": "Tenure",
     "fieldOwner": "Current owner commitment",
-    "step2": "3. Generate the proof and submit",
-    "stepFreeze": "2. Freeze the seller on chain",
-    "abandonAndUnfreeze": "Abandon this dossier and lift the freeze",
+    "step2": "2. Generate the proof and submit",
     "termLabel": "Minimum remaining term the buyer accepts (years)",
     "termHint": "Enter 0 to only prove it has not expired, or enter an agreed minimum remaining years.",
     "termInvalid": "Enter a whole number of years, 0 or more.",
@@ -200,10 +198,8 @@
     "publishedIn": "Round #{id} — download the buyer's bundle on the Changes page",
     "approvedTitle": "Transfer #{id} approved; will publish with next ChangeSet",
     "rejectedTitle": "Transfer #{id} rejected",
-    "rootMismatchHint": "The registry published a new root after this proof was made. Please re-submit at the counter. The seller stays frozen until you lift it in the Rejected tab.",
-    "staleTimestampHint": "Chain timestamp is outdated. Please mine a block and try again.",
-    "ownerNotFrozenHint": "The seller's freeze is no longer on chain. Sign the freeze again below, then approve.",
-    "rejectedStillFrozen": "The seller stays frozen until you lift it in the Rejected tab."
+    "rootMismatchHint": "The registry published a new root after this proof was made. Please re-submit at the counter.",
+    "staleTimestampHint": "Chain timestamp is outdated. Please mine a block and try again."
   },
   "govChanges": {
     "title": "Changes",
@@ -560,33 +556,6 @@
     "pendingTransfers": "{count} pending transfer(s) were proven on the previous state. Once published, they will need re-submission.",
     "notOnChainYet": "Chain does not hold this root yet"
   },
-  "govFreeze": {
-    "freezeTitle": "Freeze {count} plot(s) on chain",
-    "freezeBody": "From this signature until the next change set publishes, the current owner's certificate cannot back an ownership or mortgage proof that any verifier accepts. The procedure is recorded only after the freeze is on chain.",
-    "unfreezeTitle": "Lift the freeze on {count} plot(s)",
-    "unfreezeBody": "No procedure is open on this plot any more. Lifting the freeze lets the current owner use the certificate again.",
-    "loading": "Reading the wallet and the registry...",
-    "stepConnect": "Connect the officer wallet with state-authority role to sign.",
-    "stepWrongChain": "Wallet is on chain {actual}. This registry requires chain {expected}.",
-    "switchChain": "Switch network",
-    "stepNoRole": "{account} does not hold STATE_AUTHORITY_ROLE. Select the authorized account in your wallet.",
-    "signFreeze": "Sign the freeze",
-    "signUnfreeze": "Sign the unfreeze",
-    "signing": "Waiting for the wallet signature...",
-    "mining": "Waiting for the block...",
-    "frozenDone": "The owner is frozen on chain.",
-    "unfreezeCheck": "Lift the freeze",
-    "checking": "Checking...",
-    "unfreezeBlockedOpen": "A procedure is still open on this plot, so the freeze must stay.",
-    "unfreezeNotNeeded": "This plot's owner is not frozen. Nothing to lift.",
-    "unfrozenDone": "Freeze lifted.",
-    "openProcedureTransfer": "This plot has an open transfer (#{id}). Finish or reject it first.",
-    "openProcedureRevocation": "This plot has a pending revocation (#{id}). It must be published first.",
-    "unfrozenQueueTitle": "{count} queued plot(s) are not frozen on chain",
-    "unfrozenQueueBody": "They were queued before freezing existed, or their freeze was lifted from another session. Sign the freeze before drafting a change set.",
-    "unfreezeNoLongerAllowed": "A procedure was opened on this plot meanwhile, so the freeze must stay.",
-    "freezePlot": "Plot {id}"
-  },
   "govErrors": {
     "badRequest": "Invalid request rejected by registry",
     "unauthorized": "Portal key expired or invalid",
@@ -607,8 +576,6 @@
     "walletNoRole": "Wallet account lacks state-authority permission",
     "walletAlreadyRevoked": "A plot in this change set is already revoked on chain. Please discard draft.",
     "walletInvalidRevocation": "Contract rejected revocation data. Please discard draft.",
-    "walletNotFrozen": "This plot is not frozen on chain, so there is nothing to lift",
-    "walletInvalidFreeze": "Contract rejected the freeze data",
     "walletUnknown": "Blockchain transaction failed"
   },
   "residentShell": {

@@ -10,7 +10,5 @@ export default async function Page({ params }: PageProps<'/[lang]'>) {
   if (!isLocale(lang)) notFound();
   const dict = await getDictionary(lang);
 
-  return (
-    <RevocationsView t={dict.govRevocations} errors={dict.govErrors} freezeT={dict.govFreeze} />
-  );
+  return <RevocationsView t={dict.govRevocations} errors={dict.govErrors} />;
 }

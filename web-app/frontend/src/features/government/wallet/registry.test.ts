@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest';
 import type { ChangeSetDraftDetail, IssuanceDraftDetail } from '../api/types';
 import {
   bytes32ToDecimal,
-  freezeCallsFor,
-  MAX_FREEZES_PER_TX,
   publishCallFor,
   rootRegistryAbi,
   rootToBytes32,
@@ -72,12 +70,7 @@ describe('publishCallFor (D54)', () => {
 
     expect(publishCallFor(draft)).toEqual({
       functionName: 'publishRootWithRevocations',
-      args: [
-        rootToBytes32(ROOT),
-        [2000n, 2001n],
-        [3, 3],
-        draft.revocationCalldata.detailHashes,
-      ],
+      args: [rootToBytes32(ROOT), [2000n, 2001n], [3, 3], draft.revocationCalldata.detailHashes],
     });
   });
 });
@@ -110,7 +103,10 @@ describe('walletErrorCode', () => {
 
   it('recognises a signature the officer cancelled', () => {
     expect(
-      walletErrorCode({ name: 'TransactionExecutionError', cause: { name: 'UserRejectedRequestError' } }),
+      walletErrorCode({
+        name: 'TransactionExecutionError',
+        cause: { name: 'UserRejectedRequestError' },
+      }),
     ).toBe('rejected');
     expect(walletErrorCode({ code: 4001, message: 'User denied' })).toBe('rejected');
   });
@@ -127,38 +123,5 @@ describe('walletErrorCode', () => {
     expect(walletErrorCode(new Error('boom'))).toBe('unknown');
     expect(walletErrorCode(revert('SomethingElse'))).toBe('unknown');
     expect(walletErrorCode(undefined)).toBe('unknown');
-  });
-});
-
-describe('freezeCallsFor (D79/D80)', () => {
-  it('freezes one plot in one call, as bigints', () => {
-    expect(freezeCallsFor('freeze', { propertyIds: ['1001'], ownerCommitments: [ROOT] })).toEqual([
-      { functionName: 'freezeOwners', args: [[1001n], [BigInt(ROOT)]] },
-    ]);
-  });
-
-  it('splits a large queue into batches of MAX_FREEZES_PER_TX', () => {
-    const ids = Array.from({ length: MAX_FREEZES_PER_TX + 1 }, (_, i) => String(i + 1));
-    const calls = freezeCallsFor('freeze', { propertyIds: ids, ownerCommitments: ids });
-
-    expect(calls).toHaveLength(2);
-    expect(calls[0].args[0]).toHaveLength(MAX_FREEZES_PER_TX);
-    expect(calls[1].args[0]).toEqual([BigInt(MAX_FREEZES_PER_TX + 1)]);
-  });
-
-  it('unfreezes by property id only', () => {
-    expect(freezeCallsFor('unfreeze', { propertyIds: ['7'], ownerCommitments: ['1'] })).toEqual([
-      { functionName: 'unfreezeOwners', args: [[7n]] },
-    ]);
-  });
-});
-
-describe('walletErrorCode — freeze reverts', () => {
-  const revertFreeze = (errorName: string) => ({ cause: { data: { errorName } } });
-
-  it('names NotFrozen and the two malformed-freeze errors', () => {
-    expect(walletErrorCode(revertFreeze('NotFrozen'))).toBe('not-frozen');
-    expect(walletErrorCode(revertFreeze('ZeroOwnerCommitment'))).toBe('invalid-freeze');
-    expect(walletErrorCode(revertFreeze('FreezeArrayLengthMismatch'))).toBe('invalid-freeze');
   });
 });

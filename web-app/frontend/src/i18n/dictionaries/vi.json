@@ -163,9 +163,7 @@
     "fieldArea": "Diện tích",
     "fieldTenure": "Thời hạn",
     "fieldOwner": "Cam kết chủ sở hữu hiện tại",
-    "step2": "3. Tạo bằng chứng và nộp",
-    "stepFreeze": "2. Ngăn chặn giao dịch của bên chuyển nhượng trên blockchain",
-    "abandonAndUnfreeze": "Hủy tiếp nhận hồ sơ và gỡ ngăn chặn",
+    "step2": "2. Tạo bằng chứng và nộp",
     "termLabel": "Thời hạn còn lại tối thiểu bên nhận chấp thuận (năm)",
     "termHint": "Nhập 0 nếu chỉ cần xác nhận còn hạn, hoặc nhập số năm tối thiểu theo thỏa thuận.",
     "termInvalid": "Vui lòng nhập số nguyên từ 0 trở lên.",
@@ -200,10 +198,8 @@
     "publishedIn": "Đợt #{id} — tải hồ sơ bên nhận tại trang Quản lý thay đổi",
     "approvedTitle": "Đã duyệt hồ sơ #{id}; sẽ công bố trong ChangeSet tiếp theo",
     "rejectedTitle": "Đã từ chối hồ sơ #{id}",
-    "rootMismatchHint": "Dữ liệu hệ thống đã thay đổi sau khi tạo bằng chứng. Vui lòng lập lại hồ sơ. Bên chuyển nhượng vẫn bị ngăn chặn cho tới khi gỡ ở tab Đã từ chối.",
-    "staleTimestampHint": "Mốc thời gian trên chuỗi đã cũ. Vui lòng khai thác khối mới và duyệt lại.",
-    "ownerNotFrozenHint": "Lệnh ngăn chặn của bên chuyển nhượng không còn trên blockchain. Ký ngăn chặn lại bên dưới rồi duyệt.",
-    "rejectedStillFrozen": "Bên chuyển nhượng vẫn bị ngăn chặn cho tới khi gỡ ở tab Đã từ chối."
+    "rootMismatchHint": "Dữ liệu hệ thống đã thay đổi sau khi tạo bằng chứng. Vui lòng lập lại hồ sơ.",
+    "staleTimestampHint": "Mốc thời gian trên chuỗi đã cũ. Vui lòng khai thác khối mới và duyệt lại."
   },
   "govChanges": {
     "title": "Quản lý thay đổi",
@@ -560,33 +556,6 @@
     "pendingTransfers": "Có {count} hồ sơ chuyển nhượng tạo trên gốc cũ sẽ cần thực hiện lại tại quầy sau khi công bố.",
     "notOnChainYet": "Blockchain chưa ghi nhận gốc này"
   },
-  "govFreeze": {
-    "freezeTitle": "Ngăn chặn giao dịch {count} thửa trên blockchain",
-    "freezeBody": "Từ lúc ký cho tới khi đợt ChangeSet tiếp theo được công bố, giấy chứng nhận của chủ hiện tại không thể dùng để tạo bằng chứng quyền sở hữu hay thế chấp mà bên xác minh chấp nhận. Hồ sơ chỉ được ghi nhận sau khi lệnh ngăn chặn đã lên blockchain.",
-    "unfreezeTitle": "Gỡ ngăn chặn {count} thửa",
-    "unfreezeBody": "Thửa này không còn thủ tục nào đang mở. Gỡ ngăn chặn để chủ hiện tại dùng lại giấy chứng nhận.",
-    "loading": "Đang đọc ví và sổ đăng ký...",
-    "stepConnect": "Kết nối ví cán bộ có quyền cơ quan có thẩm quyền để ký.",
-    "stepWrongChain": "Ví đang ở mạng {actual}. Hệ thống yêu cầu mạng {expected}.",
-    "switchChain": "Chuyển mạng",
-    "stepNoRole": "{account} không có quyền STATE_AUTHORITY_ROLE. Vui lòng chọn tài khoản có thẩm quyền trong ví.",
-    "signFreeze": "Ký ngăn chặn",
-    "signUnfreeze": "Ký gỡ ngăn chặn",
-    "signing": "Đang chờ ký trên ví...",
-    "mining": "Đang chờ giao dịch được xác nhận...",
-    "frozenDone": "Đã ngăn chặn giao dịch của chủ hiện tại trên blockchain.",
-    "unfreezeCheck": "Gỡ ngăn chặn",
-    "checking": "Đang kiểm tra...",
-    "unfreezeBlockedOpen": "Thửa vẫn còn thủ tục đang mở nên phải giữ ngăn chặn.",
-    "unfreezeNotNeeded": "Chủ hiện tại của thửa không bị ngăn chặn, không cần gỡ.",
-    "unfrozenDone": "Đã gỡ ngăn chặn.",
-    "openProcedureTransfer": "Thửa đang có hồ sơ chuyển nhượng mở (#{id}). Hãy hoàn tất hoặc từ chối trước.",
-    "openProcedureRevocation": "Thửa đang có đề nghị thu hồi chờ công bố (#{id}). Phải công bố trước.",
-    "unfrozenQueueTitle": "{count} thửa trong hàng chờ chưa được ngăn chặn trên blockchain",
-    "unfrozenQueueBody": "Các thửa này được đưa vào hàng chờ trước khi có cơ chế ngăn chặn, hoặc đã bị gỡ ngăn chặn từ phiên khác. Hãy ký ngăn chặn trước khi tạo bản nháp ChangeSet.",
-    "unfreezeNoLongerAllowed": "Thửa vừa có thủ tục mới nên phải giữ ngăn chặn.",
-    "freezePlot": "Thửa {id}"
-  },
   "govErrors": {
     "badRequest": "Yêu cầu không hợp lệ và bị từ chối",
     "unauthorized": "Khóa truy cập đã hết hạn hoặc không hợp lệ",
@@ -607,8 +576,6 @@
     "walletNoRole": "Tài khoản ví không có quyền hạn cơ quan có thẩm quyền",
     "walletAlreadyRevoked": "Một thửa trong đợt này đã bị thu hồi trên chuỗi; vui lòng hủy bản nháp.",
     "walletInvalidRevocation": "Hợp đồng từ chối dữ liệu thu hồi; vui lòng hủy bản nháp.",
-    "walletNotFrozen": "Thửa này không bị ngăn chặn trên blockchain nên không có gì để gỡ",
-    "walletInvalidFreeze": "Hợp đồng từ chối dữ liệu ngăn chặn",
     "walletUnknown": "Giao dịch blockchain không thành công"
   },
   "residentShell": {
