@@ -1,6 +1,6 @@
 # Demo đầy đủ trên Sepolia — từ deploy tới kịch bản bảo vệ
 
-Runbook dựng lại toàn bộ hệ thống trên Sepolia sau D79–D81 (sổ ngăn chặn), rồi chạy một kịch bản demo
+Runbook dựng lại toàn bộ hệ thống trên Sepolia sau D82 (xác nhận tình trạng thay sổ ngăn chặn D79–D81), rồi chạy một kịch bản demo
 đi qua cả 6 use case, gồm hai case tấn công cửa sổ chờ change set phải bị từ chối.
 
 Mọi lệnh chạy từ **gốc repo** trong **Git Bash**. Dòng nào đặt biến môi trường kiểu `A=1 lệnh` thì
@@ -17,7 +17,7 @@ PowerShell viết `$env:A='1'; lệnh`.
 | 7 | Khởi động + Metamask | 5 phút |
 | 8 | Kịch bản demo | 30–40 phút |
 
-Ước tính Sepolia ETH: deploy 5 contract + khoảng 10 giao dịch demo (publish, freeze, unfreeze)
+Ước tính Sepolia ETH: deploy 5 contract + vài giao dịch demo (registerAuthority, grantRole, publish) — từ D82 không còn giao dịch nào theo từng hồ sơ
 ⇒ chuẩn bị **≥ 0,1 Sepolia ETH** cho chắc (con số thật tuỳ gas price lúc chạy).
 
 ---
@@ -30,7 +30,11 @@ bộ, và khoá backend (`AUTHORITY_PRIVATE_KEY`).
 Lý do: backend ký địa chỉ `AUTHORITY_PRIVATE_KEY` bằng khoá X.509 của cơ quan và ghi vào
 `receipt.issuer.ethereumAccountSignature` (D30). Trang verify đối chiếu địa chỉ đó với
 `authorityInstitute` + `STATE_AUTHORITY_ROLE` on-chain. Còn Metamask phải có role thì mới ký được
-`publishRoot` / `freezeOwners`. Một ví thì cả chuỗi khớp, không phải cấp role thêm.
+`publishRoot`. Một ví thì cả chuỗi khớp, không phải cấp role thêm.
+
+Riêng **khoá attester** (D82) là tài khoản **thứ hai**: nó chỉ ký xác nhận tình trạng off-chain, không
+gửi giao dịch nên **không cần ETH**, và tách khỏi ví authority để lộ khoá này không publish được root.
+Tạo thêm một tài khoản bất kỳ, ghi lại địa chỉ + private key.
 
 - Tạo một tài khoản Metamask mới chỉ dùng cho testnet, export private key.
 - Xin Sepolia ETH (faucet ở `DEPLOYMENT.md` §2.2).
@@ -49,6 +53,7 @@ PRIVATE_KEY=0x<khoá ví demo>
 AUTHORITY_ADDRESS=                     # để trống = chính deployer
 AUTHORITY_PRIVATE_KEY=0x<khoá ví demo> # cùng khoá; để khoá Hardhat #0 ở đây thì transfer:smoke hỏng
 AUTHORITY_ORG_NAME="So Tai nguyen va Moi truong TP.HCM"
+ATTESTER_ADDRESS=0x<địa chỉ khoá attester> # bắt buộc trên Sepolia — deploy cấp ATTESTER_ROLE cho nó (D82)
 ETHERSCAN_API_KEY=<tuỳ chọn, cho bước verify source>
 DATABASE_URL="postgresql://postgres:postgres@localhost:5433/land_registry?schema=public"
 CHAIN_NETWORK=sepolia
@@ -64,6 +69,7 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5433/land_registry?schema
 CHAIN_NETWORK=sepolia
 SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<KEY>
 AUTHORITY_PRIVATE_KEY=0x<khoá ví demo>
+ATTESTER_PRIVATE_KEY=0x<khoá attester> # khớp ATTESTER_ADDRESS; thiếu là backend không khởi động (D82)
 GOV_API_KEY=<giống gốc>
 FRONTEND_URL=http://localhost:3000
 ```
@@ -246,43 +252,43 @@ export CHAIN_NETWORK=sepolia SEPOLIA_RPC_URL=<RPC> GOV_API_KEY=<key>
    thư → chữ ký địa chỉ → anchor on-chain đều đạt ⇒ phán quyết **Hợp lệ**.
 3. (Tuỳ chọn) thửa 202 đang thế chấp: UC-5 không cho tạo mortgage proof — đúng D7/D68.
 
-### 8.4 Chuyển nhượng tại quầy + **case tấn công 1** (UC-3, D79/D80)
+### 8.4 Chuyển nhượng tại quầy + **case tấn công 1** (UC-3, D82)
 
-1. Trang Chuyển nhượng → nạp hồ sơ bên bán `201/` → kiểm tra hồ sơ xanh.
-2. **Bước 2 — Ngăn chặn giao dịch**: ký `freezeOwners` trên Metamask → "Đã ngăn chặn…".
-3. Bước 3: tạo proof chuyển nhượng → nộp → hàng chờ → **Duyệt** (trong vòng 10 phút kể từ khi tạo
-   proof) → trạng thái APPROVED, chờ change set.
-4. **Tấn công — bên bán đem sổ đi vay trong lúc chờ change set:**
-   - UC-5 với `201/` → dừng ở "Giấy chứng nhận đang bị ngăn chặn giao dịch" (ngõ cụt D81).
+1. Trang Chuyển nhượng → nạp hồ sơ bên bán `201/` → kiểm tra hồ sơ xanh. **Không** có bước ký ví nào.
+2. Bước 2: tạo proof chuyển nhượng → nộp → hàng chờ → **Duyệt** (trong vòng 10 phút kể từ khi tạo
+   proof) → trạng thái APPROVED, chờ change set. Từ lúc nộp, hồ sơ mở chính là khoá.
+3. **Tấn công — bên bán đem sổ đi vay trong lúc chờ change set:**
+   - UC-5 với `201/` → dừng ở "Giấy chứng nhận đang có thủ tục chưa hoàn tất" (ngõ cụt `procedure-open`).
    - Sinh proof bằng CLI (không qua UI):
 
      ```bash
      pnpm --filter blockchain run proof:bodies demo/batch-1/201 demo/attack-201
+     # → "attestation REFUSED — the plot has an open procedure; bodies carry none (D82)"
      ```
 
-     dán `demo/attack-201/mortgage.verify.json` vào `/vi/resident/verify` → check 4 **Chủ sở hữu
-     không bị ngăn chặn giao dịch** đỏ, lý do `OwnerFrozen`, phán quyết **Từ chối**.
+     dán `demo/attack-201/mortgage.verify.json` vào `/vi/resident/verify` → check 4 **Cơ quan đăng ký
+     xác nhận không có thủ tục đang mở** đỏ, lý do `InvalidAttestation`, phán quyết **Từ chối**.
    - Contract cũng từ chối (dán body trong 10 phút):
 
      ```bash
      curl -s -X POST http://localhost:3001/api/proof/verify -H "Content-Type: application/json" \
        --data "$(jq '.onChain=true' demo/attack-201/mortgage.verify.json)"
-     # → 422 {"reason":"OwnerFrozen", …}
+     # → 422 {"reason":"InvalidAttestation", …}
      ```
 
      (Không có `jq` thì sửa tay `"onChain": false` thành `true` trong file rồi `--data @file`.)
-5. (Tuỳ chọn) thửa 209 (CDS) → quầy từ chối chuyển nhượng theo Điều 39.
+4. (Tuỳ chọn) thửa 209 (CDS) → quầy từ chối chuyển nhượng theo Điều 39.
 
-### 8.5 Thu hồi + **case tấn công 2** (UC-4, D45/D80)
+### 8.5 Thu hồi + **case tấn công 2** (UC-4, D45/D82)
 
-1. Trang Thu hồi → thửa `203`, lý do "Thu hồi theo quyết định Nhà nước", ghi chú → **Gửi** → form hiện
-   bước ký ngăn chặn cho `Thửa 203` → ký → yêu cầu vào hàng chờ.
-2. **Tấn công — chủ bị thu hồi đem sổ đi vay:** lặp lại 8.4.4 với `203/`
-   (`proof:bodies demo/batch-1/203 demo/attack-203`) → UC-5 ngõ cụt, UC-6 `OwnerFrozen`.
+1. Trang Thu hồi → thửa `203`, lý do "Thu hồi theo quyết định Nhà nước", ghi chú → **Gửi** → yêu cầu
+   vào hàng chờ ngay, không ký gì.
+2. **Tấn công — chủ bị thu hồi đem sổ đi vay:** lặp lại 8.4.3 với `203/`
+   (`proof:bodies demo/batch-1/203 demo/attack-203`) → UC-5 ngõ cụt, UC-6 `InvalidAttestation`.
 
 ### 8.6 Công bố change set (UC-4, D46)
 
-1. Trang Thay đổi → hàng chờ có 1 chuyển nhượng + 1 thu hồi, không có cảnh báo "chưa ngăn chặn" →
+1. Trang Thay đổi → hàng chờ có 1 chuyển nhượng + 1 thu hồi →
    **Tạo nháp** → **Ký** (`publishRootWithRevocations`) → confirm → gốc v2.
 2. Tải archive của change set → giải nén vào `demo/changeset-1/` → có `201/` của **bên mua** (receipt +
    secret mới, D77).
@@ -293,10 +299,10 @@ export CHAIN_NETWORK=sepolia SEPOLIA_RPC_URL=<RPC> GOV_API_KEY=<key>
    - `/vi/resident/lookup` → tra `201` và `203` → lịch sử có sự kiện chuyển nhượng / thu hồi gắn
      `rootVersion` + tx hash.
 
-### 8.7 Gỡ ngăn chặn khi từ chối (tuỳ chọn, D80)
+### 8.7 Từ chối hồ sơ là mở khoá (tuỳ chọn, D82)
 
-1. Nạp hồ sơ thửa `206/` ở quầy → ký ngăn chặn → nộp → **Từ chối** ở hàng chờ.
-2. Tab **Đã từ chối** → **Gỡ ngăn chặn** → ký `unfreezeOwners` → chủ 206 tạo proof lại được.
+1. Nạp hồ sơ thửa `206/` ở quầy → nộp → UC-5 với `206/` báo ngõ cụt `procedure-open`.
+2. **Từ chối** ở hàng chờ → chủ 206 tạo proof lại được ngay, không cần ký giao dịch nào.
 
 ---
 
@@ -309,8 +315,8 @@ export CHAIN_NETWORK=sepolia SEPOLIA_RPC_URL=<RPC> GOV_API_KEY=<key>
 | Backend log cảnh báo thiếu role | `AUTHORITY_PRIVATE_KEY` backend ≠ ví đã `registerAuthority` | Đặt đúng khoá, khởi động lại backend |
 | UC-6: chuỗi cơ quan "không xác minh được" link 1 | Frontend khởi động trước `cert:generate`, hoặc root đổi sau khi khởi động | Khởi động lại frontend |
 | UC-6: organization không khớp | `AUTHORITY_ORG_NAME` lúc deploy ≠ `O=` trong chứng thư | Thống nhất tên → `FORCE=1 cert:generate` hoặc deploy lại |
-| Duyệt chuyển nhượng báo `StaleTimestamp` | Proof quá 10 phút | Làm lại bước 3 ở quầy (freeze vẫn còn, không ký lại) |
-| Duyệt báo `OwnerNotFrozen` | Freeze bị gỡ giữa chừng | Ký ngăn chặn lại ngay ở dòng đó trong hàng chờ |
+| Duyệt chuyển nhượng báo `StaleTimestamp` | Proof quá 10 phút | Từ chối hồ sơ, làm lại bước 2 ở quầy |
+| Mọi proof ownership/mortgage bị `InvalidAttestation` | `ATTESTER_PRIVATE_KEY` backend không phải tài khoản được cấp `ATTESTER_ROLE` (backend log lỗi lúc khởi động) | Đặt đúng khoá khớp `ATTESTER_ADDRESS`, hoặc deploy lại |
 | `receipt:verify` đọc localhost | Chưa `export CHAIN_NETWORK=sepolia SEPOLIA_RPC_URL=…` | Xem đầu mục 8 |
 | Mọi check chain "không khả dụng" ở trang resident | RPC công khai quá tải / bị chặn | Đặt `NEXT_PUBLIC_SEPOLIA_RPC_URL` rồi khởi động lại frontend |
 | `insufficient funds` | Ví demo hết Sepolia ETH | Faucet |

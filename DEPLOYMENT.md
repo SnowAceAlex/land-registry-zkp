@@ -297,24 +297,28 @@ Copy-Item -Recurse blockchain\circuits\build D:\backup\land-registry-circuits-bu
 | --------------------------------------------------------------- | ----------- |
 | `publishRoot()` — **lần đầu** (slot `latestRoot` từ 0 → khác 0) | 115.577     |
 | `publishRoot()` — **các lần sau**                               | 64.277      |
-| `verifyOwnership()`                                             | ~247.955    |
-| `verifyMortgage()`                                              | ~254.624    |
-| `verifyTransfer()`                                              | ~267.100    |
-| `freezeOwners()` — 1 thửa                                       | ~49.141     |
-| `freezeOwners()` — 200 thửa                                     | ~4.871.731  |
-| `unfreezeOwners()` — 1 thửa                                     | ~26.484     |
+| `verifyOwnership()` (kèm attestation, D82)                      | ~255.160    |
+| `verifyMortgage()` (kèm attestation, D82)                       | ~261.973    |
+| `verifyTransfer()`                                              | ~267.055    |
 
 📌 Chênh lệch publish lần đầu vs lần sau là do chi phí SSTORE khởi tạo slot (20k gas) — khi lên bảng Chapter 5 nên ghi rõ đang nói con số nào, đừng gộp làm một.
 
 Ba hàm `verify*` là `view` → gọi off-chain (qua RPC) **không tốn gas thật**. Con số trên là `estimateGas`, chỉ có ý nghĩa nếu sau này có contract khác gọi chúng trong một transaction.
 
-### 4.1 Redeploy sau D79
+D82 bỏ hẳn giao dịch `freezeOwners` (~49.141 gas mỗi hồ sơ ở D79): khoá nay là dòng hồ sơ trong DB,
+thực thi bằng attestation mà verifier kiểm. Phần `verify*` tăng ~7.205 gas (calldata chữ ký +
+`ecrecover` + `hasRole`) nhưng vẫn là `view`.
 
-`RootRegistry` và `LandRegistryVerifier` không upgrade được, nên sổ ngăn chặn (D79) buộc redeploy cả
-hai. Local: theo Giai đoạn 1 ở trên (compile → restart node → `deploy:localhost`), rồi
-`prisma migrate reset` và làm lại luồng Phase 8. Sepolia: `deploy:sepolia` (ghi `deployments/sepolia.json`
-mới, `registerAuthority` lại) rồi re-issue dữ liệu demo — **do người dùng tự chạy**; root history và
-revocations trên contract cũ không mang sang được.
+### 4.1 Redeploy sau D82
+
+`RootRegistry` và `LandRegistryVerifier` không upgrade được, nên D82 (bỏ sổ ngăn chặn, thêm
+`ATTESTER_ROLE` và đổi chữ ký `verifyOwnership`/`verifyMortgage`) buộc redeploy cả hai; contract nay
+biên dịch với `evmVersion: cancun`. Local: theo Giai đoạn 1 ở trên (compile → restart node →
+`deploy:localhost`, tự cấp `ATTESTER_ROLE` cho Hardhat account #1 — khớp key mặc định của backend),
+rồi `prisma migrate reset` và làm lại luồng Phase 8. Sepolia: đặt `ATTESTER_ADDRESS` (bắt buộc) trong
+`.env` gốc và `ATTESTER_PRIVATE_KEY` tương ứng trong `web-app/backend/.env`, `deploy:sepolia` (ghi
+`deployments/sepolia.json` mới kèm `attester`), rồi re-issue dữ liệu demo — **do người dùng tự chạy**;
+root history và revocations trên contract cũ không mang sang được.
 
 ---
 

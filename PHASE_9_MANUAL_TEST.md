@@ -248,18 +248,23 @@ liệu ra một trang không đăng nhập.
    nào trong lần tải đầu.
 4. `pnpm --filter frontend run lint` phải xanh — đó mới là thứ cưỡng chế ranh giới này.
 
-### 3.10 D81 — hai case của 28/09/2026
+### 3.10 D82 — hai case của 28/09/2026, giờ chặn bằng attestation
 
 1. **Case chuyển nhượng:** sau bước 3 ở `PHASE_8_MANUAL_TEST.md` §3.8 (APPROVED, chưa publish),
-   người bán mở `/resident/proof` với bundle cũ → ngõ cụt "Giấy chứng nhận đang bị ngăn chặn giao
-   dịch". Sinh mortgage proof bằng `pnpm --filter blockchain run proof:bodies <unzipped-bundle-dir>
-   [out-dir]` (ghi ra body dán thẳng được; `owner:smoke` chỉ in ra màn hình) — hoặc proof lưu từ
-   trước khi freeze, còn trong 10 phút — → dán vào `/resident/verify` → check 4 "Chủ sở hữu không
-   bị ngăn chặn" **fail**, lý do `OwnerFrozen`; `POST /api/proof/verify` → 422 `OwnerFrozen`.
+   người bán mở `/resident/proof` với bundle cũ → ngõ cụt "Giấy chứng nhận đang có thủ tục chưa
+   hoàn tất". Sinh mortgage proof bằng `pnpm --filter blockchain run proof:bodies <unzipped-bundle-dir>
+   [out-dir]` → script báo "attestation REFUSED" và ghi body **không** có `attestation` → dán vào
+   `/resident/verify` → check 4 "Cơ quan đăng ký xác nhận không có thủ tục đang mở" **fail**, lý do
+   `InvalidAttestation`; `POST /api/proof/verify` (thêm `"onChain": true`) → 422 `InvalidAttestation`.
 2. **Case thu hồi:** sau bước 4 ở §3.8 (revocation PENDING), chủ bị thu hồi → như case 1.
-3. Sau khi change set confirm: người mua prove → pass cả 5 check; người bán cũ → `superseded`
+3. **R1' (ghi vào Limitations):** chạy `proof:bodies` **trước** khi ra quầy, rồi submit ở quầy, rồi
+   dán body đó vào UC-6 trong vòng 10 phút → **pass** (xác nhận lấy trước khi hồ sơ được ghi). Đợi
+   quá 10 phút → `StaleTimestamp` (proof) / `AttestationExpired`.
+4. Sửa một ký tự trong `attestation.signature` của body hợp lệ → `InvalidAttestation` ở cả UC-6 lẫn
+   contract.
+5. Sau khi change set confirm: người mua prove → pass cả 5 check; người bán cũ → `superseded`
    (UC-5) / `RootMismatch` (UC-6).
-4. Transfer proof dán vào UC-6 → check 4 hiện "Không áp dụng".
+6. Transfer proof dán vào UC-6 → check 4 hiện "Không áp dụng".
 
 ---
 
@@ -278,7 +283,7 @@ liệu ra một trang không đăng nhập.
 | Tra được lịch sử thửa đất (D48) | 3.1 |
 | **Tab Network không có `ownerSecret` / private field** | 3.2 |
 | Không có ví / wagmi trên trang resident | 3.9 |
-| D81: check thứ 5 + ngõ cụt `owner-frozen` đúng cả hai case (chuyển nhượng, thu hồi) | 3.10 |
+| D82: check `statusAttested` + ngõ cụt `procedure-open` đúng cả hai case; R1' tái hiện được | 3.10 |
 
 ---
 
