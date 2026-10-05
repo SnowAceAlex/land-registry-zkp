@@ -11,7 +11,6 @@
  *
  * It walks:
  *   1. the officer names the plot          (propertyId)
- *   1b. the officer freezes the seller      → RootRegistry.freezeOwners (D80)
  *   2. the registry projects the new tree and issues the buyer's secret (D77)
  *                                          → POST /transfers/preview
  *   3. both parties prove, in one session  → POST /transfers (buyer secret included)
@@ -19,7 +18,9 @@
  *   5. the officer batches + publishes     → POST /government/changesets,
  *      sign the returned root, POST .../confirm (D44/D46)
  * then points at the change set's archive, which carries the buyer's bundle
- * (D77), and re-submits the spent proof to confirm it is rejected.
+ * (D77), and re-submits the spent proof to confirm it is rejected. Between
+ * submit and publish it also checks the seller can no longer obtain a status
+ * attestation (D82) — the lock that replaced the on-chain freeze.
  *
  * D47 — every /transfers route is officer-only now, not just approve, so every
  * call below sends GOV_API_KEY, including preview and the final replay.
@@ -57,7 +58,7 @@ import { OwnerSecretFile, Receipt, receiptToLURRecord } from '../../shared/recei
 import { LURRecord } from '../../shared/types';
 import { generateGroth16Proof, getCircuitPaths } from '../../shared/zkpHelper';
 import { RootRegistry__factory } from '../../typechain-types';
-import { abort, postJson } from '../lib/http';
+import { abort, getJson, postJson } from '../lib/http';
 import { BLOCKCHAIN_DIR } from '../lib/paths';
 
 // This script runs under plain ts-node, not `hardhat run` — .env is not loaded
@@ -130,11 +131,6 @@ async function main(): Promise<void> {
 
   console.log(`\nproperty ${propertyId}`);
   console.log(`  seller commitment  ${receipt.record.ownerCommitment.slice(0, 24)}…`);
-
-  // ── Step 1b: freeze the seller BEFORE anything is recorded (D80) — the
-  // backend refuses the submit otherwise (409 OwnerNotFrozen).
-  const freezeTx = await freezeSeller(propertyId, receipt.record.ownerCommitment);
-  console.log(freezeTx ? `freeze    seller frozen, tx ${freezeTx}` : 'freeze    seller already frozen');
 
   // ── Step 2: the registry projects the tree and issues the buyer's secret,
   // like an issuance round's (D77). It is stored only when the proof is
@@ -222,6 +218,13 @@ async function main(): Promise<void> {
   if (submit.status >= 400) abort('submit', submit);
   console.log(`submit    queued as request #${submit.body.id} (status ${submit.body.status})`);
 
+  // D82: from this insert on, the registry refuses the seller a status attestation.
+  const locked = await getJson<{ reason?: string }>(`/proof/${propertyId}/attestation`);
+  if (locked.status !== 409 || locked.body.reason !== 'ProcedureOpen') {
+    abort('seller attestation should be refused while the transfer is open', locked);
+  }
+  console.log('lock      seller attestation refused (409 ProcedureOpen) ✓');
+
   // ── Step 4: the human decision — records APPROVED only, publishes nothing ─
   // (D46: publishing moves to the batched change set below.)
   const approve = await postJson<TransferApproval>(
@@ -277,8 +280,8 @@ async function main(): Promise<void> {
 
 /**
  * RootRegistry connected with the authority key, after checking its role.
- * This script has no browser, so it plays the officer's wallet (D43) — for
- * the freeze at the counter (D80) and for the change-set root at the end.
+ * This script has no browser, so it plays the officer's wallet (D43) for the
+ * change-set root at the end.
  */
 async function authorityRegistry() {
   const network = process.env.CHAIN_NETWORK ?? 'localhost';
@@ -312,19 +315,6 @@ async function authorityRegistry() {
     );
   }
   return registry;
-}
-
-/**
- * Freeze the seller before anything is recorded (D80). Returns the tx hash,
- * or null when the chain already freezes exactly this owner (a re-run).
- */
-async function freezeSeller(propertyId: string, ownerCommitment: string): Promise<string | null> {
-  const registry = await authorityRegistry();
-  if ((await registry.frozenOwner(BigInt(propertyId))) === BigInt(ownerCommitment)) return null;
-
-  const tx = await registry.freezeOwners([BigInt(propertyId)], [BigInt(ownerCommitment)]);
-  const receipt = await tx.wait();
-  return receipt!.hash;
 }
 
 /**

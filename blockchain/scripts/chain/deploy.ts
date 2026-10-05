@@ -18,6 +18,9 @@
  *   AUTHORITY_ADDRESS   authority account (default: deployer — fine for PoC)
  *   AUTHORITY_ORG_NAME  X.509 Subject "O" to anchor (default below; must match
  *                       the self-signed certificate used by Phase 9)
+ *   ATTESTER_ADDRESS    account granted ATTESTER_ROLE (D82) — the backend's
+ *                       ATTESTER_PRIVATE_KEY. Default on a local network:
+ *                       Hardhat account #1. Required on any other network.
  *
  * Addresses are written to deployments/<network>.json (committed — it is the
  * record of where the thesis contracts live, esp. on Sepolia).
@@ -30,6 +33,10 @@ import { BLOCKCHAIN_DIR } from '../lib/paths';
 
 /** Default mock organization for the PoC — X.509 Subject "O" (D30). */
 const DEFAULT_ORG_NAME = 'So Tai nguyen va Moi truong TP.HCM';
+
+/** Hardhat account #1 — a public test key, so only ever a local default (D82). */
+const LOCAL_DEFAULT_ATTESTER = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
+const LOCAL_NETWORKS = ['hardhat', 'localhost'];
 
 const VERIFIER_CONTRACTS = [
   'Groth16VerifierOwnership',
@@ -44,6 +51,9 @@ async function main() {
   const authorityAddress = process.env.AUTHORITY_ADDRESS?.trim() || deployer.address;
   const orgName = process.env.AUTHORITY_ORG_NAME?.trim() || DEFAULT_ORG_NAME;
   const instituteHash = ethers.keccak256(ethers.toUtf8Bytes(orgName));
+  const attesterAddress =
+    process.env.ATTESTER_ADDRESS?.trim() ||
+    (LOCAL_NETWORKS.includes(network.name) ? LOCAL_DEFAULT_ATTESTER : '');
 
   // Validate BEFORE deploying anything — a bad address should not surface as an
   // opaque ENS-resolution failure after five contracts have already cost gas.
@@ -54,12 +64,20 @@ async function main() {
     );
   }
 
+  if (!ethers.isAddress(attesterAddress) || attesterAddress === ethers.ZeroAddress) {
+    throw new Error(
+      `ATTESTER_ADDRESS must be a valid non-zero address on ${network.name}: "${attesterAddress}". ` +
+        `It is the account of the backend's ATTESTER_PRIVATE_KEY (D82).`,
+    );
+  }
+
   console.log(`network:   ${network.name}`);
   console.log(`deployer:  ${deployer.address}`);
   console.log(
     `balance:   ${ethers.formatEther(await deployer.provider.getBalance(deployer.address))} ETH`,
   );
   console.log(`authority: ${authorityAddress}`);
+  console.log(`attester:  ${attesterAddress}`);
   console.log(`org name:  "${orgName}"\n           → ${instituteHash}\n`);
 
   // The generated verifiers only exist after trusted setup + sync + compile.
@@ -98,6 +116,7 @@ async function main() {
     deployedAt: new Date().toISOString(),
     deployer: deployer.address,
     authority: { address: authorityAddress, orgName, instituteHash },
+    attester: attesterAddress,
     contracts: {
       RootRegistry: await registry.getAddress(),
       Groth16VerifierOwnership: verifierAddresses[0],
@@ -120,6 +139,11 @@ async function main() {
   const tx = await registry.registerAuthority(authorityAddress, instituteHash);
   await tx.wait();
   console.log(`\nSTATE_AUTHORITY_ROLE + authorityInstitute anchored for ${authorityAddress}`);
+
+  // D82: the key whose status attestations LandRegistryVerifier accepts.
+  const grant = await registry.grantRole(await registry.ATTESTER_ROLE(), attesterAddress);
+  await grant.wait();
+  console.log(`ATTESTER_ROLE granted to ${attesterAddress}`);
 
   console.log(`\ndeployment record → ${path.relative(process.cwd(), outPath)}`);
   console.log(
