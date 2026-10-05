@@ -9,7 +9,11 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { CircuitType, PUBLIC_SIGNAL_ORDER } from '@land-registry/blockchain/shared';
+import {
+  AttestationStaple,
+  CircuitType,
+  PUBLIC_SIGNAL_ORDER,
+} from '@land-registry/blockchain/shared';
 
 /**
  * proof.dto.ts — request bodies for the owner/verifier proof endpoints.
@@ -71,6 +75,20 @@ export class VerifyProofDto {
   @ArrayMaxSize(MAX_SIGNALS)
   @IsString({ each: true })
   publicSignals!: string[];
+
+  /**
+   * The status attestation stapled to an ownership/mortgage proof (D82), from
+   * `GET /api/proof/:propertyId/attestation`. Required for those two circuits;
+   * the shape is checked by the service so a bad one is a 422 InvalidAttestation.
+   */
+  @ApiPropertyOptional({
+    type: 'object',
+    properties: { expiresAt: { type: 'string' }, signature: { type: 'string' } },
+    example: { expiresAt: '1790000600', signature: '0x…' },
+  })
+  @IsOptional()
+  @IsObject()
+  attestation?: AttestationStaple;
 
   /**
    * Also verify through LandRegistryVerifier on chain. Off-chain verification

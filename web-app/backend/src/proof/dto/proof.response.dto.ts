@@ -100,9 +100,12 @@ export class ProofChecksDto {
   @ApiProperty({ example: true })
   rootMatchesChain!: boolean;
 
-  /** The owner is not frozen by a pending transfer/revocation (D79); null for a transfer proof. */
+  /**
+   * The stapled status attestation is unexpired and signed by an ATTESTER_ROLE
+   * account for this proof (D82); null for a transfer proof.
+   */
   @ApiPropertyOptional({ example: true, nullable: true })
-  ownerNotFrozen!: boolean | null;
+  statusAttested!: boolean | null;
 
   /** LandRegistryVerifier's own verdict; null when `onChain` was not requested. */
   @ApiPropertyOptional({ example: null, nullable: true })
@@ -112,7 +115,8 @@ export class ProofChecksDto {
 export class VerifyProofResponseDto {
   /**
    * Always true on a 200 — a rejected proof is a 422 carrying `reason`
-   * (InvalidProof / RootMismatch / StaleTimestamp / OwnerFrozen, the same
+   * (InvalidProof / RootMismatch / StaleTimestamp / AttestationExpired /
+   * InvalidAttestation, the same
    * taxonomy the contract reverts with, D33). Kept so a client can branch on one field
    * regardless of which layer answered.
    */

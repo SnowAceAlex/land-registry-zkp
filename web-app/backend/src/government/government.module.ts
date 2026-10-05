@@ -3,7 +3,6 @@ import { Module } from '@nestjs/common';
 import { ChainModule } from '../chain/chain.module';
 import { ChangeSetService } from './changeset.service';
 import { DraftLockModule } from '../common/draft-lock.module';
-import { FreezeModule } from '../freeze/freeze.module';
 import { GovernmentController } from './government.controller';
 import { GovernmentService } from './government.service';
 import { HistoryModule } from '../history/history.module';
@@ -53,7 +52,6 @@ import { TreeModule } from '../tree/tree.module';
     TreeModule,
     HistoryModule,
     DraftLockModule,
-    FreezeModule,
   ],
   controllers: [GovernmentController],
   providers: [GovernmentService, RevocationService, ChangeSetService, OpenDraftService],

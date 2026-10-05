@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { keccak256, toUtf8Bytes } from 'ethers';
 
-import { FreezeService } from '../freeze/freeze.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRevocationDto } from './dto/revocation.dto';
 
@@ -28,14 +27,11 @@ export const REASON_CODES: Record<number, string> = {
  * different proposition from a revoked diploma. The hash still lets the registry
  * prove the reason on demand.
  *
- * Since D80 a request is recorded only once the chain freezes the plot's current owner.
+ * The request row is also the lock: while it is open the owner gets no status attestation (D82).
  */
 @Injectable()
 export class RevocationService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly freezes: FreezeService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async request(dto: CreateRevocationDto) {
     if (!REASON_CODES[dto.reasonCode]) {
@@ -73,9 +69,6 @@ export class RevocationService {
           `resolve it before requesting a revocation`,
       );
     }
-
-    // D80: freeze first, record second.
-    await this.freezes.assertFrozen(dto.propertyId, property.ownerCommitment);
 
     const created = await this.prisma.revocation.create({
       data: {

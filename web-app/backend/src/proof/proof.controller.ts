@@ -12,6 +12,8 @@ import {
 import type { Response } from 'express';
 import {
   ApiBadRequestResponse,
+  ApiConflictResponse,
+  ApiGoneResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -22,6 +24,8 @@ import {
 } from '@nestjs/swagger';
 
 import { ProofService } from './proof.service';
+import { AttestationService } from './attestation.service';
+import { AttestationResponseDto } from './dto/attestation.response.dto';
 import { VerifyProofDto } from './dto/proof.dto';
 import { MerkleProofResponseDto, VerifyProofResponseDto } from './dto/proof.response.dto';
 
@@ -50,7 +54,10 @@ import { MerkleProofResponseDto, VerifyProofResponseDto } from './dto/proof.resp
 @ApiTags('Proof')
 @Controller('proof')
 export class ProofController {
-  constructor(private readonly proofService: ProofService) {}
+  constructor(
+    private readonly proofService: ProofService,
+    private readonly attestations: AttestationService,
+  ) {}
 
   @Get(':propertyId')
   @ApiOperation({
@@ -100,6 +107,30 @@ export class ProofController {
     return proof;
   }
 
+  @Get(':propertyId/attestation')
+  @ApiOperation({
+    summary: 'Status attestation for the current owner (D82)',
+    description:
+      "The registry signs (EIP-712) that this plot's current owner has no open transfer or " +
+      'revocation. Staple `{ expiresAt, signature }` into proof.json: LandRegistryVerifier, ' +
+      'the verifier portal and POST /api/proof/verify reject an ownership/mortgage proof ' +
+      'without a valid one. Valid for 600 s. Only public data is signed, so no key is needed.',
+  })
+  @ApiParam({ name: 'propertyId', example: '1', description: 'Decimal-string id' })
+  @ApiOkResponse({ type: AttestationResponseDto })
+  @ApiConflictResponse({ description: 'ProcedureOpen — a transfer or revocation is open' })
+  @ApiGoneResponse({ description: 'The certificate has been revoked' })
+  @ApiNotFoundResponse({ description: 'No property with that propertyId' })
+  @ApiBadRequestResponse({ description: 'Property imported but not issued yet' })
+  async attestation(
+    @Param('propertyId') propertyId: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AttestationResponseDto> {
+    // Depends on procedure state, not the root version — never cacheable.
+    res.setHeader('Cache-Control', 'no-store');
+    return this.attestations.sign(propertyId);
+  }
+
   @Post('verify')
   // POST because a proof is far too large for a query string, but nothing is
   // created — this is a question, and Nest's default 201 would say otherwise.
@@ -107,12 +138,13 @@ export class ProofController {
   @ApiOperation({
     summary: 'Verify a Groth16 proof off-chain (and optionally on-chain)',
     description:
-      'Applies the same four rules LandRegistryVerifier applies on chain, and rejects with the ' +
-      'same names (D33/D81): the proof must be cryptographically valid (InvalidProof), its ' +
+      'Applies the same rules LandRegistryVerifier applies on chain, and rejects with the ' +
+      'same names (D33/D82): the proof must be cryptographically valid (InvalidProof), its ' +
       '`currentTimestamp` must be within ±10 minutes of now (StaleTimestamp — D26: a proof ' +
       'dated back to when an expired title was still valid verifies perfectly), its root ' +
-      'must be the current on-chain root (RootMismatch), and — ownership/mortgage only — the ' +
-      'owner must not be frozen by an open procedure (OwnerFrozen). The circuit type is inferred ' +
+      'must be the current on-chain root (RootMismatch), and — ownership/mortgage only — it ' +
+      'must carry an unexpired status attestation (AttestationExpired) signed by an attester ' +
+      'for this proof (InvalidAttestation). The circuit type is inferred ' +
       'from the number of public signals when not given.',
   })
   @ApiOkResponse({ type: VerifyProofResponseDto })

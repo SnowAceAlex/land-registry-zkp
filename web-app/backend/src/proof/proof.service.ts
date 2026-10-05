@@ -1,9 +1,7 @@
 import {
   BadRequestException,
-  GoneException,
   Injectable,
   Logger,
-  NotFoundException,
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -26,6 +24,8 @@ import { blockchainDir } from '../common/paths';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeStoreService } from '../tree/node-store.service';
 import { proofETag } from './proof-etag';
+import { AttestationService } from './attestation.service';
+import { requireIssuedProperty } from './issued-property';
 import { VerifyProofDto } from './dto/proof.dto';
 import { MerkleProofResponseDto, VerifyProofResponseDto } from './dto/proof.response.dto';
 
@@ -54,6 +54,7 @@ export class ProofService {
     private readonly prisma: PrismaService,
     private readonly nodes: NodeStoreService,
     private readonly chain: ChainService,
+    private readonly attestations: AttestationService,
   ) {}
 
   /**
@@ -69,7 +70,7 @@ export class ProofService {
    * from the propertyId (D41). The owner witness never comes near this service.
    */
   async getMerkleProof(propertyId: string): Promise<MerkleProofResponseDto> {
-    return this.buildProofResponse(await this.requireIssuedProperty(propertyId));
+    return this.buildProofResponse(await requireIssuedProperty(this.prisma, propertyId));
   }
 
   /** The proof response for a plot already known to be issued. */
@@ -149,7 +150,7 @@ export class ProofService {
     propertyId: string,
     ifNoneMatch: string | undefined,
   ): Promise<{ etag?: string; proof?: MerkleProofResponseDto }> {
-    const property = await this.requireIssuedProperty(propertyId);
+    const property = await requireIssuedProperty(this.prisma, propertyId);
     const etag = proofETag(await this.chain.getRootVersion(), propertyId);
 
     if (ifNoneMatch === etag) return { etag };
@@ -164,9 +165,9 @@ export class ProofService {
    * public input the PROVER chooses, so a proof dated back to when an expired
    * title was still valid verifies perfectly (D26), and a proof made against a
    * superseded root proves membership in a tree the registry has abandoned.
-   * The four checks below are exactly the four LandRegistryVerifier applies
-   * on-chain (the fourth, D79, to ownership and mortgage only), and they
-   * reject with the same names (D33) so a portal can show one reason
+   * The checks below are exactly the ones LandRegistryVerifier applies
+   * on-chain (the status attestation, D82, to ownership and mortgage only), and
+   * they reject with the same names (D33) so a portal can show one reason
    * regardless of which layer answered.
    */
   async verify(dto: VerifyProofDto): Promise<VerifyProofResponseDto> {
@@ -206,29 +207,31 @@ export class ProofService {
       );
     }
 
-    // 4. Owner must not be frozen (D79). Ownership/mortgage only — approve()
-    //    verifies a transfer proof AFTER freezing, so it is exempt (D81).
-    let ownerNotFrozen: boolean | null = null;
+    // 4. Status attestation (D82): AttestationExpired → InvalidAttestation, as on
+    //    chain. Transfers are exempt — approve() verifies one while it is open.
+    let statusAttested: boolean | null = null;
     if (circuitType !== 'transfer') {
-      const propertyId = publicSignals[publicSignalIndex(circuitType, 'propertyId')];
-      const commitment = BigInt(publicSignals[publicSignalIndex(circuitType, 'ownerCommitment')]);
-      const frozen = (await this.chain.getFrozenOwners([propertyId])).get(propertyId) ?? 0n;
-      if (frozen !== 0n && frozen === commitment) {
-        throw this.rejection(
-          'OwnerFrozen',
-          `The owner of property ${propertyId} is frozen by a pending transfer or revocation — ` +
-            'this certificate cannot back a proof until the registry publishes or lifts the procedure',
-          { propertyId },
-        );
+      try {
+        await this.attestations.verifyStaple(circuitType, publicSignals, dto.attestation);
+      } catch (error) {
+        if (error instanceof ProofRejectedError) {
+          throw this.rejection(error.reason, error.message, error.details);
+        }
+        throw error;
       }
-      ownerNotFrozen = true;
+      statusAttested = true;
     }
 
     // 5. Optionally let the contract answer for itself.
     let onChain: boolean | null = null;
     if (dto.onChain) {
       try {
-        onChain = await this.chain.verifyOnChain(circuitType, proof, publicSignals);
+        onChain = await this.chain.verifyOnChain(
+          circuitType,
+          proof,
+          publicSignals,
+          dto.attestation,
+        );
       } catch (error) {
         if (error instanceof ProofRejectedError) {
           throw this.rejection(error.reason, error.message, error.details);
@@ -244,7 +247,7 @@ export class ProofService {
         cryptographic: true,
         freshness: true,
         rootMatchesChain: true,
-        ownerNotFrozen,
+        statusAttested,
         onChain,
       },
       disclosed: describePublicSignals(circuitType, publicSignals),
@@ -252,26 +255,6 @@ export class ProofService {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-
-  private async requireIssuedProperty(propertyId: string): Promise<Property> {
-    const property = await this.prisma.property.findUnique({ where: { propertyId } });
-    if (!property) {
-      throw new NotFoundException(`Unknown propertyId ${propertyId}`);
-    }
-    if (property.status === 'REVOKED') {
-      throw new GoneException(
-        `The certificate for property ${propertyId} has been revoked. Its leaf is no longer in ` +
-          `the tree, so no Merkle proof exists — see the on-chain revocations mapping for the reason.`,
-      );
-    }
-    if (property.ownerCommitment === null) {
-      throw new BadRequestException(
-        `Property ${propertyId} has been imported but not issued yet, so it has no leaf and ` +
-          `is not in the Merkle tree (the owner commitment is created at issue time — D14)`,
-      );
-    }
-    return property;
-  }
 
   /**
    * Off-chain snarkjs verification, with the missing-artifact case separated

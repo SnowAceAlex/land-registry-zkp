@@ -23,7 +23,6 @@ import {
 import { TransfersService } from './transfers.service';
 import { makeProperty } from '../../test/factories';
 import { toLURRecord } from '../records/record.mapper';
-import { ownerNotFrozen } from '../freeze/freeze.service';
 
 describe('TransfersService.requireTransferableProperty (D45/D48)', () => {
   it('410s a revoked property instead of crashing deep inside generateMerkleProof', async () => {
@@ -32,7 +31,7 @@ describe('TransfersService.requireTransferableProperty (D45/D48)', () => {
       property: { findUnique: jest.fn().mockResolvedValue(revoked) },
     } as never;
 
-    const service = new TransfersService(prisma, {} as never, {} as never, {} as never, {} as never);
+    const service = new TransfersService(prisma, {} as never, {} as never, {} as never);
 
     await expect(service.preview({ propertyId: '1001' })).rejects.toMatchObject({ status: 410 });
     await expect(service.preview({ propertyId: '1001' })).rejects.toBeInstanceOf(GoneException);
@@ -72,7 +71,7 @@ describe('TransfersService.preview — both Merkle paths (D28, over the node sto
     } as never;
 
     return {
-      service: new TransfersService(prisma, nodes as never, chain, issuance, {} as never),
+      service: new TransfersService(prisma, nodes as never, chain, issuance),
       tree,
     };
   }
@@ -125,9 +124,7 @@ describe('TransfersService.preview — both Merkle paths (D28, over the node sto
 describe('TransfersService — the buyer secret at submit and reject (D77)', () => {
   const property = makeProperty({ propertyId: '1001', ownerCommitment: '111' });
 
-  async function scenario(
-    opts: { frozen?: boolean; pendingRevocation?: { id: number } | null } = {},
-  ) {
+  async function scenario(opts: { pendingRevocation?: { id: number } | null } = {}) {
     const secret = 43n;
     const commitment = (await poseidonHash([secret])).toString();
     const signals = ['5', '6', '1001', '111', commitment, '1800000000', '0'];
@@ -177,16 +174,11 @@ describe('TransfersService — the buyer secret at submit and reject (D77)', () 
       verifyTransferOnChain: jest.fn().mockResolvedValue(true),
     };
     const issuance = { commitmentFor: (value: bigint) => poseidonHash([value]) };
-    // D80 — the chain freezes the seller unless the test says otherwise.
-    const assertFrozen = jest.fn(async () => {
-      if (opts.frozen === false) throw ownerNotFrozen(['1001']);
-    });
     const service = new TransfersService(
       prisma as never,
       {} as never,
       chain as never,
       issuance as never,
-      { assertFrozen } as never,
     );
     const dto = (newOwnerSecret: string) => ({
       propertyId: '1001',
@@ -195,7 +187,7 @@ describe('TransfersService — the buyer secret at submit and reject (D77)', () 
       proof: {},
       publicSignals: signals,
     });
-    return { service, create, update, dto, secret, assertFrozen };
+    return { service, create, update, dto, secret };
   }
 
   it('refuses a secret that does not open the commitment', async () => {
@@ -232,37 +224,10 @@ describe('TransfersService — the buyer secret at submit and reject (D77)', () 
     expect(update.mock.calls[0][0].data.newOwnerSecret).toBeNull();
   });
 
-  it('refuses to record a transfer whose seller is not frozen on chain (D80)', async () => {
-    const { service, create, dto, secret } = await scenario({ frozen: false });
-
-    await expect(service.submit(dto(secret.toString()))).rejects.toMatchObject({
-      status: 409,
-      response: { reason: 'OwnerNotFrozen' },
-    });
-    expect(create).not.toHaveBeenCalled();
-  });
-
-  it('checks the freeze against the seller commitment the proof carries', async () => {
-    const { service, dto, secret, assertFrozen } = await scenario();
-
-    await service.submit(dto(secret.toString()));
-
-    expect(assertFrozen).toHaveBeenCalledWith('1001', '111');
-  });
-
   it('refuses a plot with a pending revocation — one open procedure per plot', async () => {
     const { service, create, dto, secret } = await scenario({ pendingRevocation: { id: 9 } });
 
     await expect(service.submit(dto(secret.toString()))).rejects.toBeInstanceOf(ConflictException);
     expect(create).not.toHaveBeenCalled();
-  });
-
-  it('approve re-checks the freeze and records nothing when it is gone', async () => {
-    const { service, update } = await scenario({ frozen: false });
-
-    await expect(service.approve(1)).rejects.toMatchObject({
-      response: { reason: 'OwnerNotFrozen' },
-    });
-    expect(update).not.toHaveBeenCalled();
   });
 });

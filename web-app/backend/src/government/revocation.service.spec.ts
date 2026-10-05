@@ -1,7 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { keccak256, toUtf8Bytes } from 'ethers';
 
-import { ownerNotFrozen } from '../freeze/freeze.service';
 import { RevocationService } from './revocation.service';
 
 describe('RevocationService (D45)', () => {
@@ -9,20 +8,18 @@ describe('RevocationService (D45)', () => {
   const findFirst = jest.fn();
   const create = jest.fn();
   const transferFindFirst = jest.fn();
-  const assertFrozen = jest.fn();
   const prisma = {
     property: { findUnique },
     revocation: { findFirst, create, findMany: jest.fn() },
     transferRequest: { findFirst: transferFindFirst },
   } as never;
-  const service = new RevocationService(prisma, { assertFrozen } as never);
+  const service = new RevocationService(prisma);
 
   beforeEach(() => {
     jest.clearAllMocks();
     findUnique.mockResolvedValue({ propertyId: '1001', status: 'ISSUED', ownerCommitment: '111' });
     findFirst.mockResolvedValue(null);
     transferFindFirst.mockResolvedValue(null);
-    assertFrozen.mockResolvedValue(undefined);
     create.mockImplementation(({ data }) => Promise.resolve({ id: 1, ...data }));
   });
 
@@ -64,21 +61,6 @@ describe('RevocationService (D45)', () => {
     await expect(
       service.request({ propertyId: '1001', reasonCode: 1, detailText: 'x' }),
     ).rejects.toBeInstanceOf(ConflictException);
-  });
-
-  it('refuses to queue a revocation whose owner is not frozen on chain (D80)', async () => {
-    assertFrozen.mockRejectedValue(ownerNotFrozen(['1001']));
-
-    await expect(
-      service.request({ propertyId: '1001', reasonCode: 1, detailText: 'x' }),
-    ).rejects.toMatchObject({ status: 409, response: { reason: 'OwnerNotFrozen' } });
-    expect(create).not.toHaveBeenCalled();
-  });
-
-  it('checks the freeze against the current owner commitment', async () => {
-    await service.request({ propertyId: '1001', reasonCode: 1, detailText: 'x' });
-
-    expect(assertFrozen).toHaveBeenCalledWith('1001', '111');
   });
 
   it('refuses a plot with an open transfer — one open procedure per plot', async () => {

@@ -7,6 +7,8 @@ import {
   RootRegistry__factory,
 } from '@land-registry/blockchain/typechain-types';
 import {
+  ATTESTER_ROLE_NAME,
+  AttestationStaple,
   ChainNetwork,
   CircuitType,
   DeploymentRecord,
@@ -68,13 +70,16 @@ const ROOT_CACHE_TTL_MS = 10_000;
  */
 const ROOT_CACHE_STALE_MS = 60_000;
 
-/** How many ids one RootRegistry.frozenOwnersOf() eth_call carries (D80). */
-const FROZEN_READ_CHUNK = 1000;
-
 /** A LandRegistryVerifier rejection, decoded from its typed revert (D33). */
 export class ProofRejectedError extends Error {
   constructor(
-    readonly reason: 'InvalidProof' | 'RootMismatch' | 'StaleTimestamp' | 'OwnerFrozen' | 'Unknown',
+    readonly reason:
+      | 'InvalidProof'
+      | 'RootMismatch'
+      | 'StaleTimestamp'
+      | 'AttestationExpired'
+      | 'InvalidAttestation'
+      | 'Unknown',
     message: string,
     readonly details?: Record<string, string>,
   ) {
@@ -92,10 +97,9 @@ export class ChainService implements OnModuleInit {
   private registry!: RootRegistry;
   private verifier!: LandRegistryVerifier;
   private deployment!: DeploymentRecord;
-  private readonly rootCache = new TtlCache<{ root: bigint; version: number }>(
-    ROOT_CACHE_TTL_MS,
-    { staleMs: ROOT_CACHE_STALE_MS },
-  );
+  private readonly rootCache = new TtlCache<{ root: bigint; version: number }>(ROOT_CACHE_TTL_MS, {
+    staleMs: ROOT_CACHE_STALE_MS,
+  });
 
   async onModuleInit(): Promise<void> {
     const network = (process.env.CHAIN_NETWORK ?? 'localhost') as ChainNetwork;
@@ -128,15 +132,6 @@ export class ChainService implements OnModuleInit {
     );
 
     await this.warnIfNotAuthority();
-
-    // F12: an old RootRegistry deployment has no freeze register (D79) — say so early.
-    try {
-      await this.registry.frozenOwnersOf([]);
-    } catch (error) {
-      this.logger.error(
-        `RootRegistry has no freeze register (D79) — redeploy the contracts: ${(error as Error)?.message}`,
-      );
-    }
   }
 
   /**
@@ -190,6 +185,13 @@ export class ChainService implements OnModuleInit {
   async hasAuthorityRole(account: string): Promise<boolean> {
     const role = await this.registry.STATE_AUTHORITY_ROLE();
     return this.registry.hasRole(role, account);
+  }
+
+  /** Whether an account may sign status attestations (D82). Uncached: a revoked key must stop at once. */
+  async hasAttesterRole(account: string): Promise<boolean> {
+    return this.asServiceUnavailable(() =>
+      this.registry.hasRole(ethers.id(ATTESTER_ROLE_NAME), account),
+    );
   }
 
   /**
@@ -247,22 +249,6 @@ export class ChainService implements OnModuleInit {
   }
 
   /**
-   * RootRegistry.frozenOwner for many plots (D80) — not cached, unlike the root (D74).
-   * @returns propertyId → frozen commitment; 0n when the plot is not frozen.
-   */
-  async getFrozenOwners(propertyIds: string[]): Promise<Map<string, bigint>> {
-    const frozen = new Map<string, bigint>();
-    for (let i = 0; i < propertyIds.length; i += FROZEN_READ_CHUNK) {
-      const chunk = propertyIds.slice(i, i + FROZEN_READ_CHUNK);
-      const values = await this.asServiceUnavailable(() =>
-        this.registry.frozenOwnersOf(chunk.map((id) => BigInt(id))),
-      );
-      chunk.forEach((id, index) => frozen.set(id, values[index]));
-    }
-    return frozen;
-  }
-
-  /**
    * Force the next root read to go to the chain.
    *
    * ⚠️ Must be called at the START of every confirm(), before reading
@@ -288,6 +274,7 @@ export class ChainService implements OnModuleInit {
     circuitType: CircuitType,
     proof: Groth16Proof,
     publicSignals: PublicSignals,
+    attestation?: AttestationStaple,
   ): Promise<true> {
     const expected = PUBLIC_SIGNAL_ORDER[circuitType].length;
     if (publicSignals.length !== expected) {
@@ -310,18 +297,31 @@ export class ChainService implements OnModuleInit {
       c as [string, string],
     ] as const;
 
+    // D82: ownership/mortgage carry a status attestation; the contract cannot be asked without one.
+    if (circuitType !== 'transfer' && !attestation) {
+      throw new ProofRejectedError(
+        'InvalidAttestation',
+        `A ${circuitType} proof must carry a status attestation (D82)`,
+      );
+    }
+    const staple = attestation
+      ? ([BigInt(attestation.expiresAt), attestation.signature] as const)
+      : undefined;
+
     try {
       switch (circuitType) {
         case 'ownership':
           await this.verifier.verifyOwnership.staticCall(
             ...args,
             signals as unknown as [bigint, bigint, bigint, bigint],
+            ...staple!,
           );
           break;
         case 'mortgage':
           await this.verifier.verifyMortgage.staticCall(
             ...args,
             signals as unknown as [bigint, bigint, bigint, bigint, bigint],
+            ...staple!,
           );
           break;
         case 'transfer':
@@ -369,14 +369,19 @@ export class ChainService implements OnModuleInit {
           { claimed: claimed.toString(), blockTime: blockTime.toString() },
         );
       }
-      case 'OwnerFrozen': {
-        const [propertyId] = parsed.args as unknown as [bigint];
+      case 'AttestationExpired': {
+        const [expiresAt, blockTime] = parsed.args as unknown as [bigint, bigint];
         return new ProofRejectedError(
-          'OwnerFrozen',
-          'The owner of this property is frozen by a pending transfer or revocation (D79)',
-          { propertyId: propertyId.toString() },
+          'AttestationExpired',
+          'The status attestation has expired — fetch a new one and re-prove (D82)',
+          { expiresAt: expiresAt.toString(), blockTime: blockTime.toString() },
         );
       }
+      case 'InvalidAttestation':
+        return new ProofRejectedError(
+          'InvalidAttestation',
+          'The status attestation was not signed by an attester for this proof (D82)',
+        );
       default:
         return new ProofRejectedError(
           'Unknown',

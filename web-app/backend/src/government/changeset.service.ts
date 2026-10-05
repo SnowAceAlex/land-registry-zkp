@@ -19,8 +19,6 @@ import { NodeStoreService } from '../tree/node-store.service';
 import { toLURRecord } from '../records/record.mapper';
 import { TransferRequestDto } from '../transfers/dto/transfer.response.dto';
 import { toTransferRequestDto } from '../transfers/transfer-request.serializer';
-import { FreezeService, ownerNotFrozen } from '../freeze/freeze.service';
-import { FreezeCalldataDto } from '../freeze/dto/freeze-status.dto';
 import { RootService } from './root.service';
 
 /**
@@ -81,12 +79,6 @@ export interface ChangeSetDraftDetail {
   deferredRevocations: number;
 }
 
-/** Every plot the queue touches, transfers first — what D80's freeze check reads. */
-const queuedPlots = (transfers: TransferRequest[], revocations: Revocation[]): string[] => [
-  ...transfers.map((transfer) => transfer.propertyId),
-  ...revocations.map((revocation) => revocation.propertyId),
-];
-
 /**
  * ChangeSetService — one publishing round of approved transfers and revocations (D44/D46).
  *
@@ -132,27 +124,23 @@ export class ChangeSetService {
     private readonly events: PropertyEventService,
     private readonly issuance: IssuanceService,
     private readonly archive: ArchiveService,
-    private readonly freezes: FreezeService,
   ) {}
 
   /**
    * Everything eligible for the next change set, as the portal sees it, plus
    * the cap (D73). Transfers go through toTransferRequestDto: the rows hold the
-   * buyers' secrets until a change set archives them (D77). Plus the queued
-   * plots the chain does not freeze (D80).
+   * buyers' secrets until a change set archives them (D77).
    */
   async pending(): Promise<{
     transfers: TransferRequestDto[];
     revocations: Revocation[];
     revocationCap: number;
-    unfrozen: FreezeCalldataDto;
   }> {
     const { transfers, revocations } = await this.queue();
     return {
       transfers: transfers.map(toTransferRequestDto),
       revocations,
       revocationCap: MAX_REVOCATIONS_PER_CHANGESET,
-      unfrozen: await this.freezes.unfrozenAmong(queuedPlots(transfers, revocations)),
     };
   }
 
@@ -213,7 +201,7 @@ export class ChangeSetService {
       if (transferred.has(transfer.propertyId)) {
         throw new ConflictException(
           `Property ${transfer.propertyId} has more than one approved transfer waiting — ` +
-          `reject all but one before publishing.`,
+            `reject all but one before publishing.`,
         );
       }
       transferred.add(transfer.propertyId);
@@ -222,13 +210,13 @@ export class ChangeSetService {
       if (revoked.has(revocation.propertyId)) {
         throw new ConflictException(
           `Property ${revocation.propertyId} has more than one pending revocation — ` +
-          `reject all but one before publishing.`,
+            `reject all but one before publishing.`,
         );
       }
       if (transferred.has(revocation.propertyId)) {
         throw new ConflictException(
           `Property ${revocation.propertyId} has both a transfer and a revocation pending — ` +
-          `resolve the conflict before publishing.`,
+            `resolve the conflict before publishing.`,
         );
       }
       revoked.add(revocation.propertyId);
@@ -245,11 +233,6 @@ export class ChangeSetService {
           `secret — they were submitted before D77. Reject them and redo the transfers at the counter.`,
       );
     }
-
-    // D80 — nothing is published for a plot the chain does not freeze, deferred
-    // revocations included: those are open procedures too.
-    const unfrozen = await this.freezes.unfrozenAmong(queuedPlots(transfers, pendingRevocations));
-    if (unfrozen.propertyIds.length > 0) throw ownerNotFrozen(unfrozen.propertyIds);
 
     // D56 — oldest first (queue() orders by createdAt), the rest wait.
     const revocations = pendingRevocations.slice(0, MAX_REVOCATIONS_PER_CHANGESET);
@@ -275,7 +258,7 @@ export class ChangeSetService {
 
     this.logger.log(
       `change set draft #${draft.id}: ${transfers.length} transfer(s), ` +
-      `${revocations.length} revocation(s), projected root ${overlay.root}`,
+        `${revocations.length} revocation(s), projected root ${overlay.root}`,
     );
 
     return this.toDraftDetail(
@@ -391,7 +374,7 @@ export class ChangeSetService {
     if (latestRoot.toString() !== draft.newRoot) {
       throw new UnprocessableEntityException(
         `On-chain latestRoot is ${latestRoot}, but this change set projects ${draft.newRoot}. ` +
-        `The publish transaction has not been mined, or a different root was published.`,
+          `The publish transaction has not been mined, or a different root was published.`,
       );
     }
     const rootVersion = await this.chain.getRootVersion();
@@ -401,10 +384,11 @@ export class ChangeSetService {
     // before THIS round (PropertyEventService writes only forward-looking
     // rows). It comes out of leafUpdatesFor because that call already has to
     // read exactly these plots — reading them twice was the old shape.
-    const { updates, newLeaves, before: beforeById } = await this.leafUpdatesFor(
-      draft.transfers,
-      draft.revocations,
-    );
+    const {
+      updates,
+      newLeaves,
+      before: beforeById,
+    } = await this.leafUpdatesFor(draft.transfers, draft.revocations);
     const overlay = await this.nodes.projectRoot(updates);
 
     // Paranoia that has already paid for itself once in IssuanceBatchService:
@@ -413,7 +397,7 @@ export class ChangeSetService {
     if (overlay.root.toString() !== draft.newRoot) {
       throw new UnprocessableEntityException(
         `Reprojected root ${overlay.root} no longer matches the signed root ${draft.newRoot}. ` +
-        `Discard this change set and start again.`,
+          `Discard this change set and start again.`,
       );
     }
 
@@ -534,7 +518,7 @@ export class ChangeSetService {
 
     this.logger.log(
       `change set #${draft.id} confirmed at root version ${rootVersion}: ` +
-      `${draft.transfers.length} transfer(s), ${draft.revocations.length} revocation(s)`,
+        `${draft.transfers.length} transfer(s), ${draft.revocations.length} revocation(s)`,
     );
 
     return {
@@ -580,7 +564,7 @@ export class ChangeSetService {
       if (!property) {
         throw new UnprocessableEntityException(
           `Property ${transfer.propertyId} referenced by this round no longer exists. ` +
-          `Discard the draft and start again.`,
+            `Discard the draft and start again.`,
         );
       }
       // ⚠️ The status check is load-bearing, and its absence would be silent.
@@ -594,7 +578,7 @@ export class ChangeSetService {
       if (property.status !== 'ISSUED') {
         throw new UnprocessableEntityException(
           `Property ${transfer.propertyId} is ${property.status}, not ISSUED, so the approved ` +
-          `transfer for it cannot be published. Reject that transfer request first.`,
+            `transfer for it cannot be published. Reject that transfer request first.`,
         );
       }
       // Only `ownerCommitment` changes — every other leaf field is carried over
