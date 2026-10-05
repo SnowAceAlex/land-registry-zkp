@@ -69,7 +69,12 @@ describe('blockchain/shared stays bundleable for the browser (Phase 8/9)', () =>
    * back, and only a bundle measurement would notice. Type-only imports are
    * fine: they are erased before the bundler ever sees them.
    */
-  for (const file of ['treeDimensions.ts', 'leafFields.ts', 'solidityCalldata.ts']) {
+  for (const file of [
+    'treeDimensions.ts',
+    'leafFields.ts',
+    'solidityCalldata.ts',
+    'statusAttestation.ts',
+  ]) {
     it(`keeps ${file} free of runtime imports, so a page can read it cheaply`, () => {
       const source = fs.readFileSync(path.join(SHARED_DIR, file), 'latin1');
       const runtimeImports = [
