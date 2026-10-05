@@ -23,6 +23,37 @@ function body(overrides: Record<string, unknown> = {}) {
   return { circuitType: 'ownership', proof: proof(), publicSignals: signals(4), ...overrides };
 }
 
+const STAPLE = { expiresAt: '1790000600', signature: '0x' + '1b'.repeat(65) };
+
+describe('parseProofFile / assertProofPackage — status attestation (D82)', () => {
+  it('keeps a well-formed attestation on an ownership proof', () => {
+    expect(assertProofPackage(body({ attestation: STAPLE })).attestation).toEqual(STAPLE);
+  });
+
+  it('accepts a file without one — the pipeline, not the parser, rejects it', () => {
+    expect(assertProofPackage(body()).attestation).toBeUndefined();
+  });
+
+  it('refuses a malformed attestation as a shape error', () => {
+    for (const attestation of [
+      { expiresAt: 'soon', signature: STAPLE.signature },
+      { expiresAt: STAPLE.expiresAt, signature: '0x1234' },
+      'yes',
+    ]) {
+      expect(() => assertProofPackage(body({ attestation }))).toThrow(ProofFileError);
+    }
+  });
+
+  it('ignores an attestation on a transfer proof', () => {
+    const transfer = body({
+      circuitType: 'transfer',
+      publicSignals: signals(7),
+      attestation: STAPLE,
+    });
+    expect(assertProofPackage(transfer).attestation).toBeUndefined();
+  });
+});
+
 describe('parseProofFile / assertProofPackage', () => {
   // proof:bodies and transfer:smoke write exactly this shape, `onChain` and all.
   it('accepts the verify body proof:bodies writes, extra keys included', () => {
@@ -48,7 +79,8 @@ describe('parseProofFile / assertProofPackage', () => {
   });
 
   it('rejects a signal count no circuit produces, listing the ones that exist', () => {
-    const call = () => parseProofFile(JSON.stringify({ proof: proof(), publicSignals: signals(6) }));
+    const call = () =>
+      parseProofFile(JSON.stringify({ proof: proof(), publicSignals: signals(6) }));
 
     expect(call).toThrow(ProofFileError);
     expect(call).toThrow(/6 public signals match no circuit/);
@@ -79,7 +111,13 @@ describe('parseProofFile / assertProofPackage', () => {
   });
 
   it('rejects a truncated or malformed proof', () => {
-    const truncatedPiB = { ...proof(), pi_b: [['3', '4'], ['5', '6']] };
+    const truncatedPiB = {
+      ...proof(),
+      pi_b: [
+        ['3', '4'],
+        ['5', '6'],
+      ],
+    };
     expect(codeOf(() => assertProofPackage(body({ proof: truncatedPiB })))).toBe('invalid-shape');
 
     const shortPiA = { ...proof(), pi_a: ['1', '2'] };

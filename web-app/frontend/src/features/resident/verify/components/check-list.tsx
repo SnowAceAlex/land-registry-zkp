@@ -18,7 +18,12 @@ import { Check, CircleSlash, LoaderCircle, Minus, SkipForward, X } from 'lucide-
 import type { Dictionary } from '@/i18n/dictionaries';
 import { Notice } from '@/components/ui/notice';
 
-import { CHECK_ORDER, type CheckName, type CheckState, type PipelineStep } from '../lib/proof-pipeline';
+import {
+  CHECK_ORDER,
+  type CheckName,
+  type CheckState,
+  type PipelineStep,
+} from '../lib/proof-pipeline';
 
 type Strings = Dictionary['residentVerify'];
 
@@ -26,7 +31,7 @@ const LABELS = {
   freshness: { label: 'check_freshness', why: 'check_freshnessWhy' },
   cryptographic: { label: 'check_cryptographic', why: 'check_cryptographicWhy' },
   rootMatchesChain: { label: 'check_rootMatchesChain', why: 'check_rootMatchesChainWhy' },
-  ownerNotFrozen: { label: 'check_ownerNotFrozen', why: 'check_ownerNotFrozenWhy' },
+  statusAttested: { label: 'check_statusAttested', why: 'check_statusAttestedWhy' },
   onChain: { label: 'check_onChain', why: 'check_onChainWhy' },
 } as const satisfies Record<CheckName, { label: keyof Strings; why: keyof Strings }>;
 

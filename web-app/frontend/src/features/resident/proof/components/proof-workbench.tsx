@@ -25,11 +25,12 @@ import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { buttonStyles } from '@/components/ui/button';
 import { BundleError, type BundleErrorCode, type OwnerBundle, readBundleFiles } from '@/lib/bundle';
-import { readChainRoot, readFrozenOwner } from '@/lib/registry-reads';
+import { ApiError } from '@/lib/api-client';
+import { readChainRoot } from '@/lib/registry-reads';
 import { parseTermYears } from '@/lib/term';
 import { generateProof } from '@/lib/zkp';
 
-import { type MerkleProofResponse, refreshMerkleProof } from '../api';
+import { type MerkleProofResponse, fetchAttestation, refreshMerkleProof } from '../api';
 import type { IntegrityIssue, IntegrityReport } from '../lib/bundle-integrity';
 import { type OwnerProofType, buildOwnerProofInput } from '../lib/owner-witness';
 import { type ProofBlocker, isTitleExpired, proofBlockers } from '../lib/proof-feasibility';
@@ -43,6 +44,21 @@ import { loadChainConfig, resetChainConfigCache } from '../../shell/chain-config
 import { proverFailure, residentErrorCode, residentFailure } from '../../shell/resident-error';
 
 type Strings = Dictionary['residentProof'];
+
+function isProcedureOpen(error: unknown): boolean {
+  return error instanceof ApiError && error.reason === 'ProcedureOpen';
+}
+
+/** The load-time probe: only tells an open procedure apart from a usable plot (D82). */
+async function probeAttestation(propertyId: string): Promise<'ok' | 'open'> {
+  try {
+    await fetchAttestation(propertyId);
+    return 'ok';
+  } catch (error) {
+    if (isProcedureOpen(error)) return 'open';
+    throw error;
+  }
+}
 
 export function ProofWorkbench({
   t,
@@ -63,7 +79,7 @@ export function ProofWorkbench({
   const [titleExpired, setTitleExpired] = useState(false);
   const [refreshed, setRefreshed] = useState<MerkleProofResponse | null>(null);
   const [chainRoot, setChainRoot] = useState<string | undefined>(undefined);
-  const [frozenOwner, setFrozenOwner] = useState<string | null | undefined>(undefined);
+  const [attestation, setAttestation] = useState<'pending' | 'ok' | 'open'>('pending');
   const [chainFailed, setChainFailed] = useState(false);
   /** The registry said no proof can exist for this plot — revoked or unissued. */
   const [refreshRejected, setRefreshRejected] = useState(false);
@@ -95,12 +111,7 @@ export function ProofWorkbench({
     if (record === null) return none;
     const now = nowUnixTimestamp();
     return {
-      active: proofBlockers(
-        type,
-        record.record,
-        now,
-        type === 'mortgage' ? yearsValue : null,
-      ),
+      active: proofBlockers(type, record.record, now, type === 'mortgage' ? yearsValue : null),
       // Asked of the mortgage circuit whichever option is selected: the option
       // has to be able to say why it cannot be picked in the first place.
       mortgage: proofBlockers('mortgage', record.record, now, null),
@@ -119,7 +130,7 @@ export function ProofWorkbench({
     setTitleExpired(false);
     setRefreshed(null);
     setChainRoot(undefined);
-    setFrozenOwner(undefined);
+    setAttestation('pending');
     setChainFailed(false);
     setRefreshRejected(false);
     setResult(null);
@@ -145,14 +156,14 @@ export function ProofWorkbench({
       setRefreshRejected(false);
       try {
         const { config, client } = await loadChainConfig();
-        const [proof, root, frozen] = await Promise.all([
+        const [proof, root, attested] = await Promise.all([
           refreshMerkleProof(propertyId),
           readChainRoot(client, config.contracts.RootRegistry),
-          readFrozenOwner(client, config.contracts.RootRegistry, BigInt(propertyId)),
+          probeAttestation(propertyId),
         ]);
         setRefreshed(proof);
         setChainRoot(root.root);
-        setFrozenOwner(frozen);
+        setAttestation(attested);
       } catch (error) {
         // `true`: on this route 410 means revoked and 400 means not issued yet,
         // which read very differently to an owner than a generic failure.
@@ -213,15 +224,30 @@ export function ProofWorkbench({
         ownerSecret: BigInt(bundle.secret.ownerSecret),
         refreshed,
         currentTimestamp: nowUnixTimestamp(),
-        minRemainingTermYears:
-          type === 'mortgage' && yearsValue !== null ? yearsValue : undefined,
+        minRemainingTermYears: type === 'mortgage' && yearsValue !== null ? yearsValue : undefined,
       });
-      setResult(await generateProof(type, input));
+      // A fresh attestation per proof (D82): the one probed at load time may have
+      // expired while the owner read the page. A 409 here moves the stage on.
+      const attested = await fetchAttestation(bundle.receipt.propertyId);
+      const generated = await generateProof(type, input);
+      setResult({
+        ...generated,
+        pkg: {
+          ...generated.pkg,
+          attestation: { expiresAt: attested.expiresAt, signature: attested.signature },
+        },
+      });
     } catch (error) {
+      if (isProcedureOpen(error)) {
+        setAttestation('open');
+        return;
+      }
       // proverFailure, not residentFailure: a circuit that refuses the witness
       // throws `Assert Failed. Error in template Ownership_226 line: 76`, and
       // putting that on an owner's screen is worse than saying nothing (D68).
-      setFailure(proverFailure(error, errors));
+      setFailure(
+        error instanceof ApiError ? residentFailure(error, errors) : proverFailure(error, errors),
+      );
     } finally {
       setBusy(null);
     }
@@ -241,8 +267,7 @@ export function ProofWorkbench({
     refreshRejected,
     bundleLeaf: record?.leaf.toString() ?? null,
     registryLeaf: refreshed?.leaf ?? null,
-    frozenOwner,
-    bundleOwnerCommitment: record ? record.record.ownerCommitment.toString() : null,
+    attestation,
     refreshedRoot: refreshed?.merkleRoot ?? null,
     refreshedInSync: refreshed?.inSync ?? false,
     chainRoot,
@@ -263,7 +288,7 @@ export function ProofWorkbench({
     stage === 'superseded' ||
     stage === 'title-expired' ||
     stage === 'no-proof-possible' ||
-    stage === 'owner-frozen';
+    stage === 'procedure-open';
 
   return (
     <div className="space-y-8">
@@ -312,9 +337,9 @@ export function ProofWorkbench({
         </Notice>
       ) : null}
 
-      {stage === 'owner-frozen' ? (
-        <Notice tone="danger" title={t.ownerFrozenTitle}>
-          {t.ownerFrozenBody}
+      {stage === 'procedure-open' ? (
+        <Notice tone="danger" title={t.procedureOpenTitle}>
+          {t.procedureOpenBody}
         </Notice>
       ) : null}
 

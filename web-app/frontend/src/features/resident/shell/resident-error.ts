@@ -62,8 +62,9 @@ const TITLES: Record<ResidentErrorCode, keyof ErrorStrings> = {
   'root-mismatch': 'rootMismatch',
   'stale-timestamp': 'staleTimestamp',
   'invalid-proof': 'invalidProof',
-  'owner-frozen': 'ownerFrozen',
-  'owner-not-frozen': 'ownerNotFrozen',
+  'attestation-expired': 'attestationExpired',
+  'invalid-attestation': 'invalidAttestation',
+  'procedure-open': 'procedureOpen',
   unreachable: 'unreachable',
   unknown: 'unknown',
   revoked: 'revoked',
@@ -108,11 +109,7 @@ export function residentErrorCode(error: unknown, onProofRoute = false): Residen
   }
 }
 
-export function residentFailure(
-  error: unknown,
-  t: ErrorStrings,
-  onProofRoute = false,
-): Failure {
+export function residentFailure(error: unknown, t: ErrorStrings, onProofRoute = false): Failure {
   const code = residentErrorCode(error, onProofRoute);
   logFailure(`resident/${code}`, error);
   return { title: t[TITLES[code]], detail: BODIES[code] ? t[BODIES[code]] : undefined };

@@ -24,25 +24,27 @@ export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localh
  */
 export const GOV_API_KEY_HEADER = 'x-gov-api-key';
 
-/** The typed verifier rejections (D33 + D79), shared by the contract and the backend. */
-export type ProofRejectionReason = 'InvalidProof' | 'RootMismatch' | 'StaleTimestamp' | 'OwnerFrozen';
+/** The typed verifier rejections (D33 + D82), shared by the contract and the backend. */
+export type ProofRejectionReason =
+  'InvalidProof' | 'RootMismatch' | 'StaleTimestamp' | 'AttestationExpired' | 'InvalidAttestation';
 
 /**
  * Every `reason` a screen may branch on: the proof rejections above, plus the
- * 409 a government gate throws when a procedure's freeze is missing (D80).
+ * 409 the attestation route answers while the plot has an open procedure (D82).
  */
-export type ApiReason = ProofRejectionReason | 'OwnerNotFrozen';
+export type ApiReason = ProofRejectionReason | 'ProcedureOpen';
 const API_REASONS: readonly string[] = [
   'InvalidProof',
   'RootMismatch',
   'StaleTimestamp',
-  'OwnerFrozen',
-  'OwnerNotFrozen',
+  'AttestationExpired',
+  'InvalidAttestation',
+  'ProcedureOpen',
 ];
 
 /**
  * A non-2xx response. `detail` is the backend's own explanation (English, kept
- * verbatim for the detail line); `reason` is set only for a D33/D79/D80
+ * verbatim for the detail line); `reason` is set only for a D33/D82
  * rejection, which is what a screen branches on — never on the text.
  */
 export class ApiError extends Error {
@@ -122,7 +124,10 @@ function withJsonBody(init: RequestInit = {}): RequestInit {
  * `max-age=60` and hand back a pre-publish proof without asking anyone.
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BACKEND_URL}/api${path}`, { cache: 'no-store', ...withJsonBody(init) });
+  const res = await fetch(`${BACKEND_URL}/api${path}`, {
+    cache: 'no-store',
+    ...withJsonBody(init),
+  });
   await throwIfNotOk(res);
   return res.json() as Promise<T>;
 }

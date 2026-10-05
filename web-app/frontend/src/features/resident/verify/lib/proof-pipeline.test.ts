@@ -26,7 +26,7 @@ const allPass = {
   freshness: 'pass',
   cryptographic: 'pass',
   rootMatchesChain: 'pass',
-  ownerNotFrozen: 'pass',
+  statusAttested: 'pass',
 } as const;
 
 describe('nextVerificationStep (D63)', () => {
@@ -48,7 +48,7 @@ describe('nextVerificationStep (D63)', () => {
       nextVerificationStep(
         facts({ freshness: 'pass', cryptographic: 'pass', rootMatchesChain: 'pass' }),
       ),
-    ).toEqual({ kind: 'run', check: 'ownerNotFrozen' });
+    ).toEqual({ kind: 'run', check: 'statusAttested' });
     expect(nextVerificationStep(facts(allPass))).toEqual({ kind: 'run', check: 'onChain' });
     expect(nextVerificationStep(facts({ ...allPass, onChain: 'pass' }))).toEqual({ kind: 'done' });
   });
@@ -81,7 +81,9 @@ describe('nextVerificationStep (D63)', () => {
 
   it('reports RootMismatch once the cryptography has passed', () => {
     expect(
-      nextVerificationStep(facts({ freshness: 'pass', cryptographic: 'pass', rootMatchesChain: 'fail' })),
+      nextVerificationStep(
+        facts({ freshness: 'pass', cryptographic: 'pass', rootMatchesChain: 'fail' }),
+      ),
     ).toEqual({ kind: 'rejected', reason: 'RootMismatch', at: 'rootMatchesChain' });
   });
 
@@ -134,7 +136,15 @@ describe('nextVerificationStep (D63)', () => {
 
   it('skips past an unavailable check instead of stopping on it', () => {
     expect(
-      nextVerificationStep(facts({ freshness: 'pass', cryptographic: 'unavailable', rootMatchesChain: 'pass', ownerNotFrozen: 'unavailable', onChain: 'unavailable' })),
+      nextVerificationStep(
+        facts({
+          freshness: 'pass',
+          cryptographic: 'unavailable',
+          rootMatchesChain: 'pass',
+          statusAttested: 'unavailable',
+          onChain: 'unavailable',
+        }),
+      ),
     ).toEqual({ kind: 'done' });
   });
 
@@ -143,28 +153,28 @@ describe('nextVerificationStep (D63)', () => {
     expect(Object.keys(initialChecks()).sort()).toEqual([...CHECK_ORDER].sort());
   });
 
-  /** D79/D81 — a proof whose owner a pending procedure froze. */
-  it('reports OwnerFrozen once the root has matched, and before the contract is asked', () => {
+  /** D82 — a proof without a valid status attestation. */
+  it('reports InvalidAttestation once the root has matched, and before the contract is asked', () => {
     expect(
       nextVerificationStep(
         facts({
           freshness: 'pass',
           cryptographic: 'pass',
           rootMatchesChain: 'pass',
-          ownerNotFrozen: 'fail',
+          statusAttested: 'fail',
         }),
       ),
-    ).toEqual({ kind: 'rejected', reason: 'OwnerFrozen', at: 'ownerNotFrozen' });
+    ).toEqual({ kind: 'rejected', reason: 'InvalidAttestation', at: 'statusAttested' });
   });
 
   it('treats a skipped check — a transfer proof — as resolved', () => {
-    expect(nextVerificationStep(facts({ ...allPass, ownerNotFrozen: 'skipped' }))).toEqual({
+    expect(nextVerificationStep(facts({ ...allPass, statusAttested: 'skipped' }))).toEqual({
       kind: 'run',
       check: 'onChain',
     });
   });
 
-  it('blocks the freeze check too when the chain cannot be reached', () => {
+  it('blocks the attestation check too when the chain cannot be reached', () => {
     expect(
       nextVerificationStep(
         facts(
@@ -172,6 +182,6 @@ describe('nextVerificationStep (D63)', () => {
           { chainReachable: false },
         ),
       ),
-    ).toEqual({ kind: 'blocked', check: 'ownerNotFrozen', why: 'chain-unavailable' });
+    ).toEqual({ kind: 'blocked', check: 'statusAttested', why: 'chain-unavailable' });
   });
 });

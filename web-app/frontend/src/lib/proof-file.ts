@@ -26,12 +26,10 @@ import {
   circuitTypeForSignalCount,
 } from '@land-registry/blockchain/shared/circuitInputs';
 import type { Groth16Proof, ProofPackage } from '@land-registry/blockchain/shared/types';
+import type { AttestationStaple } from '@land-registry/blockchain/shared/statusAttestation';
 
 export type ProofFileErrorCode =
-  | 'invalid-json'
-  | 'invalid-shape'
-  | 'unknown-circuit'
-  | 'circuit-mismatch';
+  'invalid-json' | 'invalid-shape' | 'unknown-circuit' | 'circuit-mismatch';
 
 export class ProofFileError extends Error {
   constructor(
@@ -44,6 +42,7 @@ export class ProofFileError extends Error {
 }
 
 const DECIMAL = /^\d+$/;
+const SIGNATURE = /^0x[0-9a-fA-F]{130}$/;
 
 /** The signal counts this system's circuits produce, for error copy. */
 export function signalCountsByCircuit(): { circuitType: CircuitType; count: number }[] {
@@ -126,6 +125,27 @@ function readCircuitType(declared: unknown, signalCount: number): CircuitType {
 }
 
 /**
+ * The stapled status attestation (D82), when there is one. A missing one is
+ * not a shape error: the five-check pipeline reports it as InvalidAttestation.
+ */
+function readAttestation(value: unknown): AttestationStaple | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (
+    !isRecord(value) ||
+    typeof value.expiresAt !== 'string' ||
+    !DECIMAL.test(value.expiresAt) ||
+    typeof value.signature !== 'string' ||
+    !SIGNATURE.test(value.signature)
+  ) {
+    throw new ProofFileError(
+      'invalid-shape',
+      '`attestation` must be { expiresAt: decimal string, signature: 65-byte hex }',
+    );
+  }
+  return { expiresAt: value.expiresAt, signature: value.signature };
+}
+
+/**
  * Validate an object that is already in hand.
  *
  * Extra keys are tolerated: `proof:bodies` and `transfer:smoke` write a
@@ -140,8 +160,12 @@ export function assertProofPackage(value: unknown): ProofPackage {
   const proof = readProof(value.proof);
   const publicSignals = readPublicSignals(value.publicSignals);
   const circuitType = readCircuitType(value.circuitType, publicSignals.length);
+  // Transfers carry none (verifyTransfer takes no attestation), so one is ignored there.
+  const attestation = circuitType === 'transfer' ? undefined : readAttestation(value.attestation);
 
-  return { proof, publicSignals, circuitType };
+  return attestation
+    ? { proof, publicSignals, circuitType, attestation }
+    : { proof, publicSignals, circuitType };
 }
 
 /** Parse uploaded or pasted text into a proof package. */

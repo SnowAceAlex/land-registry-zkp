@@ -31,7 +31,8 @@ export type VerifierRevert =
   | 'InvalidProof'
   | 'RootMismatch'
   | 'StaleTimestamp'
-  | 'OwnerFrozen'
+  | 'AttestationExpired'
+  | 'InvalidAttestation'
   | 'ZeroAddressDependency'
   /** Nothing decodable — NOT a verdict. See the note in decodeVerifierRevert. */
   | 'Unknown';
@@ -53,7 +54,8 @@ const KNOWN: readonly string[] = [
   'InvalidProof',
   'RootMismatch',
   'StaleTimestamp',
-  'OwnerFrozen',
+  'AttestationExpired',
+  'InvalidAttestation',
   'ZeroAddressDependency',
 ];
 
@@ -71,7 +73,11 @@ const KNOWN: readonly string[] = [
 export function decodeVerifierRevert(error: unknown): DecodedRevert {
   const message = error instanceof Error ? error.message : undefined;
 
-  for (let node = error as Record<string, unknown> | undefined, depth = 0; node && depth < 10; depth++) {
+  for (
+    let node = error as Record<string, unknown> | undefined, depth = 0;
+    node && depth < 10;
+    depth++
+  ) {
     const data = node.data as { errorName?: unknown; args?: readonly unknown[] } | undefined;
     const errorName = typeof data?.errorName === 'string' ? data.errorName : undefined;
 
@@ -93,18 +99,24 @@ export async function verifyOnChain(
   pkg: ProofPackage,
 ): Promise<OnChainResult> {
   const { a, b, c } = toSolidityCalldata(pkg.proof);
+  const args: unknown[] = [
+    a.map(BigInt),
+    b.map((pair) => pair.map(BigInt)),
+    c.map(BigInt),
+    pkg.publicSignals.map(BigInt),
+  ];
+  // D82: ownership/mortgage take the stapled attestation; a file without one gets an empty
+  // signature, so the contract answers InvalidAttestation in its own words.
+  if (pkg.circuitType !== 'transfer') {
+    args.push(BigInt(pkg.attestation?.expiresAt ?? '0'), pkg.attestation?.signature ?? '0x');
+  }
 
   try {
     await client.readContract({
       address: verifier,
       abi: landRegistryVerifierAbi,
       functionName: FUNCTIONS[pkg.circuitType],
-      args: [
-        a.map(BigInt),
-        b.map((pair) => pair.map(BigInt)),
-        c.map(BigInt),
-        pkg.publicSignals.map(BigInt),
-      ],
+      args,
     } as never);
     return { ok: true };
   } catch (error) {

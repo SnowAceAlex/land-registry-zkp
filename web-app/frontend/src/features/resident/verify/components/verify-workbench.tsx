@@ -24,14 +24,8 @@ import { useState } from 'react';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { format } from '@/i18n/format';
 import type { ProofPackage } from '@land-registry/blockchain/shared/types';
-import {
-  isTimestampFresh,
-  nowUnixTimestamp,
-} from '@land-registry/blockchain/shared/datetime';
-import {
-  publicSignalIndex,
-  rootSignalName,
-} from '@land-registry/blockchain/shared/circuitInputs';
+import { isTimestampFresh, nowUnixTimestamp } from '@land-registry/blockchain/shared/datetime';
+import { publicSignalIndex, rootSignalName } from '@land-registry/blockchain/shared/circuitInputs';
 import type { Receipt } from '@land-registry/blockchain/shared/receipt';
 import { Notice } from '@/components/ui/notice';
 import { buttonStyles } from '@/components/ui/button';
@@ -39,20 +33,17 @@ import { ProofFileError, parseProofFile } from '@/lib/proof-file';
 import {
   type RevocationEntry,
   readChainRoot,
-  readFrozenOwner,
+  readIsAttester,
   readRevocation,
 } from '@/lib/registry-reads';
 import { ArtifactMissingError, verifyProofOffChain } from '@/lib/zkp';
+import { checkAttestation } from '@/lib/status-attestation';
 
 import { CheckList } from './check-list';
 import { DisclosurePanel } from './disclosure-panel';
 import { IssuerChainPanel } from './issuer-chain-panel';
 import { type IssuerChainReport, verifyIssuerChain } from '../lib/issuer-chain';
-import {
-  ReceiptFileError,
-  assertReceiptMatchesProof,
-  parseReceiptFile,
-} from '../lib/receipt-file';
+import { ReceiptFileError, assertReceiptMatchesProof, parseReceiptFile } from '../lib/receipt-file';
 import { TRUSTED_ROOT_CA_PEM } from '../lib/trusted-root';
 import { verifyOnChain } from '../lib/on-chain-verify';
 import {
@@ -166,7 +157,7 @@ export function VerifyWorkbench({
     } catch (error) {
       setChainReachable(false);
       set('rootMatchesChain', 'unavailable');
-      set('ownerNotFrozen', 'unavailable');
+      set('statusAttested', 'unavailable');
       set('onChain', 'unavailable');
       setFailure(residentFailure(error, errors));
       return;
@@ -176,17 +167,15 @@ export function VerifyWorkbench({
     // that is `oldMerkleRoot` — exactly what verifyTransfer compares.
     set('rootMatchesChain', 'running');
     const propertyId = BigInt(publicSignals[publicSignalIndex(circuitType, 'propertyId')]);
-    let frozenOwner: string | null = null;
     try {
-      const [chain, entry, frozen] = await Promise.all([
+      const [chain, entry] = await Promise.all([
         readChainRoot(client, config.contracts.RootRegistry),
         readRevocation(client, config.contracts.RootRegistry, propertyId),
-        readFrozenOwner(client, config.contracts.RootRegistry, propertyId),
       ]);
       setRevocation(entry);
-      frozenOwner = frozen;
 
-      const claimedRoot = publicSignals[publicSignalIndex(circuitType, rootSignalName(circuitType))];
+      const claimedRoot =
+        publicSignals[publicSignalIndex(circuitType, rootSignalName(circuitType))];
       if (claimedRoot !== chain.root) {
         set('rootMatchesChain', 'fail');
         setRejection('RootMismatch');
@@ -195,24 +184,40 @@ export function VerifyWorkbench({
       set('rootMatchesChain', 'pass');
     } catch (error) {
       set('rootMatchesChain', 'unavailable');
-      set('ownerNotFrozen', 'unavailable');
+      set('statusAttested', 'unavailable');
       set('onChain', 'unavailable');
       setFailure(residentFailure(error, errors));
       return;
     }
 
-    // 4. D79: owner must not be frozen by a pending procedure (read from chain, not backend).
-    // Transfer proofs are exempt, like verifyTransfer.
+    // 4. D82: the registry's signed "no open procedure", recovered here and its signer's
+    // role read from the chain — still no question to the backend (D62). Transfers take none.
     if (circuitType === 'transfer') {
-      set('ownerNotFrozen', 'skipped');
+      set('statusAttested', 'skipped');
     } else {
-      const commitment = publicSignals[publicSignalIndex(circuitType, 'ownerCommitment')];
-      if (frozenOwner !== null && BigInt(frozenOwner) === BigInt(commitment)) {
-        set('ownerNotFrozen', 'fail');
-        setRejection('OwnerFrozen');
+      set('statusAttested', 'running');
+      try {
+        const attested = await checkAttestation(
+          parsed,
+          config.chainId,
+          config.contracts.LandRegistryVerifier,
+          nowUnixTimestamp(),
+        );
+        const ok =
+          attested.ok &&
+          (await readIsAttester(client, config.contracts.RootRegistry, attested.signer));
+        if (!ok) {
+          set('statusAttested', 'fail');
+          setRejection(attested.ok ? 'InvalidAttestation' : attested.reason);
+          return;
+        }
+        set('statusAttested', 'pass');
+      } catch (error) {
+        set('statusAttested', 'unavailable');
+        set('onChain', 'unavailable');
+        setFailure(residentFailure(error, errors));
         return;
       }
-      set('ownerNotFrozen', 'pass');
     }
 
     // 5. The contract's own opinion.

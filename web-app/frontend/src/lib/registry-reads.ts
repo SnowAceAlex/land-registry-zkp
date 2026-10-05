@@ -3,7 +3,7 @@
  *
  * Every function here is a `view` call, so this is `eth_call` only: no gas, no
  * wallet, no connector (D61). Promoted to shared code because UC-5 needs the
- * current root and UC-6 needs all five, and sibling features must not import
+ * current root and UC-6 needs the rest, and sibling features must not import
  * each other (D66).
  *
  * Roots come back as DECIMAL STRINGS, not hex. That is the form the API, the
@@ -84,22 +84,23 @@ export async function readRevocation(
   };
 }
 
-/**
- * D79: owner commitment frozen by a pending transfer/revocation, or null (0 = not frozen).
- * Decimal string, the same form as a proof's publicSignals.
- */
-export async function readFrozenOwner(
+/** D82: whether `account` may sign status attestations — read from the chain, never the backend. */
+export async function readIsAttester(
   client: PublicClient,
   registry: Address,
-  propertyId: bigint,
-): Promise<string | null> {
-  const frozen = (await client.readContract({
+  account: Address,
+): Promise<boolean> {
+  const role = (await client.readContract({
     address: registry,
     abi: rootRegistryAbi,
-    functionName: 'frozenOwner',
-    args: [propertyId],
-  })) as bigint;
-  return frozen === 0n ? null : frozen.toString();
+    functionName: 'ATTESTER_ROLE',
+  })) as Hex;
+  return (await client.readContract({
+    address: registry,
+    abi: rootRegistryAbi,
+    functionName: 'hasRole',
+    args: [role, account],
+  })) as boolean;
 }
 
 export interface AuthorityAnchor {

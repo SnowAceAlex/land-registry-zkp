@@ -72,11 +72,18 @@ describe('decodeVerifierRevert (D33)', () => {
     );
   });
 
-  it('names OwnerFrozen — a proof whose owner a pending procedure froze (D81)', () => {
-    const error = Object.assign(new Error('reverted'), {
-      cause: { data: { errorName: 'OwnerFrozen', args: [1001n] } },
+  it('names the two attestation reverts (D82)', () => {
+    const expired = Object.assign(new Error('reverted'), {
+      cause: { data: { errorName: 'AttestationExpired', args: [1n, 2n] } },
+    });
+    const invalid = Object.assign(new Error('reverted'), {
+      cause: { data: { errorName: 'InvalidAttestation', args: [] } },
     });
 
-    expect(decodeVerifierRevert(error)).toMatchObject({ name: 'OwnerFrozen', args: [1001n] });
+    expect(decodeVerifierRevert(expired)).toMatchObject({
+      name: 'AttestationExpired',
+      args: [1n, 2n],
+    });
+    expect(decodeVerifierRevert(invalid).name).toBe('InvalidAttestation');
   });
 });

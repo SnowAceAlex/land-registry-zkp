@@ -74,11 +74,10 @@ describe('parseApiError', () => {
     expect(error.detail).toBe('Proof root does not match latestRoot');
   });
 
-  it('keeps the two freeze reasons (D79/D80)', () => {
-    expect(parseApiError(422, { reason: 'OwnerFrozen', message: 'x' }).reason).toBe('OwnerFrozen');
-    expect(parseApiError(409, { reason: 'OwnerNotFrozen', message: 'x' }).reason).toBe(
-      'OwnerNotFrozen',
-    );
+  it('keeps the status-attestation reasons (D82)', () => {
+    for (const reason of ['AttestationExpired', 'InvalidAttestation', 'ProcedureOpen']) {
+      expect(parseApiError(422, { reason, message: 'x' }).reason).toBe(reason);
+    }
   });
 
   it('ignores a reason that is not one of the D33 names', () => {

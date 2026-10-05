@@ -1,8 +1,8 @@
 /**
  * features/resident/proof/api.ts - UC-5's only contact with the network.
  *
- * ⚠️ THE PRIVACY CONSTRAINT IS ENFORCED BY THE SHAPE OF THIS FILE. There is one
- *    function, it is a GET, and its only argument goes in the path. No function
+ * ⚠️ THE PRIVACY CONSTRAINT IS ENFORCED BY THE SHAPE OF THIS FILE. Both
+ *    functions are GETs whose only argument goes in the path. No function
  *    here takes a body, so there is no call site through which a witness could
  *    leave the page even by mistake. `ownerSecret` and the record fields stay
  *    in the browser; only a finished proof and its public signals ever travel,
@@ -17,6 +17,7 @@
  */
 
 import { apiFetch } from '@/lib/api-client';
+import type { AttestationStaple } from '@land-registry/blockchain/shared/statusAttestation';
 
 /** GET /api/proof/:propertyId — MerkleProofResponseDto. */
 export interface MerkleProofResponse {
@@ -57,4 +58,23 @@ export interface MerkleProofResponse {
  */
 export async function refreshMerkleProof(propertyId: string): Promise<MerkleProofResponse> {
   return apiFetch<MerkleProofResponse>(`/proof/${propertyId}`, { cache: 'no-cache' });
+}
+
+/** GET /api/proof/:propertyId/attestation — AttestationResponseDto (D82). */
+export interface AttestationResponse extends AttestationStaple {
+  propertyId: string;
+  ownerCommitment: string;
+  merkleRoot: string;
+  attester: string;
+  chainId: number;
+  verifyingContract: string;
+}
+
+/**
+ * The registry's signed "no open procedure" note, stapled into proof.json
+ * (D82). 409 ProcedureOpen while a transfer or revocation is open. Never
+ * cached: it follows the plot's procedures, not the root.
+ */
+export async function fetchAttestation(propertyId: string): Promise<AttestationResponse> {
+  return apiFetch<AttestationResponse>(`/proof/${propertyId}/attestation`, { cache: 'no-store' });
 }

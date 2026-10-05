@@ -46,8 +46,8 @@
  * one never issued (D39), and neither is a network problem a retry could fix —
  * the leaf is not in the tree, so no Merkle proof exists to fetch.
  *
- * A fourth, `owner-frozen` (D81): a pending transfer/revocation froze this owner on chain,
- * so every verifier rejects its proofs with OwnerFrozen until the change set publishes.
+ * A fourth, `procedure-open` (D82): a transfer or revocation is open on this plot, so the
+ * registry refuses the status attestation every verifier requires until it publishes or closes.
  *
  * ⚠️ ORDERING BUG THIS FIXES. `refreshedRoot === null` used to be tested before
  *    `chainReachable`, so ANY failed refresh — revoked, unissued, 503, node
@@ -72,7 +72,7 @@ export type ProofStage =
   | 'chain-unavailable'
   | 'root-not-published'
   | 'superseded'
-  | 'owner-frozen'
+  | 'procedure-open'
   | 'ready'
   | 'proving'
   | 'done';
@@ -97,12 +97,10 @@ export interface ProofStageFacts {
    */
   registryLeaf: string | null;
   /**
-   * RootRegistry.frozenOwner for this plot, decimal (D79); null when not
-   * frozen, undefined while the read is in flight.
+   * The status attestation request (D82): `pending` while in flight, `open`
+   * when the registry answered 409 ProcedureOpen.
    */
-  frozenOwner: string | null | undefined;
-  /** Decimal owner commitment from the bundle's own record; null until parsed. */
-  bundleOwnerCommitment: string | null;
+  attestation: 'pending' | 'ok' | 'open';
   /**
    * The registry answered definitively that no proof can exist for this plot:
    * revoked (410) or never issued (400). Distinct from `chainReachable: false`
@@ -157,16 +155,10 @@ export function nextProofStage(f: ProofStageFacts): ProofStage {
     return 'superseded';
   }
 
-  // D81: after superseded, so a freeze is only claimed once both roots and
-  // both leaves already agree that it is about THIS owner of THIS leaf.
-  if (f.frozenOwner === undefined) return 'refreshing';
-  if (
-    f.frozenOwner !== null &&
-    f.bundleOwnerCommitment !== null &&
-    f.frozenOwner === f.bundleOwnerCommitment
-  ) {
-    return 'owner-frozen';
-  }
+  // D82: after superseded, so an open procedure is only claimed once both roots
+  // and both leaves agree that it is about THIS owner of THIS leaf.
+  if (f.attestation === 'pending') return 'refreshing';
+  if (f.attestation === 'open') return 'procedure-open';
 
   if (f.busy === 'proving') return 'proving';
   if (f.hasResult) return 'done';

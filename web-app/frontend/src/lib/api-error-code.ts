@@ -33,8 +33,9 @@ export type ApiErrorCode =
   | 'root-mismatch'
   | 'stale-timestamp'
   | 'invalid-proof'
-  | 'owner-frozen'
-  | 'owner-not-frozen'
+  | 'attestation-expired'
+  | 'invalid-attestation'
+  | 'procedure-open'
   | 'unreachable'
   | 'unknown';
 
@@ -42,8 +43,9 @@ const REASON_CODES: Record<ApiReason, ApiErrorCode> = {
   RootMismatch: 'root-mismatch',
   StaleTimestamp: 'stale-timestamp',
   InvalidProof: 'invalid-proof',
-  OwnerFrozen: 'owner-frozen',
-  OwnerNotFrozen: 'owner-not-frozen',
+  AttestationExpired: 'attestation-expired',
+  InvalidAttestation: 'invalid-attestation',
+  ProcedureOpen: 'procedure-open',
 };
 
 const STATUS_CODES: Record<number, ApiErrorCode> = {

@@ -15,8 +15,7 @@ function facts(overrides: Partial<ProofStageFacts> = {}): ProofStageFacts {
     refreshRejected: false,
     bundleLeaf: LEAF,
     registryLeaf: LEAF,
-    frozenOwner: null,
-    bundleOwnerCommitment: '111',
+    attestation: 'ok',
     refreshedRoot: ROOT,
     refreshedInSync: true,
     chainRoot: ROOT,
@@ -33,9 +32,9 @@ describe('nextProofStage (D64)', () => {
   });
 
   it('walks the happy path in order', () => {
-    expect(nextProofStage(facts({ bundleLoaded: false, integrityIssues: null, refreshedRoot: null }))).toBe(
-      'no-bundle',
-    );
+    expect(
+      nextProofStage(facts({ bundleLoaded: false, integrityIssues: null, refreshedRoot: null })),
+    ).toBe('no-bundle');
     expect(nextProofStage(facts({ busy: 'parsing' }))).toBe('parsing');
     expect(nextProofStage(facts({ integrityIssues: null }))).toBe('parsing');
     expect(nextProofStage(facts({ refreshedRoot: null }))).toBe('refreshing');
@@ -94,7 +93,9 @@ describe('nextProofStage (D64)', () => {
   });
 
   it('does not let a result mask a chain that has moved on', () => {
-    expect(nextProofStage(facts({ hasResult: true, chainRoot: '8888' }))).toBe('root-not-published');
+    expect(nextProofStage(facts({ hasResult: true, chainRoot: '8888' }))).toBe(
+      'root-not-published',
+    );
   });
 
   /**
@@ -207,26 +208,24 @@ describe('nextProofStage (D64)', () => {
     });
   });
 
-  /** D81 — a pending transfer or revocation froze this owner on chain. */
-  describe('owner-frozen (D81)', () => {
-    it('stops when the chain freezes exactly this bundle’s owner', () => {
-      expect(nextProofStage(facts({ frozenOwner: '111' }))).toBe('owner-frozen');
+  /** D82 — the registry refuses the status attestation while a procedure is open. */
+  describe('procedure-open (D82)', () => {
+    it('stops when the registry refuses the attestation', () => {
+      expect(nextProofStage(facts({ attestation: 'open' }))).toBe('procedure-open');
     });
 
-    it('does not fire for a freeze of a different owner', () => {
-      expect(nextProofStage(facts({ frozenOwner: '999' }))).toBe('ready');
-    });
-
-    it('waits while the freeze read is in flight', () => {
-      expect(nextProofStage(facts({ frozenOwner: undefined }))).toBe('refreshing');
+    it('waits while the attestation request is in flight', () => {
+      expect(nextProofStage(facts({ attestation: 'pending' }))).toBe('refreshing');
     });
 
     /** Same reasoning as `superseded`: only claim it once evidence agrees. */
     it('yields to root-not-published and superseded', () => {
-      expect(nextProofStage(facts({ frozenOwner: '111', chainRoot: '8888' }))).toBe(
+      expect(nextProofStage(facts({ attestation: 'open', chainRoot: '8888' }))).toBe(
         'root-not-published',
       );
-      expect(nextProofStage(facts({ frozenOwner: '111', registryLeaf: '6666' }))).toBe('superseded');
+      expect(nextProofStage(facts({ attestation: 'open', registryLeaf: '6666' }))).toBe(
+        'superseded',
+      );
     });
   });
 });
