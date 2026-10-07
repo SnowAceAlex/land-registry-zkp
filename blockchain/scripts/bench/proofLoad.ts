@@ -12,6 +12,10 @@
  *                      hashing (D74). The gap between the two modes is the load
  *                      a CDN would absorb.
  *
+ * ROUTE=attestation measures `GET /api/proof/:propertyId/attestation` (D82)
+ * instead: one open-procedure lookup, one commitment read, one EIP-712
+ * signature. It is never conditional, so ETAG is ignored there.
+ *
  * ⚠️ The route sits on the shared 60/minute throttle bucket (D74). Run the
  * backend with `THROTTLE_LIMIT=1000000`, or this measures the throttle instead
  * of the server. The `statuses` line in the output must contain no 429.
@@ -30,7 +34,10 @@ const API_BASE = process.env.API_BASE ?? 'http://localhost:3001/api';
 const CONCURRENCY = Number(process.env.CONCURRENCY ?? 50);
 const REQUESTS = Number(process.env.REQUESTS ?? 5_000);
 const SAMPLE = Number(process.env.SAMPLE ?? 2_000);
-const USE_ETAG = process.env.ETAG === '1';
+const ROUTE = process.env.ROUTE === 'attestation' ? 'attestation' : 'proof';
+const USE_ETAG = ROUTE === 'proof' && process.env.ETAG === '1';
+const pathFor = (id: string): string =>
+  ROUTE === 'attestation' ? `/proof/${id}/attestation` : `/proof/${id}`;
 
 /** `PageResult<T> = { total, items }` — see backend/src/common/pagination.ts. */
 interface PageResult<T> {
@@ -88,7 +95,7 @@ async function main(): Promise<void> {
       const id = ids[n % ids.length];
 
       const requestStart = Date.now();
-      const res = await fetch(`${API_BASE}/proof/${id}`, {
+      const res = await fetch(`${API_BASE}${pathFor(id)}`, {
         headers: USE_ETAG && etags.has(id) ? { 'if-none-match': etags.get(id)! } : {},
       });
       // Drain the body: a request is not finished until its payload is read.
@@ -104,7 +111,7 @@ async function main(): Promise<void> {
   const stats = percentiles(latencies);
   const report = {
     kind: 'proof-load',
-    mode: USE_ETAG ? 'etag-304' : 'full-200',
+    mode: ROUTE === 'attestation' ? 'attestation' : USE_ETAG ? 'etag-304' : 'full-200',
     concurrency: CONCURRENCY,
     requests: REQUESTS,
     distinctIds: ids.length,

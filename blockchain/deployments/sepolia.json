@@ -1,18 +1,19 @@
 {
   "network": "sepolia",
   "chainId": 11155111,
-  "deployedAt": "2026-09-29T05:59:48.707Z",
+  "deployedAt": "2026-10-05T12:43:48.631Z",
   "deployer": "0xc128Eb26F177BB6a3b4374A715be350887ED7726",
   "authority": {
     "address": "0xc128Eb26F177BB6a3b4374A715be350887ED7726",
     "orgName": "So Tai nguyen va Moi truong TP.HCM",
     "instituteHash": "0x1f730914c2418f93d7466bfc23ec84f2790208f8c887355a7acaa798fa0ba603"
   },
+  "attester": "0x55636981fA9f7b2c357025691C9a26B066dD25c8",
   "contracts": {
-    "RootRegistry": "0xB4340Fc842F807085D250e13Ac33F8789C1CedAD",
-    "Groth16VerifierOwnership": "0x808c5bcC675F53e45C271BEd0dd858Fc2f67ED86",
-    "Groth16VerifierMortgage": "0x66c3E7070cf86E776d67DAC38df2991Baa4eC429",
-    "Groth16VerifierTransfer": "0x9914015d95054672b2BdB32408936D3D78ef9c8A",
-    "LandRegistryVerifier": "0xF324ba6d3614bE5E2D0E44892daFfFf4c87BDd22"
+    "RootRegistry": "0x4c80286177cA50cE454e261Afc95554f2Ff206F1",
+    "Groth16VerifierOwnership": "0xC14D8Da6bd469178CB6BF1fDE9be60faa706B62a",
+    "Groth16VerifierMortgage": "0xE855270F8BBF12097e00d1dfb442852C8e0377eE",
+    "Groth16VerifierTransfer": "0x89a67AC023B10D5334BAf45eb450E1D6DB86969f",
+    "LandRegistryVerifier": "0xaC08cE377164CB4F4cF7b5673fDDb690F00fdd79"
   }
 }
