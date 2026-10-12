@@ -6,7 +6,7 @@ jest.mock('@land-registry/blockchain/shared', () => ({
   assertProofFresh: jest.fn(),
 }));
 
-import { BadRequestException, GoneException } from '@nestjs/common';
+import { BadRequestException, ConflictException, GoneException } from '@nestjs/common';
 import { Property } from '@prisma/client';
 import {
   BN254_FIELD_MODULUS,
@@ -70,7 +70,10 @@ describe('TransfersService.preview — both Merkle paths (D28, over the node sto
       commitmentFor: (secret: bigint) => poseidonHash([secret]),
     } as never;
 
-    return { service: new TransfersService(prisma, nodes as never, chain, issuance), tree };
+    return {
+      service: new TransfersService(prisma, nodes as never, chain, issuance),
+      tree,
+    };
   }
 
   it('issues the buyer secret and projects the root a rebuild with that owner would produce', async () => {
@@ -121,9 +124,10 @@ describe('TransfersService.preview — both Merkle paths (D28, over the node sto
 describe('TransfersService — the buyer secret at submit and reject (D77)', () => {
   const property = makeProperty({ propertyId: '1001', ownerCommitment: '111' });
 
-  async function scenario() {
+  async function scenario(opts: { pendingRevocation?: { id: number } | null } = {}) {
     const secret = 43n;
     const commitment = (await poseidonHash([secret])).toString();
+    const signals = ['5', '6', '1001', '111', commitment, '1800000000', '0'];
     const create = jest.fn(async ({ data }) => ({
       id: 1,
       ...data,
@@ -153,12 +157,22 @@ describe('TransfersService — the buyer secret at submit and reject (D77)', () 
       property: { findUnique: jest.fn().mockResolvedValue(property) },
       transferRequest: {
         findFirst: jest.fn().mockResolvedValue(null),
-        findUnique: jest.fn().mockResolvedValue({ id: 1, status: 'PENDING' }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 1,
+          status: 'PENDING',
+          propertyId: '1001',
+          proof: {},
+          publicSignals: signals,
+        }),
         create,
         update,
       },
+      revocation: { findFirst: jest.fn().mockResolvedValue(opts.pendingRevocation ?? null) },
     };
-    const chain = { getLatestRoot: jest.fn().mockResolvedValue(5n) };
+    const chain = {
+      getLatestRoot: jest.fn().mockResolvedValue(5n),
+      verifyTransferOnChain: jest.fn().mockResolvedValue(true),
+    };
     const issuance = { commitmentFor: (value: bigint) => poseidonHash([value]) };
     const service = new TransfersService(
       prisma as never,
@@ -166,7 +180,6 @@ describe('TransfersService — the buyer secret at submit and reject (D77)', () 
       chain as never,
       issuance as never,
     );
-    const signals = ['5', '6', '1001', '111', commitment, '1800000000', '0'];
     const dto = (newOwnerSecret: string) => ({
       propertyId: '1001',
       newOwnerCommitment: commitment,
@@ -209,5 +222,12 @@ describe('TransfersService — the buyer secret at submit and reject (D77)', () 
     await service.reject(1, 'no');
 
     expect(update.mock.calls[0][0].data.newOwnerSecret).toBeNull();
+  });
+
+  it('refuses a plot with a pending revocation — one open procedure per plot', async () => {
+    const { service, create, dto, secret } = await scenario({ pendingRevocation: { id: 9 } });
+
+    await expect(service.submit(dto(secret.toString()))).rejects.toBeInstanceOf(ConflictException);
+    expect(create).not.toHaveBeenCalled();
   });
 });

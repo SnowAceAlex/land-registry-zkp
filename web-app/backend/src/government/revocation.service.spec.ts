@@ -7,16 +7,19 @@ describe('RevocationService (D45)', () => {
   const findUnique = jest.fn();
   const findFirst = jest.fn();
   const create = jest.fn();
+  const transferFindFirst = jest.fn();
   const prisma = {
     property: { findUnique },
     revocation: { findFirst, create, findMany: jest.fn() },
+    transferRequest: { findFirst: transferFindFirst },
   } as never;
   const service = new RevocationService(prisma);
 
   beforeEach(() => {
     jest.clearAllMocks();
-    findUnique.mockResolvedValue({ propertyId: '1001', status: 'ISSUED' });
+    findUnique.mockResolvedValue({ propertyId: '1001', status: 'ISSUED', ownerCommitment: '111' });
     findFirst.mockResolvedValue(null);
+    transferFindFirst.mockResolvedValue(null);
     create.mockImplementation(({ data }) => Promise.resolve({ id: 1, ...data }));
   });
 
@@ -58,5 +61,14 @@ describe('RevocationService (D45)', () => {
     await expect(
       service.request({ propertyId: '1001', reasonCode: 1, detailText: 'x' }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('refuses a plot with an open transfer — one open procedure per plot', async () => {
+    transferFindFirst.mockResolvedValue({ id: 4, status: 'APPROVED' });
+
+    await expect(
+      service.request({ propertyId: '1001', reasonCode: 1, detailText: 'x' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(create).not.toHaveBeenCalled();
   });
 });

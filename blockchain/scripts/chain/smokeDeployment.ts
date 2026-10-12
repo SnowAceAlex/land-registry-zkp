@@ -10,7 +10,9 @@
  *                    the three verifiers. Sends no transaction, costs no gas.
  *   SMOKE_PUBLISH=1  full round trip — builds a real Merkle tree from mock
  *                    records, publishes its root (TRANSACTION, costs gas),
- *                    generates a real ownership proof and verifies it on-chain.
+ *                    generates a real ownership proof, signs its status
+ *                    attestation with ATTESTER_PRIVATE_KEY (D82) and verifies
+ *                    both on-chain.
  *
  * Usage:
  *   pnpm --filter blockchain run chain:smoke:localhost                 # read-only
@@ -28,6 +30,10 @@ import { ethers, network } from 'hardhat';
 import { PUBLIC_SIGNAL_ORDER } from '../../shared/circuitInputs';
 import { fromUnixTimestamp } from '../../shared/datetime';
 import { loadDeployment } from '../../shared/deployments';
+import {
+  attestationMessageFromSignals,
+  statusAttestationTypedData,
+} from '../../shared/statusAttestation';
 import { generateGroth16Proof, getCircuitPaths, toSolidityCalldata } from '../../shared/zkpHelper';
 import { BLOCKCHAIN_DIR } from '../lib/paths';
 import { buildSampleInput } from '../circuits/sampleWitness';
@@ -95,6 +101,16 @@ async function main() {
     throw new Error('Authority is not correctly registered — re-run the deploy script.');
   }
 
+  // ── 3b. D82 attester ───────────────────────────────────────────────────────
+  if (deployment.attester) {
+    const isAttester = await registry.hasRole(await registry.ATTESTER_ROLE(), deployment.attester);
+    console.log(`\nAttester (D82)       ${deployment.attester}`);
+    console.log(`  ATTESTER_ROLE:     ${isAttester ? 'yes' : 'NO — role missing!'}`);
+    if (!isAttester) throw new Error('Attester has no ATTESTER_ROLE — re-run the deploy script.');
+  } else {
+    console.log('\nAttester (D82)       (none recorded — deployment predates D82, redeploy)');
+  }
+
   // ── 4. Dispatcher wiring ───────────────────────────────────────────────────
   const [regRef, ownershipRef, mortgageRef, transferRef, tolerance] = await Promise.all([
     dispatcher.registry(),
@@ -154,9 +170,24 @@ async function main() {
   const pkg = await generateGroth16Proof(input, wasmPath, zkeyPath, 'ownership');
   console.log(`  proof generated in ${Date.now() - startedAt} ms`);
 
+  // Plays the backend's GET /api/proof/:id/attestation (D82).
+  const attesterKey = process.env.ATTESTER_PRIVATE_KEY?.trim();
+  if (!attesterKey)
+    throw new Error('SMOKE_PUBLISH needs ATTESTER_PRIVATE_KEY to sign the attestation.');
+  const attester = new ethers.Wallet(attesterKey);
+  const expiresAt = chainNow + 300n;
+  const typed = statusAttestationTypedData(
+    deployment.chainId,
+    await dispatcher.getAddress(),
+    attestationMessageFromSignals('ownership', pkg.publicSignals, expiresAt),
+  );
+  const signature = await attester.signTypedData(typed.domain, typed.types, typed.message);
+  console.log(`  attestation signed by ${attester.address}`);
+
   const { a, b, c } = toSolidityCalldata(pkg.proof);
-  const verified = await dispatcher.verifyOwnership(a, b, c, pkg.publicSignals);
-  const verifyGas = await dispatcher.verifyOwnership.estimateGas(a, b, c, pkg.publicSignals);
+  const args = [a, b, c, pkg.publicSignals, expiresAt, signature] as const;
+  const verified = await dispatcher.verifyOwnership(...args);
+  const verifyGas = await dispatcher.verifyOwnership.estimateGas(...args);
   console.log(`  on-chain verifyOwnership → ${verified}  (gas ${verifyGas})`);
   if (!verified) throw new Error('On-chain verification returned false.');
 

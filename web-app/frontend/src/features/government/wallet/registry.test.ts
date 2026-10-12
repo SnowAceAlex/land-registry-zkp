@@ -70,12 +70,7 @@ describe('publishCallFor (D54)', () => {
 
     expect(publishCallFor(draft)).toEqual({
       functionName: 'publishRootWithRevocations',
-      args: [
-        rootToBytes32(ROOT),
-        [2000n, 2001n],
-        [3, 3],
-        draft.revocationCalldata.detailHashes,
-      ],
+      args: [rootToBytes32(ROOT), [2000n, 2001n], [3, 3], draft.revocationCalldata.detailHashes],
     });
   });
 });
@@ -108,7 +103,10 @@ describe('walletErrorCode', () => {
 
   it('recognises a signature the officer cancelled', () => {
     expect(
-      walletErrorCode({ name: 'TransactionExecutionError', cause: { name: 'UserRejectedRequestError' } }),
+      walletErrorCode({
+        name: 'TransactionExecutionError',
+        cause: { name: 'UserRejectedRequestError' },
+      }),
     ).toBe('rejected');
     expect(walletErrorCode({ code: 4001, message: 'User denied' })).toBe('rejected');
   });

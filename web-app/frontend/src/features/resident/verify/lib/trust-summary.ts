@@ -17,7 +17,9 @@
  *  - a perfect proof checked by a verifier with NO pinned root is
  *    `accept-with-warning`, never a clean accept: link 1 could not run;
  *  - an unreachable chain is `unknown`, not `accept`. Half the checks did not
- *    run, and a green tick would be a lie.
+ *    run, and a green tick would be a lie;
+ *  - on the standard tab no receipt is asked for, so a missing issuer report
+ *    is not a warning; on the agency tab it is required, and missing = `unknown`.
  *
  * Pure, so every one of those combinations is a test rather than a screen that
  * has to be driven by hand.
@@ -35,7 +37,6 @@ export type TrustReason =
   | 'property-revoked'
   | 'issuer-mismatch'
   | 'issuer-unverified'
-  | 'issuer-not-supplied'
   | 'chain-unavailable'
   | 'checks-incomplete';
 
@@ -43,8 +44,10 @@ export interface TrustFacts {
   step: PipelineStep;
   /** null when the plot carries no on-chain revocation; undefined if unread. */
   revocation: RevocationEntry | null | undefined;
-  /** null when the verifier supplied no receipt. */
+  /** null when no receipt was checked (yet). */
   issuer: IssuerChainReport | null;
+  /** Agency tab: the receipt's issuer chain is part of the verdict. */
+  issuerRequired: boolean;
   chainReachable: boolean | undefined;
 }
 
@@ -80,13 +83,13 @@ export function summariseTrust(f: TrustFacts): TrustSummary {
 
   // Nothing is wrong, but not everything could be checked.
   if (f.chainReachable === false) reasons.push('chain-unavailable');
-  if (f.step.kind !== 'done') reasons.push('checks-incomplete');
+  if (f.step.kind !== 'done' || (f.issuerRequired && f.issuer === null)) {
+    reasons.push('checks-incomplete');
+  }
 
   if (reasons.length > 0) return { verdict: 'unknown', reasons };
 
-  if (f.issuer === null) {
-    return { verdict: 'accept-with-warning', reasons: ['issuer-not-supplied'] };
-  }
+  if (!f.issuerRequired || f.issuer === null) return { verdict: 'accept', reasons: [] };
 
   // No pinned root (D78): link 1 could not run, so the issuer's identity is
   // only as good as links 2–4, which an impostor with their own certificate

@@ -34,6 +34,8 @@
  */
 import { execFileSync } from 'child_process';
 import * as fs from 'fs';
+import * as http from 'http';
+import * as os from 'os';
 import * as path from 'path';
 
 import { Prisma, PrismaClient } from '@prisma/client';
@@ -55,6 +57,8 @@ const DAYS = Number(process.env.DAYS ?? 22);
 const API_BASE = process.env.API_BASE ?? 'http://localhost:3001/api';
 const API_KEY = process.env.GOV_API_KEY ?? '';
 const INSERT_CHUNK = 1_000;
+// Resume a run stopped mid-month (1-based): keeps the queue, signs the open draft first.
+const RESUME_FROM_DAY = Number(process.env.RESUME_FROM_DAY ?? 0);
 
 /**
  * Which `sign:root` variant to run.
@@ -66,9 +70,8 @@ const INSERT_CHUNK = 1_000;
  * else. The network has to be chosen here, from the same variable the backend
  * was started with.
  */
-const SIGN_SCRIPT = (process.env.CHAIN_NETWORK ?? 'localhost') === 'sepolia'
-  ? 'sign:root:sepolia'
-  : 'sign:root';
+const SIGN_SCRIPT =
+  (process.env.CHAIN_NETWORK ?? 'localhost') === 'sepolia' ? 'sign:root:sepolia' : 'sign:root';
 
 interface DayResult {
   day: number;
@@ -101,24 +104,50 @@ interface DayResult {
  * an answer and is never retried: a 409 means the queue is wrong and repeating
  * it would only hide that.
  */
-async function call<T>(method: 'GET' | 'POST' | 'DELETE', route: string, body?: unknown): Promise<T> {
-  const send = async (): Promise<Response> =>
-    fetch(`${API_BASE}${route}`, {
-      method,
-      headers: { 'content-type': 'application/json', 'x-gov-api-key': API_KEY },
-      ...(method === 'GET' ? {} : { body: JSON.stringify(body ?? {}) }),
+async function call<T>(
+  method: 'GET' | 'POST' | 'DELETE',
+  route: string,
+  body?: unknown,
+): Promise<T> {
+  // node:http, not fetch: fetch gives up after 300s without headers, and a D77
+  // confirm of ~3,000 transfers takes longer than that.
+  const send = (): Promise<{ status: number; text: string }> =>
+    new Promise((resolve, reject) => {
+      const payload = method === 'GET' ? undefined : JSON.stringify(body ?? {});
+      const req = http.request(
+        `${API_BASE}${route}`,
+        {
+          method,
+          headers: {
+            'content-type': 'application/json',
+            'x-gov-api-key': API_KEY,
+            ...(payload ? { 'content-length': Buffer.byteLength(payload) } : {}),
+          },
+        },
+        (res) => {
+          let text = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk) => (text += chunk));
+          res.on('end', () => resolve({ status: res.statusCode ?? 0, text }));
+          res.on('error', reject);
+        },
+      );
+      req.on('error', reject);
+      if (payload) req.write(payload);
+      req.end();
     });
 
-  let res: Response;
+  let res: { status: number; text: string };
   try {
     res = await send();
   } catch {
     res = await send();
   }
 
-  const text = await res.text();
-  if (!res.ok) throw new Error(`${method} ${route} → ${res.status} ${text.slice(0, 400)}`);
-  return (text ? JSON.parse(text) : undefined) as T;
+  if (res.status < 200 || res.status >= 300) {
+    throw new Error(`${method} ${route} → ${res.status} ${res.text.slice(0, 400)}`);
+  }
+  return (res.text ? JSON.parse(res.text) : undefined) as T;
 }
 
 const api = <T>(route: string, body?: unknown): Promise<T> => call<T>('POST', route, body);
@@ -196,11 +225,12 @@ async function main(): Promise<void> {
   // TransfersService.submit() that refuses a second request for one plot, so a
   // half-finished earlier run would make the next round fail for a reason that
   // has nothing to do with what is being measured.
-  await resetQueue(prisma);
+  if (!RESUME_FROM_DAY) await resetQueue(prisma);
 
   const needed = TRANSFERS + REVOCATIONS;
   const pool_ = await prisma.property.findMany({
-    where: { status: 'ISSUED' },
+    // On resume, plots revoked earlier this run still belong to the genesis pool.
+    where: { status: RESUME_FROM_DAY ? { in: ['ISSUED', 'REVOKED'] } : 'ISSUED' },
     // The current commitment is needed: the next owner is chained from it, so
     // that replaying against an already-replayed database still moves each leaf.
     select: { propertyId: true, ownerCommitment: true },
@@ -227,7 +257,67 @@ async function main(): Promise<void> {
   const days: DayResult[] = [];
   let peakRssMb = 0;
 
-  for (let day = 0; day < DAYS; day++) {
+  const dir = path.resolve(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    'blockchain',
+    'bench',
+    'results',
+    new Date().toISOString().replace(/[:.]/g, '-'),
+  );
+  fs.mkdirSync(dir, { recursive: true });
+
+  // Rewritten after every day, so a run stopped early still leaves its days on disk.
+  const writeReport = (): bigint => {
+    const totalGas = days.reduce((sum, d) => sum + BigInt(d.gasUsed), 0n);
+    const report = {
+      kind: 'month' as const,
+      at: new Date().toISOString(),
+      assumptions: [
+        'every mutation modelled as a transfer (conservative upper bound)',
+        'transfer proofs measured separately by bench:prove, not generated here',
+        'no per-procedure transaction: the lock is the open request row, enforced by the status attestation (D82)',
+      ],
+      transfers: TRANSFERS,
+      revocations: REVOCATIONS,
+      days: DAYS,
+      publishes: days.length,
+      totalGas: totalGas.toString(),
+      peakRssMb: Math.round(peakRssMb),
+      perDay: days,
+      machine: {
+        platform: process.platform,
+        arch: process.arch,
+        cpus: require('os').cpus().length,
+        totalMemGb: Math.round(require('os').totalmem() / 1024 ** 3),
+        node: process.version,
+      },
+    };
+    fs.writeFileSync(path.join(dir, 'month.json'), JSON.stringify(report, null, 2));
+    return totalGas;
+  };
+
+  for (let day = Math.max(RESUME_FROM_DAY - 1, 0); day < DAYS; day++) {
+    const resumeDraft =
+      RESUME_FROM_DAY && day === RESUME_FROM_DAY - 1
+        ? (
+            await call<{
+              draft: {
+                id: number;
+                newRoot: string;
+                revocationCalldata: {
+                  propertyIds: string[];
+                  reasonCodes: number[];
+                  detailHashes: string[];
+                };
+                deferredRevocations: number;
+              } | null;
+            }>('GET', '/government/drafts/open')
+          ).draft
+        : null;
+
     const todayTransfers = transferPool.slice(day * perDayTransfers, (day + 1) * perDayTransfers);
     const todayRevocations = revocationPool.slice(
       day * perDayRevocations,
@@ -237,6 +327,7 @@ async function main(): Promise<void> {
 
     // ── Queue the day's paperwork ────────────────────────────────────────────
     const queueStart = Date.now();
+    if (!resumeDraft) {
 
     // Transfers go straight in as APPROVED (see assumption 2). The new owner
     // commitment is REAL — the projected root has to be correct or confirm()
@@ -271,17 +362,24 @@ async function main(): Promise<void> {
         detailText: `bench replay, day ${day + 1}`,
       });
     }
-    const queueMs = Date.now() - queueStart;
+    }
+    const queueMs = resumeDraft ? 0 : Date.now() - queueStart;
 
     // ── The real flow, with no shortcuts from here on ────────────────────────
     const draftStart = Date.now();
-    const draft = await api<{
-      id: number;
-      newRoot: string;
-      revocationCalldata: { propertyIds: string[]; reasonCodes: number[]; detailHashes: string[] };
-      deferredRevocations: number;
-    }>('/government/changesets');
-    const draftMs = Date.now() - draftStart;
+    const draft =
+      resumeDraft ??
+      (await api<{
+        id: number;
+        newRoot: string;
+        revocationCalldata: {
+          propertyIds: string[];
+          reasonCodes: number[];
+          detailHashes: string[];
+        };
+        deferredRevocations: number;
+      }>('/government/changesets'));
+    const draftMs = resumeDraft ? 0 : Date.now() - draftStart;
 
     const calldata = draft.revocationCalldata.propertyIds.map((propertyId, i) => ({
       propertyId,
@@ -318,44 +416,10 @@ async function main(): Promise<void> {
         `(${draft.deferredRevocations} deferred) — draft ${draftMs}ms, confirm ${confirmMs}ms, ` +
         `gas ${signed.gasUsed}`,
     );
+    writeReport();
   }
 
-  const totalGas = days.reduce((sum, d) => sum + BigInt(d.gasUsed), 0n);
-  const report = {
-    kind: 'month' as const,
-    at: new Date().toISOString(),
-    assumptions: [
-      'every mutation modelled as a transfer (conservative upper bound)',
-      'transfer proofs measured separately by bench:prove, not generated here',
-    ],
-    transfers: TRANSFERS,
-    revocations: REVOCATIONS,
-    days: DAYS,
-    publishes: days.length,
-    totalGas: totalGas.toString(),
-    peakRssMb: Math.round(peakRssMb),
-    perDay: days,
-    machine: {
-      platform: process.platform,
-      arch: process.arch,
-      cpus: require('os').cpus().length,
-      totalMemGb: Math.round(require('os').totalmem() / 1024 ** 3),
-      node: process.version,
-    },
-  };
-
-  const dir = path.resolve(
-    __dirname,
-    '..',
-    '..',
-    '..',
-    'blockchain',
-    'bench',
-    'results',
-    new Date().toISOString().replace(/[:.]/g, '-'),
-  );
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'month.json'), JSON.stringify(report, null, 2));
+  const totalGas = writeReport();
 
   const confirmTimes = days.map((d) => d.confirmMs).sort((a, b) => a - b);
   console.log('');

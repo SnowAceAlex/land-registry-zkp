@@ -7,6 +7,8 @@ import {
   RootRegistry__factory,
 } from '@land-registry/blockchain/typechain-types';
 import {
+  ATTESTER_ROLE_NAME,
+  AttestationStaple,
   ChainNetwork,
   CircuitType,
   DeploymentRecord,
@@ -71,7 +73,13 @@ const ROOT_CACHE_STALE_MS = 60_000;
 /** A LandRegistryVerifier rejection, decoded from its typed revert (D33). */
 export class ProofRejectedError extends Error {
   constructor(
-    readonly reason: 'InvalidProof' | 'RootMismatch' | 'StaleTimestamp' | 'Unknown',
+    readonly reason:
+      | 'InvalidProof'
+      | 'RootMismatch'
+      | 'StaleTimestamp'
+      | 'AttestationExpired'
+      | 'InvalidAttestation'
+      | 'Unknown',
     message: string,
     readonly details?: Record<string, string>,
   ) {
@@ -89,10 +97,9 @@ export class ChainService implements OnModuleInit {
   private registry!: RootRegistry;
   private verifier!: LandRegistryVerifier;
   private deployment!: DeploymentRecord;
-  private readonly rootCache = new TtlCache<{ root: bigint; version: number }>(
-    ROOT_CACHE_TTL_MS,
-    { staleMs: ROOT_CACHE_STALE_MS },
-  );
+  private readonly rootCache = new TtlCache<{ root: bigint; version: number }>(ROOT_CACHE_TTL_MS, {
+    staleMs: ROOT_CACHE_STALE_MS,
+  });
 
   async onModuleInit(): Promise<void> {
     const network = (process.env.CHAIN_NETWORK ?? 'localhost') as ChainNetwork;
@@ -180,6 +187,13 @@ export class ChainService implements OnModuleInit {
     return this.registry.hasRole(role, account);
   }
 
+  /** Whether an account may sign status attestations (D82). Uncached: a revoked key must stop at once. */
+  async hasAttesterRole(account: string): Promise<boolean> {
+    return this.asServiceUnavailable(() =>
+      this.registry.hasRole(ethers.id(ATTESTER_ROLE_NAME), account),
+    );
+  }
+
   /**
    * The current root and its version, read in ONE pass and cached briefly (D74).
    *
@@ -260,6 +274,7 @@ export class ChainService implements OnModuleInit {
     circuitType: CircuitType,
     proof: Groth16Proof,
     publicSignals: PublicSignals,
+    attestation?: AttestationStaple,
   ): Promise<true> {
     const expected = PUBLIC_SIGNAL_ORDER[circuitType].length;
     if (publicSignals.length !== expected) {
@@ -282,18 +297,31 @@ export class ChainService implements OnModuleInit {
       c as [string, string],
     ] as const;
 
+    // D82: ownership/mortgage carry a status attestation; the contract cannot be asked without one.
+    if (circuitType !== 'transfer' && !attestation) {
+      throw new ProofRejectedError(
+        'InvalidAttestation',
+        `A ${circuitType} proof must carry a status attestation (D82)`,
+      );
+    }
+    const staple = attestation
+      ? ([BigInt(attestation.expiresAt), attestation.signature] as const)
+      : undefined;
+
     try {
       switch (circuitType) {
         case 'ownership':
           await this.verifier.verifyOwnership.staticCall(
             ...args,
             signals as unknown as [bigint, bigint, bigint, bigint],
+            ...staple!,
           );
           break;
         case 'mortgage':
           await this.verifier.verifyMortgage.staticCall(
             ...args,
             signals as unknown as [bigint, bigint, bigint, bigint, bigint],
+            ...staple!,
           );
           break;
         case 'transfer':
@@ -341,6 +369,19 @@ export class ChainService implements OnModuleInit {
           { claimed: claimed.toString(), blockTime: blockTime.toString() },
         );
       }
+      case 'AttestationExpired': {
+        const [expiresAt, blockTime] = parsed.args as unknown as [bigint, bigint];
+        return new ProofRejectedError(
+          'AttestationExpired',
+          'The status attestation has expired — fetch a new one and re-prove (D82)',
+          { expiresAt: expiresAt.toString(), blockTime: blockTime.toString() },
+        );
+      }
+      case 'InvalidAttestation':
+        return new ProofRejectedError(
+          'InvalidAttestation',
+          'The status attestation was not signed by an attester for this proof (D82)',
+        );
       default:
         return new ProofRejectedError(
           'Unknown',

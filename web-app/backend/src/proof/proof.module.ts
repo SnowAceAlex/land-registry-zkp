@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ChainModule } from '../chain/chain.module';
 import { ProofController } from './proof.controller';
 import { ProofService } from './proof.service';
+import { AttestationService } from './attestation.service';
 import { TreeModule } from '../tree/tree.module';
 
 /**
@@ -17,6 +18,6 @@ import { TreeModule } from '../tree/tree.module';
 @Module({
   imports: [TreeModule, ChainModule],
   controllers: [ProofController],
-  providers: [ProofService],
+  providers: [ProofService, AttestationService],
 })
 export class ProofModule {}

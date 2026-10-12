@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {RootRegistry} from "./RootRegistry.sol";
 import {
     IOwnershipVerifier,
@@ -19,7 +21,13 @@ import {
  *              TIMESTAMP_TOLERANCE_SECONDS of block.timestamp (D9/D26) — the
  *              timestamp is a prover-chosen public input, so without this check
  *              a proof generated back when an expired title was still valid
- *              verifies perfectly.
+ *              verifies perfectly,
+ *           4. (ownership and mortgage only) requires an unexpired EIP-712
+ *              status attestation over (propertyId, ownerCommitment, root),
+ *              signed by an ATTESTER_ROLE account (D82). The backend refuses to
+ *              sign while the plot has an open procedure, which closes the
+ *              window between the counter and the change set without a
+ *              per-procedure transaction.
  *         On success it returns true; on any failure it reverts with a typed
  *         error so callers can tell WHY a proof was rejected.
  *
@@ -38,7 +46,7 @@ import {
  *     5   | —               | —                        | currentTimestamp
  *     6   | —               | —                        | minRequiredRemainingTerm
  */
-contract LandRegistryVerifier {
+contract LandRegistryVerifier is EIP712 {
     // -------------------------------------------------------------------------
     // Configuration
     // -------------------------------------------------------------------------
@@ -54,6 +62,15 @@ contract LandRegistryVerifier {
     ///         convention and cross-checked in the Hardhat tests (D26).
     uint256 public constant TIMESTAMP_TOLERANCE_SECONDS = 600;
 
+    /// @notice Longest attestation validity accepted (D82); mirrors ATTESTATION_TTL_SECONDS
+    ///         in shared/statusAttestation.ts. Caps what a leaked attester key can sign.
+    uint256 public constant ATTESTATION_TTL_SECONDS = 600;
+
+    bytes32 public constant STATUS_ATTESTATION_TYPEHASH =
+        keccak256(
+            "StatusAttestation(uint256 propertyId,uint256 ownerCommitment,uint256 merkleRoot,uint64 expiresAt)"
+        );
+
     // Public-signal indices (D21) — see the table in the contract natspec.
     uint256 internal constant OWNERSHIP_ROOT_INDEX = 0;
     uint256 internal constant OWNERSHIP_TIMESTAMP_INDEX = 3;
@@ -61,6 +78,10 @@ contract LandRegistryVerifier {
     uint256 internal constant MORTGAGE_TIMESTAMP_INDEX = 3;
     uint256 internal constant TRANSFER_OLD_ROOT_INDEX = 0;
     uint256 internal constant TRANSFER_TIMESTAMP_INDEX = 5;
+    uint256 internal constant OWNERSHIP_PROPERTY_ID_INDEX = 1;
+    uint256 internal constant OWNERSHIP_COMMITMENT_INDEX = 2;
+    uint256 internal constant MORTGAGE_PROPERTY_ID_INDEX = 1;
+    uint256 internal constant MORTGAGE_COMMITMENT_INDEX = 2;
 
     // -------------------------------------------------------------------------
     // Errors
@@ -72,6 +93,11 @@ contract LandRegistryVerifier {
     error RootMismatch(bytes32 expected, bytes32 actual);
     /// @notice The proof's currentTimestamp is outside the tolerance window (replay guard).
     error StaleTimestamp(uint256 claimed, uint256 blockTime);
+    /// @notice D82: the status attestation has expired.
+    error AttestationExpired(uint64 expiresAt, uint256 blockTime);
+    /// @notice D82: the attestation's signer is not an attester, its signature does not
+    ///         match this proof, or its expiry is longer than ATTESTATION_TTL_SECONDS.
+    error InvalidAttestation();
     /// @notice A constructor dependency was the zero address.
     error ZeroAddressDependency();
 
@@ -84,7 +110,7 @@ contract LandRegistryVerifier {
         IOwnershipVerifier _ownershipVerifier,
         IMortgageVerifier _mortgageVerifier,
         ITransferVerifier _transferVerifier
-    ) {
+    ) EIP712("LandRegistryVerifier", "1") {
         // These four are immutable: a zero address here cannot be corrected
         // afterwards, only redeployed around. Every verify* call would revert on
         // the call to a non-contract, with no hint as to which dependency was
@@ -116,11 +142,20 @@ contract LandRegistryVerifier {
         uint[2] calldata a,
         uint[2][2] calldata b,
         uint[2] calldata c,
-        uint[4] calldata pubSignals
+        uint[4] calldata pubSignals,
+        uint64 attestationExpiresAt,
+        bytes calldata attestationSignature
     ) external view returns (bool) {
         if (!ownershipVerifier.verifyProof(a, b, c, pubSignals)) revert InvalidProof();
         _requireLatestRoot(pubSignals[OWNERSHIP_ROOT_INDEX]);
         _requireFreshTimestamp(pubSignals[OWNERSHIP_TIMESTAMP_INDEX]);
+        _requireAttested(
+            pubSignals[OWNERSHIP_PROPERTY_ID_INDEX],
+            pubSignals[OWNERSHIP_COMMITMENT_INDEX],
+            pubSignals[OWNERSHIP_ROOT_INDEX],
+            attestationExpiresAt,
+            attestationSignature
+        );
         return true;
     }
 
@@ -135,11 +170,20 @@ contract LandRegistryVerifier {
         uint[2] calldata a,
         uint[2][2] calldata b,
         uint[2] calldata c,
-        uint[5] calldata pubSignals
+        uint[5] calldata pubSignals,
+        uint64 attestationExpiresAt,
+        bytes calldata attestationSignature
     ) external view returns (bool) {
         if (!mortgageVerifier.verifyProof(a, b, c, pubSignals)) revert InvalidProof();
         _requireLatestRoot(pubSignals[MORTGAGE_ROOT_INDEX]);
         _requireFreshTimestamp(pubSignals[MORTGAGE_TIMESTAMP_INDEX]);
+        _requireAttested(
+            pubSignals[MORTGAGE_PROPERTY_ID_INDEX],
+            pubSignals[MORTGAGE_COMMITMENT_INDEX],
+            pubSignals[MORTGAGE_ROOT_INDEX],
+            attestationExpiresAt,
+            attestationSignature
+        );
         return true;
     }
 
@@ -186,5 +230,46 @@ contract LandRegistryVerifier {
         if (drift > TIMESTAMP_TOLERANCE_SECONDS) {
             revert StaleTimestamp(claimed, block.timestamp);
         }
+    }
+
+    /// @notice The EIP-712 digest an attester signs (D82); exposed for parity tests.
+    function attestationDigest(
+        uint256 propertyId,
+        uint256 ownerCommitment,
+        uint256 merkleRoot,
+        uint64 expiresAt
+    ) public view returns (bytes32) {
+        return
+            _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        STATUS_ATTESTATION_TYPEHASH,
+                        propertyId,
+                        ownerCommitment,
+                        merkleRoot,
+                        expiresAt
+                    )
+                )
+            );
+    }
+
+    /// @dev Last check (D82). Not used by verifyTransfer — approve() verifies a
+    ///      transfer while its own procedure is open.
+    function _requireAttested(
+        uint256 propertyId,
+        uint256 ownerCommitment,
+        uint256 merkleRoot,
+        uint64 expiresAt,
+        bytes calldata signature
+    ) internal view {
+        if (block.timestamp > expiresAt) revert AttestationExpired(expiresAt, block.timestamp);
+        if (expiresAt > block.timestamp + ATTESTATION_TTL_SECONDS) revert InvalidAttestation();
+
+        (address signer, ECDSA.RecoverError err, ) = ECDSA.tryRecoverCalldata(
+            attestationDigest(propertyId, ownerCommitment, merkleRoot, expiresAt),
+            signature
+        );
+        if (err != ECDSA.RecoverError.NoError) revert InvalidAttestation();
+        if (!registry.hasRole(registry.ATTESTER_ROLE(), signer)) revert InvalidAttestation();
     }
 }

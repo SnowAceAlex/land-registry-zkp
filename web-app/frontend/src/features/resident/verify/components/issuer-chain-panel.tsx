@@ -9,20 +9,16 @@
  *    a claim this build cannot make, and it is the most load-bearing claim on
  *    the page. `verifyReceipt.ts` makes the same distinction on the Node side.
  *
- * The receipt input is optional and visibly secondary, with the disclosure
- * warning attached: a receipt reveals the whole certificate, including the term
- * and encumbrance that mortgage.circom exists to hide. The identity check and
- * selective disclosure genuinely pull against each other here, and the screen
- * says which persona should accept that trade.
+ * Rendered on the agency tab only: a receipt reveals the whole certificate,
+ * including the term and encumbrance mortgage.circom exists to hide, so the
+ * standard tab (buyer, bank) never asks for one.
  */
 
-import { Check, CircleHelp, CircleSlash, FileText, X } from 'lucide-react';
+import { Check, CircleHelp, CircleSlash, LoaderCircle, X } from 'lucide-react';
 
 import type { Dictionary } from '@/i18n/dictionaries';
-import { format } from '@/i18n/format';
 import { HashText } from '@/components/ui/hash-text';
 import { Notice } from '@/components/ui/notice';
-import { buttonStyles } from '@/components/ui/button';
 
 import type { IssuerChainReport, IssuerLink, LinkState } from '../lib/issuer-chain';
 
@@ -50,13 +46,14 @@ function formatDate(date: Date | undefined): string {
 export function IssuerChainPanel({
   report,
   contractMatches,
-  onChooseReceipt,
+  pending,
   t,
 }: {
   report: IssuerChainReport | null;
   /** Whether receipt.contractAddress matches the registry this page reads. */
   contractMatches: boolean | undefined;
-  onChooseReceipt: () => void;
+  /** The check is still running; a null report afterwards means it could not run. */
+  pending: boolean;
   t: Strings;
 }) {
   return (
@@ -65,17 +62,14 @@ export function IssuerChainPanel({
       <p className="max-w-3xl text-xs leading-relaxed text-steel">{t.issuerBody}</p>
 
       {report === null ? (
-        <div className="space-y-3">
-          <Notice tone="info" title={t.issuerNeedsReceipt}>
-            {t.issuerReceiptDisclosureWarning}
-          </Notice>
-          <button type="button" className={buttonStyles.secondary} onClick={onChooseReceipt}>
-            <span className="inline-flex items-center gap-2">
-              <FileText className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-              {t.chooseReceipt}
-            </span>
-          </button>
-        </div>
+        pending ? (
+          <p className="inline-flex items-center gap-2 text-sm text-steel">
+            <LoaderCircle className="h-4 w-4 animate-spin" strokeWidth={1.75} aria-hidden />
+            {t.issuerChecking}
+          </p>
+        ) : (
+          <p className="text-sm text-steel">{t.issuerNotChecked}</p>
+        )
       ) : (
         <div className="space-y-3">
           <dl className="divide-y divide-hairline rounded-lg border border-hairline bg-surface px-4">
@@ -107,7 +101,7 @@ export function IssuerChainPanel({
                   <div className="min-w-0">
                     <p className="text-ink">{t[LINKS[link]]}</p>
                     {link === 'certificate' ? (
-                      <CertificateNote state={state} issuedBy={report.issuedBy} t={t} />
+                      <CertificateNote state={state} t={t} />
                     ) : null}
                   </div>
                 </li>
@@ -131,21 +125,17 @@ export function IssuerChainPanel({
 /** Who issued the certificate — or why that could not be said. */
 function CertificateNote({
   state,
-  issuedBy,
   t,
 }: {
   state: LinkState;
-  issuedBy: string | undefined;
   t: Strings;
 }) {
   const text =
-    state === 'pass' && issuedBy
-      ? format(t.link_certificateIssuedBy, { issuer: issuedBy })
-      : state === 'fail'
-        ? t.link_certificateRejected
-        : state === 'not-verifiable'
-          ? t.link_certificateNoAnchor
-          : null;
+    state === 'fail'
+      ? t.link_certificateRejected
+      : state === 'not-verifiable'
+        ? t.link_certificateNoAnchor
+        : null;
 
   return text ? <p className="mt-1 text-xs leading-relaxed text-steel">{text}</p> : null;
 }

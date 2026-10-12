@@ -1,8 +1,9 @@
 /**
  * scripts/tools/ownerSmoke.ts
  * ─────────────────────────────────────────────────────────────────────────────
- * Plays a land owner against the Phase 6 API: refresh the Merkle proof, prove
- * ownership and clean title, have the registry verify both.
+ * Plays a land owner against the Phase 6 API: refresh the Merkle proof, fetch
+ * the status attestation (D82), prove ownership and clean title, have the
+ * registry verify both.
  *
  * This is the Node twin of what the Phase 8 owner dashboard will do in the
  * browser, written first on purpose — it proves the whole owner path end to end
@@ -57,6 +58,17 @@ interface VerifyResult {
   reason?: string;
   message?: string;
 }
+
+/** What GET /api/proof/:propertyId/attestation returns (D82). */
+interface AttestationResponse {
+  expiresAt: string;
+  signature: string;
+  attester: string;
+  /** Present on a 409 instead. */
+  reason?: string;
+}
+
+type Staple = { expiresAt: string; signature: string };
 
 /** Seconds of remaining term the owner chooses to prove they still have (D16). */
 const MORTGAGE_THRESHOLD = BigInt(process.env.MIN_REMAINING_TERM ?? String(5 * 365 * 24 * 60 * 60));
@@ -120,10 +132,19 @@ async function main(): Promise<void> {
   };
   const ownerSecret = BigInt(secret.ownerSecret);
 
+  // ── 1b. Status attestation: the registry vouches no procedure is open (D82)
+  const attestation = await getOrAbort<AttestationResponse>(
+    `/proof/${propertyId}/attestation`,
+    'fetch status attestation',
+  );
+  const staple: Staple = { expiresAt: attestation.expiresAt, signature: attestation.signature };
+  report.pass('registry signed a status attestation', `by ${attestation.attester}`);
+
   // ── 2. Ownership — "I hold this property and it is not expired" ────────────
   const ownership = await proveAndVerify(
     'ownership',
     buildOwnershipInput({ record, ownerSecret, proof: proofData, currentTimestamp: now() }),
+    staple,
     report,
   );
 
@@ -137,6 +158,7 @@ async function main(): Promise<void> {
       currentTimestamp: now(),
       minRequiredRemainingTerm: MORTGAGE_THRESHOLD,
     }),
+    staple,
     report,
   );
 
@@ -156,6 +178,7 @@ async function main(): Promise<void> {
       circuitType: 'ownership',
       proof: ownership.proof,
       publicSignals: ownership.publicSignals,
+      attestation: staple,
       onChain: true,
     });
 
@@ -195,6 +218,7 @@ async function main(): Promise<void> {
   const staleResult = await postJson<VerifyResult>('/proof/verify', {
     proof: stale.proof,
     publicSignals: stale.publicSignals,
+    attestation: staple,
   });
   report.check(
     staleResult.status === 422 && staleResult.body.reason === 'StaleTimestamp',
@@ -202,6 +226,20 @@ async function main(): Promise<void> {
     'HTTP 422 StaleTimestamp',
     `HTTP ${staleResult.status} ${staleResult.body?.reason ?? ''} — a replayed proof was ACCEPTED`,
   );
+
+  // ── 6. Without the attestation the same good proof is refused (D82) ────────
+  if (ownership) {
+    const bare = await postJson<VerifyResult>('/proof/verify', {
+      proof: ownership.proof,
+      publicSignals: ownership.publicSignals,
+    });
+    report.check(
+      bare.status === 422 && bare.body.reason === 'InvalidAttestation',
+      'a proof without its status attestation is rejected',
+      'HTTP 422 InvalidAttestation',
+      `HTTP ${bare.status} ${bare.body?.reason ?? ''} — an unattested proof was ACCEPTED`,
+    );
+  }
 
   // snarkjs leaves worker threads alive; without this the script never exits.
   process.exit(report.summarise());
@@ -256,6 +294,7 @@ async function prove(
 async function proveAndVerify(
   circuitType: CircuitType,
   input: ProofInput,
+  attestation: Staple,
   report: CheckReport,
 ): Promise<
   { proof: unknown; publicSignals: string[]; disclosed: Record<string, string> } | undefined
@@ -263,7 +302,11 @@ async function proveAndVerify(
   const { proof, publicSignals, ms } = await prove(circuitType, input);
   console.log(`${circuitType.padEnd(9)} proof generated in ${ms} ms`);
 
-  const verified = await postJson<VerifyResult>('/proof/verify', { proof, publicSignals });
+  const verified = await postJson<VerifyResult>('/proof/verify', {
+    proof,
+    publicSignals,
+    attestation,
+  });
   if (verified.status !== 200 || !verified.body.valid) {
     report.fail(
       `registry verifies the ${circuitType} proof`,

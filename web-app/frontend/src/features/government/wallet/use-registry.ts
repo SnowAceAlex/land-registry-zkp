@@ -65,14 +65,28 @@ export function useRegistryChain(target: RegistryTarget | undefined) {
   };
 }
 
+/** Wait for a transaction's block; a mined-but-reverted transaction is a failure. */
+function useWaitMined() {
+  const config = useConfig();
+  return useCallback(
+    async (target: RegistryTarget, hash: Hex): Promise<void> => {
+      const receipt = await waitForTransactionReceipt(config, { hash, chainId: target.chainId });
+      if (receipt.status !== 'success') {
+        throw new Error(`Transaction ${hash} was mined but reverted`);
+      }
+    },
+    [config],
+  );
+}
+
 /**
  * Publish a draft's root from the connected wallet. Split in two so the screen
  * can tell "waiting for the wallet" from "waiting for the block": `send` resolves
  * once the officer signs, `waitMined` once the transaction is in a block.
  */
 export function usePublishDraft() {
-  const config = useConfig();
   const { writeContractAsync } = useWriteContract();
+  const waitMined = useWaitMined();
 
   const send = useCallback(
     async (target: RegistryTarget, draft: OpenDraft): Promise<Hex> => {
@@ -87,16 +101,6 @@ export function usePublishDraft() {
           });
     },
     [writeContractAsync],
-  );
-
-  const waitMined = useCallback(
-    async (target: RegistryTarget, hash: Hex): Promise<void> => {
-      const receipt = await waitForTransactionReceipt(config, { hash, chainId: target.chainId });
-      if (receipt.status !== 'success') {
-        throw new Error(`Transaction ${hash} was mined but reverted`);
-      }
-    },
-    [config],
   );
 
   return { send, waitMined };

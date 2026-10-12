@@ -34,6 +34,7 @@ import {
 import { ChainService, ProofRejectedError } from '../chain/chain.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProofService } from './proof.service';
+import { AttestationService } from './attestation.service';
 import { NodeStoreService } from '../tree/node-store.service';
 import { VerifyProofDto } from './dto/proof.dto';
 import { makeProperty } from '../../test/factories';
@@ -76,6 +77,8 @@ interface Harness {
   service: ProofService;
   proofFor: jest.Mock;
   verifyOnChain: jest.Mock;
+  /** AttestationService.verifyStaple — its own logic is attestation.service.spec. */
+  verifyStaple: jest.Mock;
 }
 
 /**
@@ -119,8 +122,15 @@ async function makeService(
     rootRegistryAddress: REGISTRY_ADDRESS,
     verifyOnChain,
   } as unknown as ChainService;
+  const verifyStaple = jest.fn().mockResolvedValue(undefined);
+  const attestations = { verifyStaple } as unknown as AttestationService;
 
-  return { service: new ProofService(prisma, nodes, chain), proofFor, verifyOnChain };
+  return {
+    service: new ProofService(prisma, nodes, chain, attestations),
+    proofFor,
+    verifyOnChain,
+    verifyStaple,
+  };
 }
 
 /** Public signals for an ownership proof, fresh and against `root` by default. */
@@ -272,9 +282,9 @@ describe('ProofService.conditionalProof — the validator is guessable (D74)', (
     // that does not exist.
     const { service } = await makeService(null, 1n);
 
-    await expect(
-      service.conditionalProof('999999', `"v${CHAIN_VERSION}-p999999"`),
-    ).rejects.toThrow(NotFoundException);
+    await expect(service.conditionalProof('999999', `"v${CHAIN_VERSION}-p999999"`)).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('410s a revoked plot even with the current validator — the one that matters', async () => {
@@ -307,10 +317,13 @@ describe('ProofService.conditionalProof — the validator is guessable (D74)', (
 describe('ProofService.verify', () => {
   const ROOT = 12345n;
 
+  const STAPLE = { expiresAt: '1790000000', signature: '0xabc' };
+
   function dto(overrides: Partial<VerifyProofDto> = {}): VerifyProofDto {
     return {
       proof: PROOF,
       publicSignals: ownershipSignals(ROOT),
+      attestation: STAPLE,
       ...overrides,
     } as VerifyProofDto;
   }
@@ -326,6 +339,7 @@ describe('ProofService.verify', () => {
       cryptographic: true,
       freshness: true,
       rootMatchesChain: true,
+      statusAttested: true,
       onChain: null,
     });
     // The disclosed set IS the selective disclosure — it must be exactly the
@@ -393,7 +407,7 @@ describe('ProofService.verify', () => {
 
     const result = await service.verify(dto({ onChain: true }));
 
-    expect(verifyOnChain).toHaveBeenCalledWith('ownership', PROOF, expect.any(Array));
+    expect(verifyOnChain).toHaveBeenCalledWith('ownership', PROOF, expect.any(Array), STAPLE);
     expect(result.checks.onChain).toBe(true);
   });
 
@@ -415,5 +429,52 @@ describe('ProofService.verify', () => {
 
     await expect(service.verify(dto())).rejects.toThrow(ServiceUnavailableException);
     await expect(service.verify(dto())).rejects.not.toThrow(UnprocessableEntityException);
+  });
+
+  it('rejects with the attestation reason as a 422 (D82)', async () => {
+    const { service, verifyStaple } = await makeService(null, ROOT);
+    verifyStaple.mockRejectedValue(
+      new ProofRejectedError('AttestationExpired', 'expired', { expiresAt: '1' }),
+    );
+
+    await expect(service.verify(dto())).rejects.toMatchObject({
+      response: { reason: 'AttestationExpired', valid: false, details: { expiresAt: '1' } },
+    });
+  });
+
+  it('hands the stapled attestation to the attestation check', async () => {
+    const { service, verifyStaple } = await makeService(null, ROOT);
+
+    await service.verify(dto());
+
+    expect(verifyStaple).toHaveBeenCalledWith('ownership', expect.any(Array), STAPLE);
+  });
+
+  it('reports RootMismatch before the attestation — the same order as the contract', async () => {
+    const { service, verifyStaple } = await makeService(null, ROOT);
+    verifyStaple.mockRejectedValue(new ProofRejectedError('InvalidAttestation', 'bad'));
+
+    await expect(
+      service.verify(dto({ publicSignals: ownershipSignals(999n) })),
+    ).rejects.toMatchObject({ response: { reason: 'RootMismatch' } });
+    expect(verifyStaple).not.toHaveBeenCalled();
+  });
+
+  it('does not ask a transfer proof for an attestation, as verifyTransfer does not', async () => {
+    const { service, verifyStaple } = await makeService(null, ROOT);
+    const transfer = [
+      ROOT.toString(),
+      '6',
+      '1',
+      makeProperty().ownerCommitment!,
+      '7',
+      nowUnixTimestamp().toString(),
+      '0',
+    ];
+
+    const result = await service.verify(dto({ publicSignals: transfer, attestation: undefined }));
+
+    expect(result.checks.statusAttested).toBeNull();
+    expect(verifyStaple).not.toHaveBeenCalled();
   });
 });

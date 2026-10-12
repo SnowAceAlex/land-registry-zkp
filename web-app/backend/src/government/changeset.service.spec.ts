@@ -159,9 +159,12 @@ describe('ChangeSetService (D44)', () => {
       transfers: [],
       revocations: [],
     });
-    const chain = { getLatestRoot: jest.fn().mockResolvedValue(999n),
+    const chain = {
+      getLatestRoot: jest.fn().mockResolvedValue(999n),
       // D74 — confirm() always asks the chain itself, never the 2s cache.
-      invalidateRootCache: jest.fn(), getRootVersion: jest.fn() };
+      invalidateRootCache: jest.fn(),
+      getRootVersion: jest.fn(),
+    };
     const service = new ChangeSetService(
       prisma,
       {} as never,
@@ -205,7 +208,6 @@ describe('ChangeSetService (D44)', () => {
       ],
     };
 
-
     const prisma = {
       changeSet: {
         findUnique: jest.fn().mockResolvedValue(draft),
@@ -246,7 +248,9 @@ describe('ChangeSetService (D44)', () => {
     });
     const nodes = { projectRoot, applyStatements, proofInOverlay };
     const issuance = {
-      batchContext: jest.fn().mockReturnValue({ issuer: {}, issuedOn: '2026-09-24T10:00:00+07:00' }),
+      batchContext: jest
+        .fn()
+        .mockReturnValue({ issuer: {}, issuedOn: '2026-09-24T10:00:00+07:00' }),
       buildBundleFiles: jest.fn().mockResolvedValue({
         files: [{ name: 'receipt.json', content: '{}' }],
       }),
@@ -285,7 +289,7 @@ describe('ChangeSetService (D44)', () => {
     };
   }
 
-  it("confirm writes only the plots this round touched — nobody else needs a write", async () => {
+  it('confirm writes only the plots this round touched — nobody else needs a write', async () => {
     const { service, propertyUpdate, applyStatements } = buildConfirmScenario();
 
     await service.confirm(9);
@@ -499,7 +503,12 @@ describe('ChangeSetService (D44)', () => {
       changeSetId: null,
       createdAt: new Date(Date.UTC(2026, 8, 1, 0, id)),
     });
-    const transfer = { id: 11, propertyId: '5005', newOwnerCommitment: '999', newOwnerSecret: '43' };
+    const transfer = {
+      id: 11,
+      propertyId: '5005',
+      newOwnerCommitment: '999',
+      newOwnerSecret: '43',
+    };
 
     function scenario(pendingRevocations: ReturnType<typeof revocation>[]) {
       const create = jest.fn(async () => ({
@@ -517,9 +526,7 @@ describe('ChangeSetService (D44)', () => {
         // The transferred plot has to exist as a full row: its leaf is
         // re-hashed from it, with only ownerCommitment replaced.
         property: {
-          findMany: jest
-            .fn()
-            .mockResolvedValue([propertyRow({ propertyId: transfer.propertyId })]),
+          findMany: jest.fn().mockResolvedValue([propertyRow({ propertyId: transfer.propertyId })]),
         },
       } as never;
       const projectRoot = jest.fn().mockResolvedValue(overlayOf(777n));
@@ -650,9 +657,11 @@ describe('ChangeSetService.createDraft — duplicate queue entries', () => {
     const prisma = {
       transferRequest: { findMany: jest.fn().mockResolvedValue(transfers) },
       revocation: {
-        findMany: jest.fn().mockResolvedValue(
-          revocations.map((r) => ({ ...r, reasonCode: 1, detailHash: '0xaa', detailText: 'x' })),
-        ),
+        findMany: jest
+          .fn()
+          .mockResolvedValue(
+            revocations.map((r) => ({ ...r, reasonCode: 1, detailHash: '0xaa', detailText: 'x' })),
+          ),
       },
       changeSet: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       property: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
@@ -735,7 +744,11 @@ describe('ChangeSetService — a transfer may not resurrect a revoked plot (D45/
     const transaction = jest.fn().mockResolvedValue([]);
     const prisma = {
       transferRequest: { findMany: jest.fn().mockResolvedValue([transfer]), update: jest.fn() },
-      revocation: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn(), count: jest.fn() },
+      revocation: {
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn(),
+        count: jest.fn(),
+      },
       changeSet: {
         create,
         findUnique: jest.fn().mockResolvedValue({
@@ -765,8 +778,8 @@ describe('ChangeSetService — a transfer may not resurrect a revoked plot (D45/
       } as never,
       {
         getLatestRoot: jest.fn().mockResolvedValue(555n),
-      // D74 — confirm() always asks the chain itself, never the 2s cache.
-      invalidateRootCache: jest.fn(),
+        // D74 — confirm() always asks the chain itself, never the 2s cache.
+        invalidateRootCache: jest.fn(),
         getRootVersion: jest.fn().mockResolvedValue(9),
       } as never,
       { recordRootStatement: jest.fn() } as never,
@@ -797,9 +810,11 @@ describe('ChangeSetService — buyer secrets and the archive (D77)', () => {
   it('createDraft refuses transfers submitted before D77 and names them', async () => {
     const prisma = {
       transferRequest: {
-        findMany: jest.fn().mockResolvedValue([
-          { id: 5, propertyId: '7', newOwnerCommitment: '1', newOwnerSecret: null },
-        ]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { id: 5, propertyId: '7', newOwnerCommitment: '1', newOwnerSecret: null },
+          ]),
       },
       revocation: { findMany: jest.fn().mockResolvedValue([]) },
       changeSet: { create: jest.fn() },

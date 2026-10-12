@@ -14,7 +14,8 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
  *
  * Access Control:
  *  - DEFAULT_ADMIN_ROLE (OZ built-in): can grant / revoke roles
- *  - STATE_AUTHORITY_ROLE: can call publishRoot()
+ *  - STATE_AUTHORITY_ROLE: can call publishRoot*()
+ *  - ATTESTER_ROLE: signs status attestations off-chain (D82); writes nothing here
  */
 contract RootRegistry is AccessControl {
     // -------------------------------------------------------------------------
@@ -23,6 +24,10 @@ contract RootRegistry is AccessControl {
 
     /// @notice Role granted to state authority accounts that can publish new Merkle roots.
     bytes32 public constant STATE_AUTHORITY_ROLE = keccak256("STATE_AUTHORITY_ROLE");
+
+    /// @notice D82: the backend key whose EIP-712 status attestations LandRegistryVerifier
+    ///         accepts. Granted by the admin via grantRole; it cannot publish roots.
+    bytes32 public constant ATTESTER_ROLE = keccak256("ATTESTER_ROLE");
 
     // -------------------------------------------------------------------------
     // State

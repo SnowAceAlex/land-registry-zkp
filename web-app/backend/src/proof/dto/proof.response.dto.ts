@@ -100,6 +100,13 @@ export class ProofChecksDto {
   @ApiProperty({ example: true })
   rootMatchesChain!: boolean;
 
+  /**
+   * The stapled status attestation is unexpired and signed by an ATTESTER_ROLE
+   * account for this proof (D82); null for a transfer proof.
+   */
+  @ApiPropertyOptional({ example: true, nullable: true })
+  statusAttested!: boolean | null;
+
   /** LandRegistryVerifier's own verdict; null when `onChain` was not requested. */
   @ApiPropertyOptional({ example: null, nullable: true })
   onChain!: boolean | null;
@@ -108,8 +115,9 @@ export class ProofChecksDto {
 export class VerifyProofResponseDto {
   /**
    * Always true on a 200 — a rejected proof is a 422 carrying `reason`
-   * (InvalidProof / RootMismatch / StaleTimestamp, the same taxonomy the
-   * contract reverts with, D33). Kept so a client can branch on one field
+   * (InvalidProof / RootMismatch / StaleTimestamp / AttestationExpired /
+   * InvalidAttestation, the same
+   * taxonomy the contract reverts with, D33). Kept so a client can branch on one field
    * regardless of which layer answered.
    */
   @ApiProperty({ example: true })

@@ -149,6 +149,18 @@ export class TransfersService {
       );
     }
 
+    // D80: one open procedure per plot — the first one in wins (D82 keeps this rule).
+    const revocation = await this.prisma.revocation.findFirst({
+      where: { propertyId: property.propertyId, status: 'PENDING' },
+    });
+    if (revocation) {
+      throw new ConflictException(
+        `Property ${property.propertyId} has a pending revocation (#${revocation.id}) and ` +
+          `cannot be transferred while it is open`,
+      );
+    }
+
+    // D82: this insert is also the lock — from here on the seller gets no status attestation.
     const created = await this.prisma.transferRequest.create({
       data: {
         propertyId: dto.propertyId,

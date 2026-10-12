@@ -16,6 +16,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBody,
+  ApiConflictResponse,
   ApiConsumes,
   ApiOkResponse,
   ApiOperation,
@@ -225,6 +226,11 @@ export class GovernmentController {
 
   @Post('revocations')
   @ApiOperation({ summary: 'Request revocation of an issued certificate' })
+  @ApiConflictResponse({
+    description:
+      'The plot already has a pending revocation, or an open transfer (one procedure per plot, ' +
+      'D80). Once recorded, the owner gets no status attestation until it closes (D82)',
+  })
   async requestRevocation(@Body() dto: CreateRevocationDto) {
     return this.revocations.request(dto);
   }
@@ -248,6 +254,10 @@ export class GovernmentController {
       'TransferRequest or Revocation row is modified until confirm. Sign the returned newRoot ' +
       '(and, when the round includes any revocations, the revocationCalldata for ' +
       'publishRootWithRevocations) with Metamask, then call confirm.',
+  })
+  @ApiConflictResponse({
+    description:
+      'Another draft is already open (D44), or the queue holds conflicting procedures for one plot',
   })
   async createChangeSetDraft() {
     return this.changeSets.createDraft();

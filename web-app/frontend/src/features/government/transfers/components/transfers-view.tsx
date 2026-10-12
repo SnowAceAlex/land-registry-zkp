@@ -17,6 +17,7 @@
  *     transfer's proof has gone stale against a newer root.
  *  5. The buyer's secret is generated at the counter and must be downloaded
  *     before submit; the buyer's receipt is downloaded once PUBLISHED (D51).
+ *  6. D82: no wallet step at the counter — the submitted request is the lock (status attestation).
  */
 import type { Dictionary } from '@/i18n/dictionaries';
 import { PageHeader } from '@/components/ui/page-header';

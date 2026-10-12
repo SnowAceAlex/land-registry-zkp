@@ -9,6 +9,9 @@
  * stays in the database, off the public history too (D48). "Revoked over an
  * inheritance dispute" published permanently is a different matter from a
  * revoked diploma.
+ *
+ * No wallet step: the recorded request is itself the lock — while it is open the
+ * owner gets no status attestation, so no proof of theirs is accepted (D82).
  */
 
 import { useState } from 'react';
@@ -72,7 +75,11 @@ export function RevocationForm({
   }
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-4 rounded-xl border border-hairline bg-white p-5 sm:p-6">
+    <form
+      onSubmit={submit}
+      noValidate
+      className="space-y-4 rounded-xl border border-hairline bg-white p-5 sm:p-6"
+    >
       <div>
         <h2 className="font-medium text-ink">{t.revokeTitle}</h2>
         <p className="mt-1 max-w-prose text-sm text-steel">{t.revokeBody}</p>

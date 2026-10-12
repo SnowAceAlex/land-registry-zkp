@@ -200,7 +200,8 @@ function DraftSummary({ draft, t }: { draft: ChangeSetDraftDetail; t: Strings })
           <ul className="mt-1 space-y-0.5 text-xs text-steel">
             {propertyIds.map((propertyId, index) => (
               <li key={propertyId}>
-                <span className="font-mono text-ink">{propertyId}</span> — {reasonLabel(t, reasonCodes[index])}
+                <span className="font-mono text-ink">{propertyId}</span> —{' '}
+                {reasonLabel(t, reasonCodes[index])}
               </li>
             ))}
           </ul>
@@ -247,7 +248,12 @@ function PendingQueue({
             <p className="mt-1 text-sm text-steel">{format(t.capNote, { cap: revocationCap })}</p>
           ) : null}
         </div>
-        <button type="button" className={buttonStyles.primary} disabled={creating} onClick={onCreate}>
+        <button
+          type="button"
+          className={buttonStyles.primary}
+          disabled={creating}
+          onClick={onCreate}
+        >
           {creating ? (
             <>
               <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
@@ -268,10 +274,18 @@ function PendingQueue({
             <table className="w-full min-w-[36rem] text-left text-sm">
               <thead className="border-b border-hairline text-xs text-steel">
                 <tr>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colRequest}</th>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colProperty}</th>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colBuyer}</th>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colApproved}</th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colRequest}
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colProperty}
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colBuyer}
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colApproved}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-whisper">
@@ -310,11 +324,21 @@ function PendingQueue({
             <table className="w-full min-w-[48rem] text-left text-sm">
               <thead className="border-b border-hairline text-xs text-steel">
                 <tr>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colProperty}</th>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colReason}</th>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colDetail}</th>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colDetailHash}</th>
-                  <th scope="col" className="px-4 py-2 font-medium">{t.colRequested}</th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colProperty}
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colReason}
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colDetail}
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colDetailHash}
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    {t.colRequested}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-whisper">
@@ -322,7 +346,9 @@ function PendingQueue({
                   <tr key={revocation.id} className="align-top">
                     <td className="px-4 py-2 font-mono text-xs">{revocation.propertyId}</td>
                     <td className="px-4 py-2">{reasonLabel(t, revocation.reasonCode)}</td>
-                    <td className="max-w-[16rem] px-4 py-2 break-words text-ink">{revocation.detailText}</td>
+                    <td className="max-w-[16rem] px-4 py-2 break-words text-ink">
+                      {revocation.detailText}
+                    </td>
                     <td className="px-4 py-2">
                       <HashText value={revocation.detailHash} />
                     </td>

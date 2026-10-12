@@ -14,6 +14,9 @@
  * The seller's secret lives only in this component's state and is dropped as
  * soon as the request is submitted or the officer starts over. The buyer's
  * exists here only for the length of proveAndSubmit().
+ *
+ * No wallet step: the submit itself is the lock — from that insert on, the
+ * seller gets no status attestation and so no accepted proof (D82).
  */
 
 import { useState } from 'react';
@@ -33,7 +36,11 @@ import { type Failure, apiFailure } from '../../api/error-message';
 import { useOpenDraft } from '../../api/hooks';
 import type { PropertyDetail } from '../../api/types';
 import { getPropertyDetail, previewTransfer, submitTransfer } from '../api';
-import { type SellerCheckIssue, type SellerCheckResult, checkSellerBundle } from '../lib/seller-check';
+import {
+  type SellerCheckIssue,
+  type SellerCheckResult,
+  checkSellerBundle,
+} from '../lib/seller-check';
 import { MAX_TERM_YEARS, parseTermYears, yearsToSeconds } from '@/lib/term';
 import { buildCounterTransferInput } from '../lib/transfer-witness';
 
@@ -122,7 +129,10 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
       try {
         proved = await generateProof('transfer', input);
       } catch (error) {
-        setFailure({ title: t.proveFailed, detail: error instanceof Error ? error.message : String(error) });
+        setFailure({
+          title: t.proveFailed,
+          detail: error instanceof Error ? error.message : String(error),
+        });
         return;
       }
 
@@ -174,7 +184,10 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
       <Step number={1} title={t.step1} active>
         {seller ? (
           <div className="space-y-4">
-            <Notice tone="success" title={format(t.sellerVerified, { id: seller.property.propertyId })} />
+            <Notice
+              tone="success"
+              title={format(t.sellerVerified, { id: seller.property.propertyId })}
+            />
             <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[12rem_1fr]">
               <dt className="text-steel">{t.fieldAddress}</dt>
               <dd>{seller.property.address}</dd>
@@ -189,7 +202,12 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
                 <HashText value={seller.property.ownerCommitment ?? ''} head={12} tail={8} />
               </dd>
             </dl>
-            <button type="button" className={buttonStyles.secondary} disabled={busy !== null} onClick={startOver}>
+            <button
+              type="button"
+              className={buttonStyles.secondary}
+              disabled={busy !== null}
+              onClick={startOver}
+            >
               {t.changeBundle}
             </button>
           </div>
@@ -246,7 +264,9 @@ export function TransferCounter({ t, errors }: { t: Strings; errors: Dictionary[
                 disabled={busy !== null}
                 onChange={(event) => setYears(event.target.value)}
                 aria-invalid={yearsError === null ? undefined : true}
-                aria-describedby={yearsError === null ? 'transfer-term-hint' : 'transfer-term-error'}
+                aria-describedby={
+                  yearsError === null ? 'transfer-term-hint' : 'transfer-term-error'
+                }
                 className="mt-2 w-full rounded-lg border border-hairline bg-white px-3.5 py-2.5 font-mono text-sm ui-transition focus:border-authority"
               />
               {yearsError === null ? (

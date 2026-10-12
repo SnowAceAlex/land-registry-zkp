@@ -34,5 +34,8 @@ export * from './circuitInputs';
 // Date/timezone helpers (UTC+7 at the edges, Unix epoch in-circuit — D10)
 export * from './datetime';
 
+// Backend-signed status attestation stapled to ownership/mortgage proofs (D82)
+export * from './statusAttestation';
+
 // ZKP / snarkjs Groth16 wrapper
 export * from './zkpHelper';

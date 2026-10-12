@@ -22,6 +22,12 @@ describe('apiErrorCode', () => {
     expect(apiErrorCode(new ApiError(422, 'x', 'InvalidProof'))).toBe('invalid-proof');
   });
 
+  it('names the status-attestation reasons (D82)', () => {
+    expect(apiErrorCode(new ApiError(422, 'x', 'AttestationExpired'))).toBe('attestation-expired');
+    expect(apiErrorCode(new ApiError(422, 'x', 'InvalidAttestation'))).toBe('invalid-attestation');
+    expect(apiErrorCode(new ApiError(409, 'x', 'ProcedureOpen'))).toBe('procedure-open');
+  });
+
   it('treats a failed fetch as the API being unreachable, not as a wrong request', () => {
     // fetch() rejects with a TypeError when the backend is down or CORS fails.
     expect(apiErrorCode(new TypeError('Failed to fetch'))).toBe('unreachable');

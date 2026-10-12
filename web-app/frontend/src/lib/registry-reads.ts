@@ -3,7 +3,7 @@
  *
  * Every function here is a `view` call, so this is `eth_call` only: no gas, no
  * wallet, no connector (D61). Promoted to shared code because UC-5 needs the
- * current root and UC-6 needs all four, and sibling features must not import
+ * current root and UC-6 needs the rest, and sibling features must not import
  * each other (D66).
  *
  * Roots come back as DECIMAL STRINGS, not hex. That is the form the API, the
@@ -82,6 +82,25 @@ export async function readRevocation(
     rootVersion: Number(rootVersion),
     revokedAt,
   };
+}
+
+/** D82: whether `account` may sign status attestations — read from the chain, never the backend. */
+export async function readIsAttester(
+  client: PublicClient,
+  registry: Address,
+  account: Address,
+): Promise<boolean> {
+  const role = (await client.readContract({
+    address: registry,
+    abi: rootRegistryAbi,
+    functionName: 'ATTESTER_ROLE',
+  })) as Hex;
+  return (await client.readContract({
+    address: registry,
+    abi: rootRegistryAbi,
+    functionName: 'hasRole',
+    args: [role, account],
+  })) as boolean;
 }
 
 export interface AuthorityAnchor {

@@ -5,6 +5,8 @@
  * Import via: import { LURRecord, ProofInput } from '@land-registry/blockchain/shared'
  */
 
+import type { AttestationStaple } from './statusAttestation';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Enums
 // ─────────────────────────────────────────────────────────────────────────────
@@ -143,6 +145,8 @@ export interface ProofPackage {
   publicSignals: PublicSignals;
   /** Which circuit generated this proof */
   circuitType: 'ownership' | 'mortgage' | 'transfer';
+  /** Ownership/mortgage only: the registry's status attestation (D82). */
+  attestation?: AttestationStaple;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

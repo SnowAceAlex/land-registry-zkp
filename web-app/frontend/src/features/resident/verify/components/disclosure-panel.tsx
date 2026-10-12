@@ -3,13 +3,11 @@
 /**
  * features/resident/verify/components/disclosure-panel.tsx
  *
- * The two lists, and the persona line the DoD asks for.
+ * The two lists: what the proof discloses and what it withholds.
  *
  * The "tells you nothing about" half is the one that earns its place. A
  * verifier handed four numbers cannot tell whether the silence about the expiry
- * date is deliberate or a gap — and the difference is the entire system. The
- * persona line exists for the same reason: a bank reading a mortgage proof
- * needs to be told, in words, not to also ask for the receipt.
+ * date is deliberate or a gap — and the difference is the entire system.
  */
 
 import type { Dictionary } from '@/i18n/dictionaries';
@@ -81,15 +79,6 @@ export function DisclosurePanel({
             ))}
           </ul>
         </div>
-      </div>
-
-      <div className="rounded-lg border border-hairline bg-whisper px-4 py-3">
-        <h3 className="text-sm font-medium text-ink">{t.personaTitle}</h3>
-        <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-steel">
-          <li>{t.personaBuyer}</li>
-          <li>{t.personaBank}</li>
-          <li>{t.personaAgency}</li>
-        </ul>
       </div>
     </section>
   );

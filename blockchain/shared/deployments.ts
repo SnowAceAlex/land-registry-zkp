@@ -36,6 +36,8 @@ export interface DeploymentRecord {
     orgName: string;
     instituteHash: string;
   };
+  /** D82 — the account granted ATTESTER_ROLE (absent in records older than D82). */
+  attester?: string;
   /** Contract name → address, e.g. `RootRegistry`, `LandRegistryVerifier`. */
   contracts: Record<string, string>;
 }

@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  ParseIntPipe,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { TransferStatus } from '@prisma/client';
 import {
   ApiConflictResponse,
@@ -89,7 +80,8 @@ export class TransfersController {
   @ApiConflictResponse({
     description:
       'A transfer for this property is already pending, or already approved and waiting to be ' +
-      'published in a change set (D46)',
+      'published in a change set (D46); or the plot has an open revocation (one procedure per ' +
+      'plot, D80). From this submit on the seller gets no status attestation (D82)',
   })
   submit(@Body() dto: SubmitTransferDto) {
     return this.transfers.submit(dto);
@@ -125,7 +117,9 @@ export class TransfersController {
       'Typed rejection from LandRegistryVerifier (D33): InvalidProof, RootMismatch (the registry ' +
       'moved on — the request is auto-rejected), or StaleTimestamp',
   })
-  @ApiConflictResponse({ description: 'Request was already approved or rejected' })
+  @ApiConflictResponse({
+    description: 'Request was already approved or rejected',
+  })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid x-gov-api-key header' })
   approve(@Param('id', ParseIntPipe) id: number) {
     return this.transfers.approve(id);

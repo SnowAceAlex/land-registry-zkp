@@ -50,12 +50,7 @@ export function publishCallFor(draft: OpenDraft): PublishCall {
 }
 
 export type WalletErrorCode =
-  | 'rejected'
-  | 'duplicate-root'
-  | 'no-role'
-  | 'already-revoked'
-  | 'invalid-revocation'
-  | 'unknown';
+  'rejected' | 'duplicate-root' | 'no-role' | 'already-revoked' | 'invalid-revocation' | 'unknown';
 
 const REVERT_CODES: Record<string, WalletErrorCode> = {
   DuplicateRoot: 'duplicate-root',
@@ -71,7 +66,11 @@ const REVERT_CODES: Record<string, WalletErrorCode> = {
  * signature (EIP-1193 code 4001) or a decoded RootRegistry custom error.
  */
 export function walletErrorCode(error: unknown): WalletErrorCode {
-  for (let node = error as Record<string, unknown> | undefined, depth = 0; node && depth < 10; depth++) {
+  for (
+    let node = error as Record<string, unknown> | undefined, depth = 0;
+    node && depth < 10;
+    depth++
+  ) {
     if (node.name === 'UserRejectedRequestError' || node.code === 4001) return 'rejected';
     const data = node.data as { errorName?: unknown } | undefined;
     const errorName = typeof data?.errorName === 'string' ? data.errorName : undefined;

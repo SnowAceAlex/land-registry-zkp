@@ -75,12 +75,12 @@ export function TransferQueue({
     };
   }
 
-  async function run(id: number, action: () => Promise<unknown>, success: string) {
+  async function run(id: number, action: () => Promise<unknown>, success: string, detail?: string) {
     setWorking(id);
     setMessage(null);
     try {
       await action();
-      setMessage({ tone: 'success', title: success });
+      setMessage({ tone: 'success', title: success, detail });
     } catch (error) {
       setMessage(failureMessage(error));
     } finally {
@@ -90,9 +90,27 @@ export function TransferQueue({
     }
   }
 
+  async function runApprove(id: number) {
+    setWorking(id);
+    setMessage(null);
+    try {
+      await approveTransfer(id);
+      setMessage({ tone: 'success', title: format(t.approvedTitle, { id }) });
+    } catch (error) {
+      setMessage(failureMessage(error));
+    } finally {
+      setWorking(null);
+      await refresh();
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <div role="tablist" aria-label={t.queueTitle} className="flex flex-wrap gap-1 border-b border-whisper">
+      <div
+        role="tablist"
+        aria-label={t.queueTitle}
+        className="flex flex-wrap gap-1 border-b border-whisper"
+      >
         {TABS.map((status) => (
           <button
             key={status}
@@ -133,12 +151,24 @@ export function TransferQueue({
           <table className="w-full min-w-[46rem] text-left text-sm">
             <thead className="border-b border-hairline text-xs text-steel">
               <tr>
-                <th scope="col" className="px-4 py-2 font-medium">{t.colRequest}</th>
-                <th scope="col" className="px-4 py-2 font-medium">{t.colProperty}</th>
-                <th scope="col" className="px-4 py-2 font-medium">{t.colBuyer}</th>
-                <th scope="col" className="px-4 py-2 font-medium">{t.colCreated}</th>
-                <th scope="col" className="px-4 py-2 font-medium">{t.colDecided}</th>
-                <th scope="col" className="px-4 py-2 font-medium">{t.colAction}</th>
+                <th scope="col" className="px-4 py-2 font-medium">
+                  {t.colRequest}
+                </th>
+                <th scope="col" className="px-4 py-2 font-medium">
+                  {t.colProperty}
+                </th>
+                <th scope="col" className="px-4 py-2 font-medium">
+                  {t.colBuyer}
+                </th>
+                <th scope="col" className="px-4 py-2 font-medium">
+                  {t.colCreated}
+                </th>
+                <th scope="col" className="px-4 py-2 font-medium">
+                  {t.colDecided}
+                </th>
+                <th scope="col" className="px-4 py-2 font-medium">
+                  {t.colAction}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-whisper">
@@ -159,14 +189,19 @@ export function TransferQueue({
                     {request.status === 'PENDING' ? (
                       rejecting?.id === request.id ? (
                         <div className="flex min-w-[16rem] flex-col gap-2">
-                          <label htmlFor={`reject-${request.id}`} className="text-xs font-medium text-ink">
+                          <label
+                            htmlFor={`reject-${request.id}`}
+                            className="text-xs font-medium text-ink"
+                          >
                             {format(t.rejectReason, { id: request.id })}
                           </label>
                           <input
                             id={`reject-${request.id}`}
                             maxLength={500}
                             value={rejecting.reason}
-                            onChange={(event) => setRejecting({ id: request.id, reason: event.target.value })}
+                            onChange={(event) =>
+                              setRejecting({ id: request.id, reason: event.target.value })
+                            }
                             className="w-full rounded-lg border border-hairline px-3 py-2 text-sm ui-transition focus:border-authority"
                           />
                           <div className="flex gap-2">
@@ -177,7 +212,11 @@ export function TransferQueue({
                               onClick={() =>
                                 run(
                                   request.id,
-                                  () => rejectTransfer(request.id, rejecting.reason.trim() || undefined),
+                                  () =>
+                                    rejectTransfer(
+                                      request.id,
+                                      rejecting.reason.trim() || undefined,
+                                    ),
                                   format(t.rejectedTitle, { id: request.id }),
                                 )
                               }
@@ -199,13 +238,7 @@ export function TransferQueue({
                             type="button"
                             className={`${buttonStyles.primary} px-3 py-1.5 text-xs`}
                             disabled={working !== null}
-                            onClick={() =>
-                              run(
-                                request.id,
-                                () => approveTransfer(request.id),
-                                format(t.approvedTitle, { id: request.id }),
-                              )
-                            }
+                            onClick={() => void runApprove(request.id)}
                           >
                             {working === request.id ? (
                               <>

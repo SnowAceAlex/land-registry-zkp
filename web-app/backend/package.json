@@ -19,6 +19,7 @@
     "tree:bootstrap": "ts-node scripts/tree-bootstrap.ts",
     "bench:seed": "ts-node scripts/bench-seed-genesis.ts",
     "bench:month": "ts-node scripts/bench-replay-month.ts",
+    "bench:confirm-breakdown": "ts-node scripts/bench-confirm-breakdown.ts",
     "openapi:export": "node scripts/export-openapi.js"
   },
   "dependencies": {

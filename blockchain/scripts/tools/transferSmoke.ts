@@ -18,7 +18,9 @@
  *   5. the officer batches + publishes     → POST /government/changesets,
  *      sign the returned root, POST .../confirm (D44/D46)
  * then points at the change set's archive, which carries the buyer's bundle
- * (D77), and re-submits the spent proof to confirm it is rejected.
+ * (D77), and re-submits the spent proof to confirm it is rejected. Between
+ * submit and publish it also checks the seller can no longer obtain a status
+ * attestation (D82) — the lock that replaced the on-chain freeze.
  *
  * D47 — every /transfers route is officer-only now, not just approve, so every
  * call below sends GOV_API_KEY, including preview and the final replay.
@@ -56,7 +58,7 @@ import { OwnerSecretFile, Receipt, receiptToLURRecord } from '../../shared/recei
 import { LURRecord } from '../../shared/types';
 import { generateGroth16Proof, getCircuitPaths } from '../../shared/zkpHelper';
 import { RootRegistry__factory } from '../../typechain-types';
-import { abort, postJson } from '../lib/http';
+import { abort, getJson, postJson } from '../lib/http';
 import { BLOCKCHAIN_DIR } from '../lib/paths';
 
 // This script runs under plain ts-node, not `hardhat run` — .env is not loaded
@@ -216,6 +218,13 @@ async function main(): Promise<void> {
   if (submit.status >= 400) abort('submit', submit);
   console.log(`submit    queued as request #${submit.body.id} (status ${submit.body.status})`);
 
+  // D82: from this insert on, the registry refuses the seller a status attestation.
+  const locked = await getJson<{ reason?: string }>(`/proof/${propertyId}/attestation`);
+  if (locked.status !== 409 || locked.body.reason !== 'ProcedureOpen') {
+    abort('seller attestation should be refused while the transfer is open', locked);
+  }
+  console.log('lock      seller attestation refused (409 ProcedureOpen) ✓');
+
   // ── Step 4: the human decision — records APPROVED only, publishes nothing ─
   // (D46: publishing moves to the batched change set below.)
   const approve = await postJson<TransferApproval>(
@@ -270,18 +279,16 @@ async function main(): Promise<void> {
 }
 
 /**
- * Sign and publish the change set's projected root directly against
- * RootRegistry — the step a browser wallet performs in the real government
- * portal (D43/D46). This script has no browser, so it plays the officer's
- * wallet with the deployer/authority private key instead; that substitution
- * is the whole reason this function exists rather than living in the backend.
+ * RootRegistry connected with the authority key, after checking its role.
+ * This script has no browser, so it plays the officer's wallet (D43) for the
+ * change-set root at the end.
  */
-async function publishChangeSetRoot(draft: ChangeSetDraft): Promise<string> {
+async function authorityRegistry() {
   const network = process.env.CHAIN_NETWORK ?? 'localhost';
   const privateKey = process.env.AUTHORITY_PRIVATE_KEY ?? process.env.PRIVATE_KEY;
   if (!privateKey) {
     throw new Error(
-      'AUTHORITY_PRIVATE_KEY (or PRIVATE_KEY) must be set to sign the change-set root — see ' +
+      'AUTHORITY_PRIVATE_KEY (or PRIVATE_KEY) must be set to sign for the registry — see ' +
         '.env.example (Hardhat account #0 for local dev). This stands in for the officer’s ' +
         'Metamask signature (D43).',
     );
@@ -301,12 +308,22 @@ async function publishChangeSetRoot(draft: ChangeSetDraft): Promise<string> {
   if (!(await registry.hasRole(role, signer.address))) {
     throw new Error(
       `${signer.address} does not hold STATE_AUTHORITY_ROLE on ${network}, so it cannot ` +
-        `publish a root. The authority for this deployment is ${deployment.authority.address}. ` +
+        `sign for the registry. The authority for this deployment is ${deployment.authority.address}. ` +
         `Set AUTHORITY_PRIVATE_KEY to that account's key (on a local node it is Hardhat ` +
         `account #0) — PRIVATE_KEY alone is usually the testnet deployer, which is a ` +
         `different account.`,
     );
   }
+  return registry;
+}
+
+/**
+ * Sign and publish the change set's projected root directly against
+ * RootRegistry — the step a browser wallet performs in the real government
+ * portal (D43/D46).
+ */
+async function publishChangeSetRoot(draft: ChangeSetDraft): Promise<string> {
+  const registry = await authorityRegistry();
 
   const newRoot = ethers.toBeHex(BigInt(draft.newRoot), 32);
   const { propertyIds, reasonCodes, detailHashes } = draft.revocationCalldata;

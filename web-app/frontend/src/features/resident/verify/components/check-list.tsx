@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * features/resident/verify/components/check-list.tsx — the four checks (D63).
+ * features/resident/verify/components/check-list.tsx — the five checks (D63, D81).
  *
  * Each row carries a sentence on WHY the check exists, not just its state. A
  * verifier cannot be expected to know that the proof's timestamp is chosen by
@@ -13,12 +13,17 @@
  * words (D33).
  */
 
-import { Check, CircleSlash, LoaderCircle, Minus, X } from 'lucide-react';
+import { Check, CircleSlash, LoaderCircle, Minus, SkipForward, X } from 'lucide-react';
 
 import type { Dictionary } from '@/i18n/dictionaries';
 import { Notice } from '@/components/ui/notice';
 
-import { CHECK_ORDER, type CheckName, type CheckState, type PipelineStep } from '../lib/proof-pipeline';
+import {
+  CHECK_ORDER,
+  type CheckName,
+  type CheckState,
+  type PipelineStep,
+} from '../lib/proof-pipeline';
 
 type Strings = Dictionary['residentVerify'];
 
@@ -26,6 +31,7 @@ const LABELS = {
   freshness: { label: 'check_freshness', why: 'check_freshnessWhy' },
   cryptographic: { label: 'check_cryptographic', why: 'check_cryptographicWhy' },
   rootMatchesChain: { label: 'check_rootMatchesChain', why: 'check_rootMatchesChainWhy' },
+  statusAttested: { label: 'check_statusAttested', why: 'check_statusAttestedWhy' },
   onChain: { label: 'check_onChain', why: 'check_onChainWhy' },
 } as const satisfies Record<CheckName, { label: keyof Strings; why: keyof Strings }>;
 
@@ -35,6 +41,7 @@ const STATES = {
   pass: { icon: Check, tone: 'text-emerald-600', key: 'state_pass' },
   fail: { icon: X, tone: 'text-red-600', key: 'state_fail' },
   unavailable: { icon: CircleSlash, tone: 'text-amber-600', key: 'state_unavailable' },
+  skipped: { icon: SkipForward, tone: 'text-steel', key: 'state_skipped' },
 } as const satisfies Record<CheckState, { icon: unknown; tone: string; key: keyof Strings }>;
 
 export function CheckList({

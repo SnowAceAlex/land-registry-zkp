@@ -46,6 +46,9 @@
  * one never issued (D39), and neither is a network problem a retry could fix —
  * the leaf is not in the tree, so no Merkle proof exists to fetch.
  *
+ * A fourth, `procedure-open` (D82): a transfer or revocation is open on this plot, so the
+ * registry refuses the status attestation every verifier requires until it publishes or closes.
+ *
  * ⚠️ ORDERING BUG THIS FIXES. `refreshedRoot === null` used to be tested before
  *    `chainReachable`, so ANY failed refresh — revoked, unissued, 503, node
  *    down — left the machine at `refreshing` for good: a spinner that never
@@ -69,6 +72,7 @@ export type ProofStage =
   | 'chain-unavailable'
   | 'root-not-published'
   | 'superseded'
+  | 'procedure-open'
   | 'ready'
   | 'proving'
   | 'done';
@@ -92,6 +96,11 @@ export interface ProofStageFacts {
    * same Poseidon output, so there is no formatting to reconcile.
    */
   registryLeaf: string | null;
+  /**
+   * The status attestation request (D82): `pending` while in flight, `open`
+   * when the registry answered 409 ProcedureOpen.
+   */
+  attestation: 'pending' | 'ok' | 'open';
   /**
    * The registry answered definitively that no proof can exist for this plot:
    * revoked (410) or never issued (400). Distinct from `chainReachable: false`
@@ -145,6 +154,11 @@ export function nextProofStage(f: ProofStageFacts): ProofStage {
   if (f.bundleLeaf !== null && f.registryLeaf !== null && f.bundleLeaf !== f.registryLeaf) {
     return 'superseded';
   }
+
+  // D82: after superseded, so an open procedure is only claimed once both roots
+  // and both leaves agree that it is about THIS owner of THIS leaf.
+  if (f.attestation === 'pending') return 'refreshing';
+  if (f.attestation === 'open') return 'procedure-open';
 
   if (f.busy === 'proving') return 'proving';
   if (f.hasResult) return 'done';

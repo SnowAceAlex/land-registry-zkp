@@ -35,6 +35,9 @@ const API_TITLES: Record<ApiErrorCode, keyof ErrorStrings> = {
   'root-mismatch': 'rootMismatch',
   'stale-timestamp': 'staleTimestamp',
   'invalid-proof': 'invalidProof',
+  'attestation-expired': 'attestationExpired',
+  'invalid-attestation': 'invalidAttestation',
+  'procedure-open': 'procedureOpen',
   unreachable: 'unreachable',
   unknown: 'unknown',
 };

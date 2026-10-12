@@ -36,6 +36,7 @@ function facts(overrides: Partial<TrustFacts> = {}): TrustFacts {
     step: DONE,
     revocation: null,
     issuer: issuer(),
+    issuerRequired: true,
     chainReachable: true,
     ...overrides,
   };
@@ -114,11 +115,25 @@ describe('summariseTrust (D63)', () => {
     );
   });
 
-  it('warns rather than accepting when no receipt was supplied', () => {
-    expect(summariseTrust(facts({ issuer: null }))).toEqual({
-      verdict: 'accept-with-warning',
-      reasons: ['issuer-not-supplied'],
+  // Standard tab (buyer, bank): no receipt is asked for, so its absence is not a warning.
+  it('accepts cleanly without a receipt when the issuer check was not asked for', () => {
+    expect(summariseTrust(facts({ issuer: null, issuerRequired: false }))).toEqual({
+      verdict: 'accept',
+      reasons: [],
     });
+  });
+
+  it('is unknown when the issuer check was asked for but has no result', () => {
+    expect(summariseTrust(facts({ issuer: null }))).toEqual({
+      verdict: 'unknown',
+      reasons: ['checks-incomplete'],
+    });
+  });
+
+  it('still rejects a revoked plot on the standard tab', () => {
+    const summary = summariseTrust(facts({ revocation, issuer: null, issuerRequired: false }));
+
+    expect(summary).toEqual({ verdict: 'reject', reasons: ['property-revoked'] });
   });
 
   /**

@@ -26,6 +26,8 @@ export const REASON_CODES: Record<number, string> = {
  * order — would otherwise be public and permanent, which is a materially
  * different proposition from a revoked diploma. The hash still lets the registry
  * prove the reason on demand.
+ *
+ * The request row is also the lock: while it is open the owner gets no status attestation (D82).
  */
 @Injectable()
 export class RevocationService {
@@ -54,6 +56,17 @@ export class RevocationService {
     if (pending) {
       throw new ConflictException(
         `Property ${dto.propertyId} already has a pending revocation (#${pending.id})`,
+      );
+    }
+
+    // D80: one open procedure per plot.
+    const transfer = await this.prisma.transferRequest.findFirst({
+      where: { propertyId: dto.propertyId, status: { in: ['PENDING', 'APPROVED'] } },
+    });
+    if (transfer) {
+      throw new ConflictException(
+        `Property ${dto.propertyId} has an open transfer (#${transfer.id}, ${transfer.status}) — ` +
+          `resolve it before requesting a revocation`,
       );
     }
 

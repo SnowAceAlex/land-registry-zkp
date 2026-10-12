@@ -27,6 +27,8 @@ const config: HardhatUserConfig = {
     // is about a clean verified-source page, not a defect fix.
     version: '0.8.36',
     settings: {
+      // OZ 5.6's EIP712 (D82) pulls in Bytes.sol, which uses mcopy; Sepolia runs Cancun.
+      evmVersion: 'cancun',
       optimizer: {
         enabled: true,
         runs: 200,
