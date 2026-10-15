@@ -233,7 +233,7 @@ async function main(): Promise<void> {
     where: { status: RESUME_FROM_DAY ? { in: ['ISSUED', 'REVOKED'] } : 'ISSUED' },
     // The current commitment is needed: the next owner is chained from it, so
     // that replaying against an already-replayed database still moves each leaf.
-    select: { propertyId: true, ownerCommitment: true },
+    select: { propertyId: true, ownerCommitment: true, landOfficeId: true },
     orderBy: { id: 'asc' },
     take: needed,
   });
@@ -242,6 +242,10 @@ async function main(): Promise<void> {
       `need ${needed} issued plots, found ${pool_.length} — run bench:seed against this database first`,
     );
   }
+
+  // D86: every request row names the office that filed it; the bench files as HQ.
+  const hq = await prisma.landOffice.findUnique({ where: { code: 'HQ' }, select: { id: true } });
+  if (!hq) throw new Error('land office HQ is missing — apply the Phase 10 migrations first');
 
   const transferPool = pool_.slice(0, TRANSFERS);
   const revocationPool = pool_.slice(TRANSFERS);
@@ -334,20 +338,21 @@ async function main(): Promise<void> {
       // Its secret is stored too: since D77 confirm() archives it for the buyer
       // and refuses a round that has none.
       const rows: Prisma.Sql[] = [];
-      for (const { propertyId, ownerCommitment } of todayTransfers) {
+      for (const { propertyId, ownerCommitment, landOfficeId } of todayTransfers) {
         const secret = await nextOwnerSecret(ownerCommitment!);
         rows.push(Prisma.sql`(
         ${propertyId}, ${await nextOwnerCommitment(ownerCommitment!)}, ${secret.toString()},
         ${'0'}, ${'0'},
         ${'{}'}::jsonb, ${'[]'}::jsonb, ${'APPROVED'}::"TransferStatus",
-        ${new Date().toISOString()}::timestamp
+        ${new Date().toISOString()}::timestamp,
+        ${hq.id}::integer, ${landOfficeId}::integer
       )`);
       }
       for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
         await prisma.$executeRaw(
           Prisma.sql`INSERT INTO transfer_requests (
           "propertyId", "newOwnerCommitment", "newOwnerSecret", "oldRoot", "newRoot",
-          "proof", "publicSignals", "status", "createdAt"
+          "proof", "publicSignals", "status", "createdAt", "officeId", "landOfficeId"
         ) VALUES ${Prisma.join(rows.slice(i, i + INSERT_CHUNK))}`,
         );
       }

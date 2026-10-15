@@ -53,6 +53,11 @@ describe('toQueueItem (D87)', () => {
     expect(unassigned).toMatchObject({ byFallback: false, landOfficeCode: null });
   });
 
+  it('never counts an issuance as fallback: issuing is the central office’s own job (D87)', () => {
+    // HQ files the request on a CN01 plot — the normal path, not a stand-in for the branch.
+    expect(toQueueItem('issuance', row, offices, now).byFallback).toBe(false);
+  });
+
   it('reports hold state', () => {
     const held = toQueueItem(
       'issuance',

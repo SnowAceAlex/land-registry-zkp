@@ -44,8 +44,6 @@ const QUEUE_SELECT = {
 
 const CLEAR_HOLD = { heldAt: null, heldReason: null };
 
-const WITHDRAWN_TRANSFER_REASON = 'Withdrawn by the central office';
-
 function parseKind(raw: string): QueueKind {
   if (!(QUEUE_KINDS as readonly string[]).includes(raw)) {
     throw new BadRequestException(`kind must be one of ${QUEUE_KINDS.join(', ')}`);
@@ -132,7 +130,8 @@ export class QueueService {
         ...CLEAR_HOLD,
         status: 'REJECTED',
         newOwnerSecret: null,
-        rejectReason: WITHDRAWN_TRANSFER_REASON,
+        // No text: the portal words a reasonless rejection in the officer's language.
+        rejectReason: null,
         decidedAt: new Date(),
       },
       revocation: { status: 'REJECTED', ...CLEAR_HOLD },

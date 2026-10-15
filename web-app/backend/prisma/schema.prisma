@@ -73,7 +73,7 @@ enum PropertyStatus {
   REVOKED
 }
 
-/// Shared lifecycle of both draft types (D43).
+/// Lifecycle of a ChangeSet draft (D43): DRAFT → PUBLISHED or DISCARDED.
 enum DraftStatus {
   DRAFT
   PUBLISHED
@@ -154,7 +154,7 @@ model Property {
   /// Lifecycle state. The tree contains exactly the ISSUED rows.
   status PropertyStatus @default(IMPORTED)
 
-  /// Land office whose area this plot lies in (D84); null until assigned
+  /// Land office whose area this plot lies in (D85); null until assigned
   landOfficeId Int?
   landOffice   LandOffice? @relation(fields: [landOfficeId], references: [id])
 
@@ -198,7 +198,7 @@ model AdministrativeUnit {
   code      String?
   createdAt DateTime               @default(now())
 
-  /// Land office responsible for this commune (D84)
+  /// Land office responsible for this commune (D85)
   landOfficeId Int?
   landOffice   LandOffice? @relation(fields: [landOfficeId], references: [id])
 
@@ -209,7 +209,7 @@ model AdministrativeUnit {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LandOffice — the offices that operate the registry (D84)
+// LandOffice — the offices that operate the registry (D85)
 // ─────────────────────────────────────────────────────────────────────────────
 // The office-stamp columns on the procedure tables (officeId, approvedByOfficeId,
 // createdByOfficeId, confirmedByOfficeId, firstDownloadedByOfficeId and landOfficeId
@@ -292,7 +292,7 @@ model MerkleNode {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ChangeSet — one publishing round of approved transfers + revocations (D44)
+// ChangeSet — one registration round: issuances + transfers + revocations (D84)
 // ─────────────────────────────────────────────────────────────────────────────
 
 model ChangeSet {
@@ -319,7 +319,7 @@ model ChangeSet {
   @@map("change_sets")
 }
 
-/// One archive per (change set, office): each office downloads only its own plots' bundles (D87).
+/// One archive per (change set, office): each office downloads only its own plots' bundles (D88).
 model ChangeSetArchive {
   id                        Int        @id @default(autoincrement())
   changeSetId               Int
@@ -344,7 +344,7 @@ enum IssuanceRequestStatus {
   WITHDRAWN
 }
 
-/// A pending issuance: the owner secret is held until the change set archive is written (D85).
+/// A pending issuance: the owner secret is held until the change set archive is written (D87).
 model IssuanceRequest {
   id              Int                   @id @default(autoincrement())
   propertyId      String

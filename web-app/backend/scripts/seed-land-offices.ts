@@ -126,17 +126,18 @@ async function main(): Promise<void> {
     }
     console.log(`Properties without an office (address did not resolve): ${unassigned}`);
 
-    const keys: [string, string][] = [];
+    let created = 0;
     for (const [code, officeId] of officeIdByCode) {
       const active = await prisma.officeCredential.count({ where: { officeId, revokedAt: null } });
       if (active > 0) continue;
       const key = generateOfficeKey();
       await prisma.officeCredential.create({ data: { officeId, keyHash: hashOfficeKey(key) } });
-      keys.push([code, key]);
+      // Printed at once: if a later office fails, the keys already stored are not lost.
+      console.log(`${code}\t${key}`);
+      created++;
     }
-    for (const [code, key] of keys) console.log(`${code}\t${key}`);
     console.log(
-      keys.length > 0
+      created > 0
         ? 'Store these keys now — only their hashes are kept.'
         : 'Every office already has an active key; none created.',
     );

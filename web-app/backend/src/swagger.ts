@@ -29,10 +29,9 @@ export function setupSwagger(app: INestApplication): string | null {
         '',
         '**Roles.** `Government` endpoints belong to the state authority and are gated by an API key —',
         'press **Authorize** and paste `GOV_API_KEY` (the head office) or a land office key (D86).',
-        'A branch acts only on plots in its own area. `Transfers` is split',
-        'deliberately: computing a projected root reveals nothing and needs no judgement, so',
-        'preview/submit are open, while approving a transfer is the step that requires a person',
-        'at the authority.',
+        'A branch acts only on plots in its own area. Every `Transfers` route is gated too: the',
+        'transfer is an officer action at the counter (D47). `Records`, `Proof` and `Public` are',
+        'unguarded — a land owner or a buyer calls them, not an officer (D39).',
         '',
         '**Numbers are decimal strings.** Property ids, commitments, Merkle roots and leaves are',
         'BN254 field elements — far beyond `Number.MAX_SAFE_INTEGER` — so they cross the API as',
@@ -47,12 +46,16 @@ export function setupSwagger(app: INestApplication): string | null {
     .addApiKey({ type: 'apiKey', name: GOV_API_KEY_HEADER, in: 'header' }, GOV_API_KEY_SECURITY)
     .addTag(
       'Government',
-      'State authority: bulk import, issuance requests, the shared queue, root publishing rounds',
+      'State authority: bulk import, issuance requests, revocations, registration rounds and archives',
     )
-    .addTag('Transfers', 'Two-step transfer flow — automatic preview, human approval')
-    .addTag('Bundles', 'One-time owner bundle download')
-    .addTag('Records', 'Read-only registry queries')
-    .addTag('Proof', 'Merkle proof issuance — not implemented yet (Phase 6)')
+    .addTag('Operations', 'The shared queue and the operations console (D87, D89)')
+    .addTag(
+      'Transfers',
+      'The transfer counter: preview, submit, then an officer approves or rejects',
+    )
+    .addTag('Records', 'Read-only registry queries, plot history and certificate lineage')
+    .addTag('Proof', 'Fresh Merkle proofs, status attestations and proof verification (D39, D82)')
+    .addTag('Public', 'Chain id and contract addresses for the resident portal (D58)')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

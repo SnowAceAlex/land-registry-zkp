@@ -242,6 +242,20 @@ describe('TransfersService — the buyer secret at submit and reject (D77)', () 
     expect(update.mock.calls[0][0].data.newOwnerSecret).toBeNull();
   });
 
+  it('keeps an officer-typed reason, and writes no English default without one', async () => {
+    const { service, update } = await scenario();
+
+    await service.reject(1, BRANCH_ACTOR, 'Hồ sơ công chứng không hợp lệ');
+    await service.reject(1, BRANCH_ACTOR);
+    await service.reject(1, BRANCH_ACTOR, '   ');
+
+    expect(update.mock.calls.map((call) => call[0].data.rejectReason)).toEqual([
+      'Hồ sơ công chứng không hợp lệ',
+      null,
+      null,
+    ]);
+  });
+
   it('refuses a plot with a pending revocation — one open procedure per plot', async () => {
     const { service, create, dto, secret } = await scenario({ pendingRevocation: { id: 9 } });
 

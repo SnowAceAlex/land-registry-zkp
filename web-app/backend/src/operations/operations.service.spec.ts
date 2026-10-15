@@ -1,4 +1,4 @@
-import { ServiceUnavailableException } from '@nestjs/common';
+import { Logger, ServiceUnavailableException } from '@nestjs/common';
 
 import { BRANCH_ACTOR, CENTRAL_ACTOR } from '../../test/factories';
 import { OperationsService } from './operations.service';
@@ -313,11 +313,19 @@ describe('OperationsService.overview (D89)', () => {
     expect(dto.alerts.map((a) => a.code)).toEqual(['AuthorityRoleMissing', 'AttesterRoleMissing']);
   });
 
-  it('does not throw when a role read fails: only those flags turn false', async () => {
+  it('does not throw when a role read fails: only those flags turn false, and it logs why', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     const { service } = build({ dbRoot: synced, roleFails: true });
     const dto = await service.overview(CENTRAL_ACTOR, now);
     expect(dto.registry.onChainVersion).toBe(4);
     expect(dto.alerts.map((a) => a.code)).toEqual(['AuthorityRoleMissing', 'AttesterRoleMissing']);
+    // A failed read is not a missing role; the log is what tells the two apart.
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls.map((c) => String(c[0]))).toEqual([
+      expect.stringContaining('rpc down'),
+      expect.stringContaining('rpc down'),
+    ]);
+    warn.mockRestore();
   });
 
   it('answers 503 when the root itself cannot be read', async () => {

@@ -20,7 +20,7 @@ import { LineageResponseDto, PropertyHistoryResponseDto } from './dto/history.re
  * disclose. A buyer being able to check a plot's history themselves — rather
  * than taking an officer's word for it — is the point.
  */
-@ApiTags('records')
+@ApiTags('Records')
 @Controller('records')
 export class HistoryController {
   constructor(

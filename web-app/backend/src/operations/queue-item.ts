@@ -14,7 +14,7 @@ export interface QueueItem {
   ageHours: number;
   held: boolean;
   heldReason: string | null;
-  /** A central office filed it on a plot that belongs to another office. */
+  /** A central office filed a transfer or revocation on a plot that belongs to another office. */
   byFallback: boolean;
 }
 
@@ -48,6 +48,7 @@ export function toQueueItem(
     ageHours: Math.max(0, Math.floor((now.getTime() - row.createdAt.getTime()) / HOUR_MS)),
     held: row.heldAt !== null,
     heldReason: row.heldReason,
-    byFallback: isFallback(row.officeId, row.landOfficeId),
+    // Issuance always belongs to the central office (D87), so it is never a stand-in.
+    byFallback: kind !== 'issuance' && isFallback(row.officeId, row.landOfficeId),
   };
 }

@@ -224,7 +224,8 @@ describe('QueueService.withdraw (D87)', () => {
       data: {
         status: 'REJECTED',
         newOwnerSecret: null,
-        rejectReason: 'Withdrawn by the central office',
+        // No English default: the portal words a reasonless rejection itself.
+        rejectReason: null,
         decidedAt: now,
         heldAt: null,
         heldReason: null,

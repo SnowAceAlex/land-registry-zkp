@@ -25,3 +25,12 @@ describe('GovernmentController — who may run a publishing round (D86)', () => 
     expect(guardsOf(method)).not.toContain(CentralOnlyGuard);
   });
 });
+
+describe('GovernmentController — who may import and queue issuance (D86, D87)', () => {
+  it.each(['import', 'requestIssuance', 'listIssuanceRequests'] as const)(
+    '%s answers a branch with 403 CentralScopeRequired',
+    (method) => {
+      expect(guardsOf(method)).toContain(CentralOnlyGuard);
+    },
+  );
+});

@@ -214,7 +214,8 @@
     "withdrawing": "Withdrawing...",
     "withdrawConfirm": "Withdraw approved transfer #{id}? The plot is unlocked and the buyer's secret is discarded. The parties must start again at the counter.",
     "withdrawConfirmButton": "Confirm withdrawal",
-    "withdrawnTitle": "Transfer #{id} withdrawn; the plot is unlocked"
+    "withdrawnTitle": "Transfer #{id} withdrawn; the plot is unlocked",
+    "rejectedNoReason": "Rejected or withdrawn from the queue"
   },
   "govChanges": {
     "title": "Close the register",

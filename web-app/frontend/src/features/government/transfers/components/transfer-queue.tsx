@@ -350,7 +350,9 @@ export function TransferQueue({
                           : '—'}
                       </span>
                     ) : (
-                      <span className="text-xs text-steel">{request.rejectReason ?? '—'}</span>
+                      <span className="text-xs text-steel">
+                        {request.rejectReason ?? t.rejectedNoReason}
+                      </span>
                     )}
                   </td>
                 </tr>

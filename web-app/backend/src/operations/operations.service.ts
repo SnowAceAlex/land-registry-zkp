@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import { ChainService } from '../chain/chain.service';
 import { Actor } from '../common/actor';
@@ -57,6 +57,8 @@ function add<K>(map: Map<K, number>, key: K, n: number): void {
 // D89: the operations page. Every number is a groupBy over indexed columns, never a row load.
 @Injectable()
 export class OperationsService {
+  private readonly logger = new Logger(OperationsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly chain: ChainService,
@@ -88,8 +90,12 @@ export class OperationsService {
       this.pendingTransfersByOffice(),
       this.archiveWindows(now),
       this.prisma.property.count({ where: { landOfficeId: null, status: { not: 'REVOKED' } } }),
-      this.chain.hasAuthorityRole(this.chain.authorityAddress).catch(() => false),
-      this.chain.hasAttesterRole(this.attestation.address).catch(() => false),
+      this.chain
+        .hasAuthorityRole(this.chain.authorityAddress)
+        .catch((error: unknown) => this.roleReadFailed('STATE_AUTHORITY_ROLE', error)),
+      this.chain
+        .hasAttesterRole(this.attestation.address)
+        .catch((error: unknown) => this.roleReadFailed('ATTESTER_ROLE', error)),
     ]);
 
     const codes = new Map(offices.map((o) => [o.id, o.code]));
@@ -285,6 +291,14 @@ export class OperationsService {
       if (isFallback(g.officeId!, g.landOfficeId)) add(counts, g.landOfficeId, g._count);
     }
     return counts;
+  }
+
+  // Reported as missing so the alert still shows, but logged: a failed read is not a missing role.
+  private roleReadFailed(role: string, error: unknown): false {
+    this.logger.warn(
+      `Could not read ${role} from the chain: ${(error as Error)?.message ?? error}`,
+    );
+    return false;
   }
 
   private async archiveWindows(now: Date) {

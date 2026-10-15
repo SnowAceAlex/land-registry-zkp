@@ -146,9 +146,10 @@ export class GovernmentController {
 
   //CSV Import
   @Post('import')
+  @CentralOnly()
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({
-    summary: 'Bulk import land records from CSV',
+    summary: 'Bulk import land records from CSV (central office only)',
     description:
       'Columns: propertyId, landUseCode, certificateSerial, bookEntryNumber, address, area, ' +
       'issuingAuthority, issueDate (DD/MM/YYYY), expiryDate (DD/MM/YYYY, omit for perpetual ' +

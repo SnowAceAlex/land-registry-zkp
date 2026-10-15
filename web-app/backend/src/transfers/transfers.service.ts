@@ -276,7 +276,8 @@ export class TransfersService {
       where: { id: request.id },
       data: {
         status: TransferStatus.REJECTED,
-        rejectReason: reason ?? 'Rejected by the issuing authority',
+        // Only the officer's own words; the portal words a missing reason itself.
+        rejectReason: reason?.trim() ? reason : null,
         // D77 — a rejected commitment never reaches the chain, so its secret
         // has no further use.
         newOwnerSecret: null,

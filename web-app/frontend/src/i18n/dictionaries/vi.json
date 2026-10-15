@@ -214,7 +214,8 @@
     "withdrawing": "Đang rút lại...",
     "withdrawConfirm": "Rút lại hồ sơ chuyển nhượng #{id} đã duyệt? Thửa đất được mở khóa và khóa bí mật của bên nhận bị hủy. Hai bên phải làm lại từ đầu tại quầy.",
     "withdrawConfirmButton": "Xác nhận rút lại",
-    "withdrawnTitle": "Đã rút hồ sơ chuyển nhượng #{id}; thửa đất đã được mở khóa"
+    "withdrawnTitle": "Đã rút hồ sơ chuyển nhượng #{id}; thửa đất đã được mở khóa",
+    "rejectedNoReason": "Đã bị từ chối hoặc rút khỏi hàng chờ"
   },
   "govChanges": {
     "title": "Chốt sổ",
