@@ -12,10 +12,15 @@ export function archiveStatus(a: ArchiveSummary, now: Date): ArchiveStatus {
   return left <= WARN_MS ? 'expiring' : 'waiting';
 }
 
-/** Whole days and hours left, for the "expires in" cell. Null once it has expired. */
+/** Whole days and hours left (0 days 0 hours = under an hour). Null once it has expired. */
 export function timeLeft(a: ArchiveSummary, now: Date): { days: number; hours: number } | null {
   const left = new Date(a.expiresAt).getTime() - now.getTime();
   if (left <= 0) return null;
   const hours = Math.floor(left / 3600_000);
   return { days: Math.floor(hours / 24), hours: hours % 24 };
+}
+
+/** Re-issue is needed only when the secrets expired without ever being fetched. */
+export function expiredHintKind(a: ArchiveSummary): 'reissue' | 'neutral' {
+  return a.firstDownloadedAt === null ? 'reissue' : 'neutral';
 }

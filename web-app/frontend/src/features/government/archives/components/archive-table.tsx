@@ -8,7 +8,7 @@ import { format } from '@/i18n/format';
 import { Button } from '@/components/ui/button';
 
 import type { ArchiveSummary } from '../../api/types';
-import { type ArchiveStatus, archiveStatus, timeLeft } from '../lib/archive-status';
+import { type ArchiveStatus, archiveStatus, expiredHintKind, timeLeft } from '../lib/archive-status';
 
 type T = Dictionary['govArchives'];
 
@@ -22,6 +22,7 @@ const BADGE: Record<ArchiveStatus, string> = {
 function expiresText(a: ArchiveSummary, now: Date, t: T): string {
   const left = timeLeft(a, now);
   if (!left) return t.expiredShort;
+  if (left.days === 0 && left.hours === 0) return t.expiresUnderHour;
   return left.days > 0
     ? format(t.expiresDaysHours, { days: left.days, hours: left.hours })
     : format(t.expiresHours, { hours: left.hours });
@@ -50,7 +51,7 @@ export function ArchiveTable({
 
   return (
     <div className="overflow-x-auto rounded-lg border border-hairline bg-white">
-      <table className="w-full min-w-[52rem] text-left text-sm">
+      <table aria-label={t.tableLabel} className="w-full min-w-[52rem] text-left text-sm">
         <thead className="border-b border-hairline text-xs text-steel">
           <tr>
             <th scope="col" className="px-4 py-2 font-medium">{t.colRound}</th>
@@ -98,12 +99,17 @@ export function ArchiveTable({
                         : ''}
                     </p>
                   ) : null}
-                  {status === 'expired' ? <p className="mt-1 text-xs text-steel">{t.expiredHint}</p> : null}
+                  {status === 'expired' ? (
+                    <p className="mt-1 text-xs text-steel">
+                      {expiredHintKind(a) === 'reissue' ? t.expiredHint : t.expiredHintNeutral}
+                    </p>
+                  ) : null}
                 </td>
                 <td className="px-4 py-2 text-right">
                   <Button
                     variant="secondary"
                     disabled={status === 'expired' || downloading !== null}
+                    aria-busy={busy}
                     onClick={() => onDownload(a)}
                   >
                     <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden />

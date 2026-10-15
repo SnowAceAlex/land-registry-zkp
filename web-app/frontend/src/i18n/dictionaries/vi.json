@@ -750,6 +750,9 @@
     "expiredHint": "Bí mật đã bị xoá; cần cấp lại các thửa này.",
     "download": "Tải ZIP",
     "downloading": "Đang tải…",
-    "noValue": "—"
+    "noValue": "—",
+    "expiresUnderHour": "< 1 giờ",
+    "expiredHintNeutral": "Đã hết hạn trên máy chủ; bản đã tải về vẫn dùng được.",
+    "tableLabel": "Hồ sơ đợt vào sổ theo đơn vị"
   }
 }

@@ -41,7 +41,7 @@
     "transfers": "Transfers",
     "revocations": "Revocations",
     "changes": "Close the register",
-    "archives": "Round archives",
+    "archives": "Registration round archives",
     "signOut": "Sign out"
   },
   "residentNav": {
@@ -722,12 +722,12 @@
     "noValue": "—"
   },
   "govArchives": {
-    "title": "Round archives",
+    "title": "Registration round archives",
     "description": "Each registration round produces one archive per branch. Download yours before it expires.",
     "warningTitle": "The archive contains secret files",
     "warning": "Each archive holds the secret.json files of new owners and buyers. Whoever downloads it must hand each plot folder only to its owner and keep the rest private. The server copy expires 7 days after the round is published; after that the secrets are gone and the affected plots must be re-issued with new property IDs.",
     "empty": "No registration round has produced an archive yet.",
-    "colRound": "Round",
+    "colRound": "Registration round",
     "colPublished": "Published",
     "colOffice": "Office",
     "colPlots": "Plots",
@@ -750,6 +750,9 @@
     "expiredHint": "Secrets deleted; re-issue these plots.",
     "download": "Download ZIP",
     "downloading": "Downloading…",
-    "noValue": "—"
+    "noValue": "—",
+    "expiresUnderHour": "< 1 h",
+    "expiredHintNeutral": "Expired on the server; the downloaded copy still works.",
+    "tableLabel": "Round archives by office"
   }
 }
