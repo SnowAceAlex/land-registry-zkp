@@ -26,3 +26,18 @@ describe('DraftLockService (D44)', () => {
     await expect(service.openDraft()).resolves.toEqual({ kind: 'changeset', id: 9 });
   });
 });
+
+describe('DraftLockService inside a transaction (createDraft race)', () => {
+  it('reads the open draft through the client it is handed, not its own', async () => {
+    const own = { changeSet: { findFirst: jest.fn().mockResolvedValue(null) } };
+    const tx = { changeSet: { findFirst: jest.fn().mockResolvedValue({ id: 4 }) } };
+    const service = new DraftLockService(own as never);
+
+    await expect(service.assertNoOpenDraft(tx as never)).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.changeSet.findFirst).toHaveBeenCalledWith({
+      where: { status: 'DRAFT' },
+      select: { id: true },
+    });
+    expect(own.changeSet.findFirst).not.toHaveBeenCalled();
+  });
+});

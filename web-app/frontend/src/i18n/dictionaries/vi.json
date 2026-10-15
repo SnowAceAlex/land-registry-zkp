@@ -632,6 +632,7 @@
     "centralScopeRequired": "Chỉ trung tâm (trụ sở và các cơ sở) mới thực hiện được thao tác này. Chi nhánh thì không.",
     "predecessorNotRevoked": "Giấy chứng nhận mà giấy này thay thế chưa bị thu hồi. Hãy thu hồi giấy cũ và chốt sổ đợt đó trước.",
     "itemInOpenDraft": "Mục này đã nằm trong đợt vào sổ đang chuẩn bị. Hãy hủy bản nháp hoặc hoàn tất đợt đó trước.",
+    "queueChanged": "Hàng chờ vừa thay đổi trong lúc tạo đợt — hãy tạo lại.",
     "unreachable": "Không thể kết nối đến máy chủ hệ thống",
     "unknown": "Đã xảy ra lỗi không mong muốn",
     "walletRejected": "Thao tác ký đã bị hủy trong ví",

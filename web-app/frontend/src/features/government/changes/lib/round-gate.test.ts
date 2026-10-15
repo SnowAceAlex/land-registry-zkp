@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Alert } from '../../api/types';
-import { ackSignature, roundGate } from './round-gate';
+import { ackSignature, ROUND_BLOCKING_CODES, roundGate } from './round-gate';
 
 const alert = (severity: Alert['severity'], code: Alert['code'] = 'HeldItems'): Alert => ({
   code,
@@ -24,10 +24,25 @@ describe('roundGate (D84)', () => {
     expect(roundGate([alert('info'), warning])).toEqual({ state: 'needs-ack', reasons: [warning] });
   });
 
-  it('blocks on any error, and lists only the errors', () => {
+  it('blocks only on ChainAheadOfDatabase, and lists only the blocking alerts', () => {
+    expect(ROUND_BLOCKING_CODES).toEqual(['ChainAheadOfDatabase']);
     const error = alert('error', 'ChainAheadOfDatabase');
-    const gate = roundGate([alert('warning'), error, alert('info')]);
+    const gate = roundGate([alert('warning'), error, alert('error', 'ArchiveExpiredUndownloaded')]);
     expect(gate).toEqual({ state: 'blocked', reasons: [error] });
+  });
+
+  it('asks for an acknowledgement on an expired archive, which never clears by itself', () => {
+    const expired = alert('error', 'ArchiveExpiredUndownloaded');
+    expect(roundGate([expired])).toEqual({ state: 'needs-ack', reasons: [expired] });
+  });
+
+  it('asks for an acknowledgement on a missing role, error or not', () => {
+    const role = alert('error', 'AuthorityRoleMissing');
+    const warning = alert('warning', 'StaleQueueItem');
+    expect(roundGate([role, alert('info'), warning])).toEqual({
+      state: 'needs-ack',
+      reasons: [role, warning],
+    });
   });
 });
 
@@ -39,8 +54,8 @@ describe('ackSignature (D84)', () => {
     expect(ackSignature([a, b])).toBe(ackSignature([b, a]));
   });
 
-  it('ignores a count that moved but not which warnings are showing', () => {
-    expect(ackSignature([a])).toBe(ackSignature([{ ...a, count: 9 }]));
+  it('changes when a count moves, so a tick for one item does not cover five', () => {
+    expect(ackSignature([b])).not.toBe(ackSignature([{ ...b, count: 5 }]));
   });
 
   it('changes when a warning is added, removed or moves to another office', () => {

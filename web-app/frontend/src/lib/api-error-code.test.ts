@@ -37,6 +37,7 @@ describe('apiErrorCode', () => {
       'predecessor-not-revoked',
     );
     expect(apiErrorCode(new ApiError(409, 'x', 'ItemInOpenDraft'))).toBe('item-in-open-draft');
+    expect(apiErrorCode(new ApiError(409, 'x', 'QueueChanged'))).toBe('queue-changed');
   });
 
   it('calls a 403 without a reason forbidden, not unknown', () => {

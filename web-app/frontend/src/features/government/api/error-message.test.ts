@@ -44,6 +44,7 @@ describe('apiFailure', () => {
     [403, 'CentralScopeRequired', 'centralScopeRequired'],
     [409, 'PredecessorNotRevoked', 'predecessorNotRevoked'],
     [409, 'ItemInOpenDraft', 'itemInOpenDraft'],
+    [409, 'QueueChanged', 'queueChanged'],
   ] as const)('words %i %s in both languages (D86, D87, D90)', (status, reason, key) => {
     for (const dict of [en.govErrors, viDict.govErrors]) {
       const failure = apiFailure(new ApiError(status, BACKEND_PROSE, reason), dict);

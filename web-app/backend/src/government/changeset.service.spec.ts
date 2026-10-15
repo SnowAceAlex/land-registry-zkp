@@ -1,7 +1,12 @@
 import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { hashRecord } from '@land-registry/blockchain/shared';
 
-import { ChangeSetService, DEFAULT_REVOCATION_CAP, revocationCap } from './changeset.service';
+import {
+  ChangeSetService,
+  DEFAULT_REVOCATION_CAP,
+  ROUND_DRAFT_LOCK_KEY,
+  revocationCap,
+} from './changeset.service';
 import { ARCHIVE_TTL_DAYS } from '../issuance/archive.service';
 import { LineageService } from '../lineage/lineage.service';
 import { toLURRecord } from '../records/record.mapper';
@@ -21,6 +26,37 @@ const overlayOf = (root: bigint) => ({ root, touched: new Map<string, bigint>(),
 
 /** A write that returns a labelled statement, so a test can see what shares a $transaction. */
 const tagged = (label: string) => jest.fn((args: any) => ({ label, args }));
+
+type TxMock = {
+  $executeRawUnsafe: jest.Mock;
+  $transaction: jest.Mock;
+  issuanceRequest: { updateMany: jest.Mock };
+  transferRequest: { updateMany: jest.Mock };
+  revocation: { updateMany: jest.Mock };
+};
+
+/**
+ * createDraft runs in one interactive transaction: the mock hands itself in as `tx`, takes the
+ * advisory lock, and attaches every id it is given. confirm()'s array form goes to the original.
+ */
+function asTx<T extends object>(prisma: T): T & TxMock {
+  const p = prisma as any;
+  if (!p.$executeRawUnsafe) p.$executeRawUnsafe = jest.fn().mockResolvedValue(0);
+  for (const model of ['issuanceRequest', 'transferRequest', 'revocation']) {
+    p[model] = p[model] ?? {};
+    if (!p[model].updateMany) {
+      p[model].updateMany = jest.fn(async ({ where }: any) => ({ count: where.id.in.length }));
+    }
+  }
+  const arrayForm = p.$transaction ?? jest.fn().mockResolvedValue([]);
+  p.$transaction = jest.fn((arg: unknown, options?: unknown) =>
+    typeof arg === 'function' ? arg(p) : arrayForm(arg, options),
+  );
+  return p;
+}
+
+/** RoundArchiveService as confirm() uses it: the expired-archive purge (A3). */
+const archiveStore = () => ({ purgeExpired: jest.fn().mockResolvedValue(0) });
 
 const OFFICES = [
   { id: 1, code: 'HQ' },
@@ -51,7 +87,7 @@ describe('ChangeSetService (D44)', () => {
   const changeSetCreate = jest.fn();
   const changeSetUpdate = jest.fn();
 
-  const prisma = {
+  const prisma = asTx({
     issuanceRequest: { findMany: issuanceFindMany, update: jest.fn() },
     transferRequest: { findMany: transferFindMany, update: jest.fn() },
     revocation: { findMany: revocationFindMany, update: jest.fn() },
@@ -66,7 +102,7 @@ describe('ChangeSetService (D44)', () => {
     // not a re-hash), so an empty result is the honest fixture.
     property: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
     $transaction: jest.fn().mockResolvedValue([]),
-  } as never;
+  }) as unknown as never;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -80,6 +116,7 @@ describe('ChangeSetService (D44)', () => {
   it('reports the revocation cap alongside the queue', async () => {
     const service = new ChangeSetService(
       prisma,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -102,6 +139,7 @@ describe('ChangeSetService (D44)', () => {
     process.env.REVOCATION_CAP = '60';
     const service = new ChangeSetService(
       prisma,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -147,6 +185,7 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     const { transfers } = await service.pending(CENTRAL_ACTOR);
@@ -183,6 +222,7 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     const { issuances } = await service.pending(CENTRAL_ACTOR);
@@ -195,6 +235,7 @@ describe('ChangeSetService (D44)', () => {
   it('scopes all three lists to a branch’s own area, and none for the central office (D86)', async () => {
     const service = new ChangeSetService(
       prisma,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -238,6 +279,7 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     const pending = await service.pending(CENTRAL_ACTOR);
@@ -268,6 +310,7 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       { assertNoOpenDraft: jest.fn() } as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -312,6 +355,7 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     const draft = await service.createDraft(CENTRAL_ACTOR);
@@ -348,6 +392,7 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       {} as never,
+      archiveStore() as never,
     );
 
     await expect(service.confirm(4, undefined, CENTRAL_ACTOR)).rejects.toBeInstanceOf(
@@ -429,7 +474,11 @@ describe('ChangeSetService (D44)', () => {
     const nodes = { projectRoot, applyStatements, proofInOverlay };
     const issuance = { commitmentFor: jest.fn() };
     const roundArchives = { build: jest.fn().mockResolvedValue([OFFICE_ARCHIVE]) };
-    const roots = { recordRootStatement: jest.fn().mockReturnValue('RECORD_ROOT_STMT') };
+    const roots = {
+      recordRootStatement: jest.fn().mockReturnValue('RECORD_ROOT_STMT'),
+      warnChainAheadOfDatabase: jest.fn(),
+    };
+    const archives = archiveStore();
     const events = {
       issuedStatements: jest.fn().mockReturnValue([]),
       transferredStatements: jest.fn().mockReturnValue([]),
@@ -446,10 +495,14 @@ describe('ChangeSetService (D44)', () => {
       issuance as never,
       roundArchives as never,
       {} as never,
+      archives as never,
     );
 
     return {
       service,
+      archives,
+      roots,
+      prisma: prisma as any,
       propertyUpdate,
       transferUpdate,
       projectRoot,
@@ -546,6 +599,7 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     await expect(service.discard(4)).rejects.toBeInstanceOf(ConflictException);
@@ -558,6 +612,7 @@ describe('ChangeSetService (D44)', () => {
     changeSetFindUnique.mockResolvedValue({ id: 4, status: 'DRAFT' });
     const service = new ChangeSetService(
       prisma,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -679,6 +734,28 @@ describe('ChangeSetService (D44)', () => {
     expect(archiveCreate.mock.calls.map((c) => c[0].data.expiresAt)).toEqual([expected, expected]);
   });
 
+  it('confirm purges expired archives before it reads the draft (D88)', async () => {
+    const { service, archives, prisma } = buildConfirmScenario();
+
+    await service.confirm(9, undefined, CENTRAL_ACTOR);
+
+    expect(archives.purgeExpired).toHaveBeenCalledWith(expect.any(Date));
+    expect(archives.purgeExpired.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.changeSet.findUnique.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('confirm reports the chain ahead of the database when the archive build fails', async () => {
+    const { service, roundArchives, roots, transaction } = buildConfirmScenario();
+    const failure = new Error('zip failed');
+    roundArchives.build.mockRejectedValue(failure);
+
+    await expect(service.confirm(9, undefined, CENTRAL_ACTOR)).rejects.toBe(failure);
+    // The chain already holds this root, so any failure past that check is a divergence.
+    expect(roots.warnChainAheadOfDatabase).toHaveBeenCalledWith('', failure);
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
   it('confirm refuses a transfer that carries no secret, before touching the chain (D77)', async () => {
     const { service, transaction, chain } = buildConfirmScenario({ secret: null });
 
@@ -721,6 +798,7 @@ describe('ChangeSetService (D44)', () => {
       {} as never,
       roundArchives as never,
       {} as never,
+      archiveStore() as never,
     );
 
     await service.confirm(4, undefined, CENTRAL_ACTOR);
@@ -758,7 +836,7 @@ describe('ChangeSetService (D44)', () => {
       }));
       const findUnique = jest.fn();
       const count = jest.fn();
-      const prisma = {
+      const prisma = asTx({
         issuanceRequest: { findMany: jest.fn().mockResolvedValue([]) },
         transferRequest: { findMany: jest.fn().mockResolvedValue([transfer]) },
         revocation: { findMany: jest.fn().mockResolvedValue(pendingRevocations), count },
@@ -768,10 +846,10 @@ describe('ChangeSetService (D44)', () => {
         property: {
           findMany: jest.fn().mockResolvedValue([propertyRow({ propertyId: transfer.propertyId })]),
         },
-      } as never;
+      });
       const projectRoot = jest.fn().mockResolvedValue(overlayOf(777n));
       const service = new ChangeSetService(
-        prisma,
+        prisma as never,
         { projectRoot, applyStatements: jest.fn().mockReturnValue([]) } as never,
         {} as never,
         {} as never,
@@ -780,8 +858,9 @@ describe('ChangeSetService (D44)', () => {
         {} as never,
         {} as never,
         {} as never,
+        {} as never,
       );
-      return { service, create, findUnique, count, projectRoot };
+      return { service, create, findUnique, count, projectRoot, prisma };
     }
 
     it('rebuilds exactly what createDraft returned, calldata included', async () => {
@@ -837,7 +916,7 @@ describe('ChangeSetService (D44)', () => {
       const pending = Array.from({ length: DEFAULT_REVOCATION_CAP + 2 }, (_, i) =>
         revocation(i + 1, String(2000 + i)),
       );
-      const { service, create, projectRoot } = scenario(pending);
+      const { service, prisma, projectRoot } = scenario(pending);
 
       const draft = await service.createDraft(CENTRAL_ACTOR);
 
@@ -845,11 +924,10 @@ describe('ChangeSetService (D44)', () => {
       expect(draft.revocationIds).toEqual(inRound.map((r) => r.id));
       expect(draft.revocationCalldata.propertyIds).toHaveLength(DEFAULT_REVOCATION_CAP);
       expect(draft.deferredRevocations).toBe(2);
-      expect(create).toHaveBeenCalledWith(
+      expect(prisma.revocation.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            revocations: { connect: inRound.map((r) => ({ id: r.id })) },
-          }),
+          where: expect.objectContaining({ id: { in: inRound.map((r) => r.id) } }),
+          data: { changeSetId: 4 },
         }),
       );
       // The projection drops ONLY this round's plots: the two deferred ones
@@ -875,17 +953,13 @@ describe('ChangeSetService (D44)', () => {
 
     it('leaves a held revocation out of the round and out of the deferred count', async () => {
       const held = { ...revocation(2, '2002'), heldAt: new Date() };
-      const { service, create } = scenario([revocation(1, '2001'), held, revocation(3, '2003')]);
+      const { service, prisma } = scenario([revocation(1, '2001'), held, revocation(3, '2003')]);
 
       const draft = await service.createDraft(CENTRAL_ACTOR);
 
       expect(draft.revocationIds).toEqual([1, 3]);
       expect(draft.deferredRevocations).toBe(0);
-      expect(create.mock.calls[0]).toEqual([
-        expect.objectContaining({
-          data: expect.objectContaining({ revocations: { connect: [{ id: 1 }, { id: 3 }] } }),
-        }),
-      ]);
+      expect(prisma.revocation.updateMany.mock.calls[0][0].where.id).toEqual({ in: [1, 3] });
     });
 
     it('still refuses a transfer and a revocation for the same plot, even a deferred one', async () => {
@@ -931,7 +1005,7 @@ describe('ChangeSetService.createDraft — duplicate queue entries', () => {
     transfers: { id: number; propertyId: string; newOwnerCommitment: string }[],
     revocations: { id: number; propertyId: string; heldAt?: Date }[],
   ) {
-    const prisma = {
+    const prisma = asTx({
       issuanceRequest: { findMany: jest.fn().mockResolvedValue([]) },
       transferRequest: {
         findMany: jest.fn().mockResolvedValue(transfers.map((t) => ({ heldAt: null, ...t }))),
@@ -950,14 +1024,15 @@ describe('ChangeSetService.createDraft — duplicate queue entries', () => {
       changeSet: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       property: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
       $transaction: jest.fn(),
-    } as never;
+    });
 
     return new ChangeSetService(
-      prisma,
+      prisma as never,
       { projectRoot: jest.fn(), applyStatements: jest.fn() } as never,
       {} as never,
       {} as never,
       { assertNoOpenDraft: jest.fn() } as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -1054,7 +1129,7 @@ describe('ChangeSetService — a transfer may not resurrect a revoked plot (D45/
     const transfer = { id: 7, propertyId: '4004', newOwnerCommitment: '888', heldAt: null };
     const create = jest.fn();
     const transaction = jest.fn().mockResolvedValue([]);
-    const prisma = {
+    const prisma = asTx({
       issuanceRequest: { findMany: jest.fn().mockResolvedValue([]) },
       transferRequest: { findMany: jest.fn().mockResolvedValue([transfer]), update: jest.fn() },
       revocation: {
@@ -1082,10 +1157,10 @@ describe('ChangeSetService — a transfer may not resurrect a revoked plot (D45/
         update: jest.fn(),
       },
       $transaction: transaction,
-    } as never;
+    });
 
     const service = new ChangeSetService(
-      prisma,
+      prisma as never,
       {
         projectRoot: jest.fn().mockResolvedValue(overlayOf(555n)),
         applyStatements: jest.fn().mockReturnValue([]),
@@ -1102,6 +1177,7 @@ describe('ChangeSetService — a transfer may not resurrect a revoked plot (D45/
       {} as never,
       {} as never,
       {} as never,
+      archiveStore() as never,
     );
     return { service, create, transaction };
   }
@@ -1177,7 +1253,7 @@ describe('ChangeSetService — issuance in the round (D84)', () => {
       transfers,
       revocations,
     };
-    const prisma = {
+    const prisma = asTx({
       issuanceRequest: {
         findMany: jest.fn().mockResolvedValue(issuances),
         update: statement('issuanceRequest.update'),
@@ -1208,7 +1284,7 @@ describe('ChangeSetService — issuance in the round (D84)', () => {
         update: statement('changeSet.update'),
       },
       $transaction: jest.fn().mockResolvedValue([]),
-    };
+    });
     const chain = {
       getLatestRoot: jest.fn().mockResolvedValue(555n),
       invalidateRootCache: jest.fn(),
@@ -1253,6 +1329,7 @@ describe('ChangeSetService — issuance in the round (D84)', () => {
       issuance as never,
       roundArchives as never,
       lineage as never,
+      archiveStore() as never,
     );
     return { service, prisma, chain, nodes, issuance, roundArchives, events, lineage };
   }
@@ -1261,23 +1338,92 @@ describe('ChangeSetService — issuance in the round (D84)', () => {
     hashRecord(toLURRecord({ ...property, ownerCommitment }));
 
   describe('createDraft', () => {
-    it('connects the issuance requests, stamps the creating office and writes nothing else', async () => {
+    it('attaches the issuance requests, stamps the creating office and writes nothing else', async () => {
       const { service, prisma } = scenario();
 
       const draft = await service.createDraft({ ...CENTRAL_ACTOR, officeId: 3 });
 
       expect(prisma.changeSet.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          status: 'DRAFT',
-          createdByOfficeId: 3,
-          issuances: { connect: [{ id: 21 }] },
-        }),
+        data: { status: 'DRAFT', newRoot: '555', createdByOfficeId: 3 },
+      });
+      expect(prisma.issuanceRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: [21] }, changeSetId: null, status: 'READY', heldAt: null },
+        data: { changeSetId: 30 },
       });
       expect(draft.issuanceRequestIds).toEqual([21]);
       // D43: only confirm() may write Property or a request's status.
       expect(prisma.property.update).not.toHaveBeenCalled();
       expect(prisma.issuanceRequest.update).not.toHaveBeenCalled();
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    describe('one atomic draft under concurrent calls', () => {
+      const mixed = () =>
+        scenario({
+          transfers: [
+            { id: 1, propertyId: '1001', newOwnerCommitment: '999', newOwnerSecret: '43' },
+          ],
+          revocations: [{ id: 2, propertyId: '2002', reasonCode: 1, detailHash: '0xaa' }],
+          properties: [importedPlot(), propertyRow({ propertyId: '1001', status: 'ISSUED' })],
+        });
+
+      it('runs in one interactive transaction that takes the advisory lock before any read', async () => {
+        const { service, prisma } = mixed();
+        const lock = (service as any).lock.assertNoOpenDraft as jest.Mock;
+
+        await service.createDraft(CENTRAL_ACTOR);
+
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+          timeout: 120_000,
+        });
+        expect(prisma.$executeRawUnsafe).toHaveBeenCalledWith(
+          `SELECT pg_advisory_xact_lock(${ROUND_DRAFT_LOCK_KEY})`,
+        );
+        const lockedAt = prisma.$executeRawUnsafe.mock.invocationCallOrder[0];
+        for (const read of [
+          lock,
+          prisma.issuanceRequest.findMany,
+          prisma.transferRequest.findMany,
+          prisma.revocation.findMany,
+        ]) {
+          expect(read.mock.invocationCallOrder[0]).toBeGreaterThan(lockedAt);
+        }
+        // The open-draft check reads through the transaction, not beside it.
+        expect(lock).toHaveBeenCalledWith(prisma);
+      });
+
+      it('attaches each kind only while it is still open, not held and in no round', async () => {
+        const { service, prisma } = mixed();
+
+        await service.createDraft(CENTRAL_ACTOR);
+
+        expect(prisma.transferRequest.updateMany).toHaveBeenCalledWith({
+          where: { id: { in: [1] }, changeSetId: null, status: 'APPROVED', heldAt: null },
+          data: { changeSetId: 30 },
+        });
+        expect(prisma.revocation.updateMany).toHaveBeenCalledWith({
+          where: { id: { in: [2] }, changeSetId: null, status: 'PENDING', heldAt: null },
+          data: { changeSetId: 30 },
+        });
+      });
+
+      it.each(['issuanceRequest', 'transferRequest', 'revocation'] as const)(
+        'answers 409 QueueChanged and rolls back when a %s left the queue mid-draft',
+        async (model) => {
+          const { service, prisma } = mixed();
+          prisma[model].updateMany.mockResolvedValueOnce({ count: 0 });
+
+          const error = await service.createDraft(CENTRAL_ACTOR).catch((e: unknown) => e);
+
+          expect(error).toBeInstanceOf(ConflictException);
+          expect((error as ConflictException).getResponse()).toMatchObject({
+            reason: 'QueueChanged',
+          });
+          // Thrown inside the callback, so Prisma rolls back the ChangeSet it created.
+          expect(prisma.changeSet.create).toHaveBeenCalledTimes(1);
+          await expect(prisma.$transaction.mock.results[0].value).rejects.toBe(error);
+        },
+      );
     });
 
     it("projects the issued leaf from the plot with the request's commitment", async () => {
@@ -1564,7 +1710,7 @@ describe('ChangeSetService — issuance in the round (D84)', () => {
 
 describe('ChangeSetService — buyer secrets and the archive (D77)', () => {
   it('createDraft refuses transfers submitted before D77 and names them', async () => {
-    const prisma = {
+    const prisma = asTx({
       issuanceRequest: { findMany: jest.fn().mockResolvedValue([]) },
       transferRequest: {
         findMany: jest
@@ -1575,13 +1721,14 @@ describe('ChangeSetService — buyer secrets and the archive (D77)', () => {
       },
       revocation: { findMany: jest.fn().mockResolvedValue([]) },
       changeSet: { create: jest.fn() },
-    };
+    });
     const service = new ChangeSetService(
       prisma as never,
       {} as never,
       {} as never,
       {} as never,
       { assertNoOpenDraft: jest.fn() } as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -1612,6 +1759,7 @@ describe('ChangeSetService — buyer secrets and the archive (D77)', () => {
     ]);
     const service = new ChangeSetService(
       { changeSet: { findMany } } as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,

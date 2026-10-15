@@ -30,7 +30,17 @@ export class RoundArchiveService {
   }
 
   async archivesForActor(actor: Actor): Promise<ArchiveSummaryDto[]> {
+    await this.purgeExpired(new Date());
     return this.summaries(this.ownOffice(actor));
+  }
+
+  /** Drops the server copy of every expired archive so its secrets do not linger; the row stays. */
+  async purgeExpired(now: Date): Promise<number> {
+    const { count } = await this.prisma.changeSetArchive.updateMany({
+      where: { expiresAt: { lte: now }, zip: { not: null } },
+      data: { zip: null },
+    });
+    return count;
   }
 
   /** The office's archive of the round, while it exists. An expired archive is gone for good. */

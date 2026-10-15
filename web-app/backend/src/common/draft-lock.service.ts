@@ -1,8 +1,12 @@
 import { ConflictException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
 export type OpenDraft = { kind: 'changeset'; id: number };
+
+/** The service's own client, or the transaction createDraft holds its advisory lock in. */
+type DraftClient = Pick<Prisma.TransactionClient, 'changeSet'>;
 
 /**
  * DraftLockService — at most one open draft (D44).
@@ -18,16 +22,16 @@ export type OpenDraft = { kind: 'changeset'; id: number };
 export class DraftLockService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async openDraft(): Promise<OpenDraft | null> {
-    const changeSet = await this.prisma.changeSet.findFirst({
+  async openDraft(client: DraftClient = this.prisma): Promise<OpenDraft | null> {
+    const changeSet = await client.changeSet.findFirst({
       where: { status: 'DRAFT' },
       select: { id: true },
     });
     return changeSet ? { kind: 'changeset', id: changeSet.id } : null;
   }
 
-  async assertNoOpenDraft(): Promise<void> {
-    const open = await this.openDraft();
+  async assertNoOpenDraft(client: DraftClient = this.prisma): Promise<void> {
+    const open = await this.openDraft(client);
     if (!open) return;
 
     throw new ConflictException(

@@ -632,6 +632,7 @@
     "centralScopeRequired": "Only the central office (head office and its sites) can do this. Branches cannot.",
     "predecessorNotRevoked": "The certificate this one replaces has not been revoked yet. Revoke it and publish that round first.",
     "itemInOpenDraft": "This item is already in the round being prepared. Discard the draft or finish the round first.",
+    "queueChanged": "The queue changed while the round was being built — create it again.",
     "unreachable": "Could not reach registry API",
     "unknown": "An unexpected error occurred",
     "walletRejected": "Signature was cancelled in wallet",

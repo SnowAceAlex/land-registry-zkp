@@ -509,7 +509,9 @@ Sao từ spec Phase 10 (§6.2, §8, §9, §2.1, §6.5) và D83, ghi ra thay vì 
    lúc bàn giao. Đây là mức D77 đã chấp nhận cho người mua; D87 không mở thêm loại rủi ro mới nhưng kéo dài cửa sổ đó cho cấp mới.
 2. **Trung tâm dự phòng (D88).** Trung tâm tải được archive của mọi chi nhánh, nên giới hạn D42 chỉ được *thu hẹp*, chưa
    mất. Hệ thống chỉ ghi **lần tải đầu** của mỗi phần: chi nhánh tải trước rồi trung tâm tải lại thì lần sau không được ghi.
-   Archive hết hạn mà chưa ai tải thì secret bị xoá và các thửa đó phải cấp lại với `propertyId` mới (D83).
+   Archive hết hạn mà chưa ai tải thì secret bị xoá và các thửa đó phải cấp lại với `propertyId` mới (D83). Bản trên máy
+   chủ được xoá ở lần chốt sổ hoặc lần mở danh sách archive kế tiếp sau khi hết hạn (hoặc khi có người thử tải phần đó),
+   không phải đúng lúc hết hạn — trong khoảng đó secret vẫn nằm trong DB.
 3. **Định danh theo đơn vị, không theo người (D86).** Khoá API tĩnh mỗi đơn vị (băm sha256), chưa có tài khoản cán bộ,
    OIDC hay VNeID, nên không có nhật ký theo từng người. `Actor` đã chừa chỗ: đổi cơ chế đăng nhập chỉ là thay resolver.
 4. **Chuỗi thay thế (D90) là dữ liệu của cơ quan đăng ký, không phải dữ liệu chứng minh được bằng mật mã.** Liên kết chỉ nằm

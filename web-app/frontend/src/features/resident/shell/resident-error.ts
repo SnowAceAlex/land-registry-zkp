@@ -70,6 +70,7 @@ const TITLES: Record<ResidentErrorCode, keyof ErrorStrings> = {
   'central-scope-required': 'forbidden',
   'predecessor-not-revoked': 'conflict',
   'item-in-open-draft': 'conflict',
+  'queue-changed': 'conflict',
   forbidden: 'forbidden',
   unreachable: 'unreachable',
   unknown: 'unknown',

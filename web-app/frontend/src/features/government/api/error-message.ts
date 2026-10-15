@@ -42,6 +42,7 @@ const API_TITLES: Record<ApiErrorCode, keyof ErrorStrings> = {
   'central-scope-required': 'centralScopeRequired',
   'predecessor-not-revoked': 'predecessorNotRevoked',
   'item-in-open-draft': 'itemInOpenDraft',
+  'queue-changed': 'queueChanged',
   forbidden: 'forbidden',
   unreachable: 'unreachable',
   unknown: 'unknown',

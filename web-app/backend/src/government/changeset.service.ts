@@ -9,6 +9,7 @@ import {
   ChangeSet,
   DraftStatus,
   IssuanceRequest,
+  Prisma,
   Property,
   Revocation,
   TransferRequest,
@@ -34,6 +35,7 @@ import { RevocationDto } from './dto/revocation.response.dto';
 import { toRevocationDto } from './revocation.serializer';
 import { RootService } from './root.service';
 import { RoundArchiveBuilder } from './round-archive.builder';
+import { RoundArchiveService } from './round-archive.service';
 
 /**
  * Most revocations one round carries (D56/D73) — past the block gas limit the
@@ -50,6 +52,11 @@ export function revocationCap(): number {
     ? value
     : DEFAULT_REVOCATION_CAP;
 }
+
+/** Advisory-lock key ("LR_ROUND" in ASCII) that serialises draft creation across connections. */
+export const ROUND_DRAFT_LOCK_KEY = 0x4c525f524f554e44n;
+const ROUND_DRAFT_LOCK_SQL = `SELECT pg_advisory_xact_lock(${ROUND_DRAFT_LOCK_KEY})`;
+const DRAFT_TRANSACTION_TIMEOUT_MS = 120_000;
 
 /** Arguments for `RootRegistry.publishRootWithRevocations`, index-aligned. */
 export interface RevocationCalldata {
@@ -98,7 +105,7 @@ const notHeld = <T extends { heldAt: Date | null }>(rows: T[]): T[] =>
 /**
  * The one publishing round (D84): READY issuances, APPROVED transfers and PENDING
  * revocations projected into a single root. Same draft → sign → confirm shape as D43:
- * a draft only `connect`s its items, and confirm() re-checks against the chain before
+ * a draft only attaches its items, and confirm() re-checks against the chain before
  * writing anything. Transfer proofs are authorisation evidence only — the tree is
  * always rebuilt from the database with the whole round applied.
  */
@@ -116,6 +123,7 @@ export class ChangeSetService {
     private readonly issuance: IssuanceService,
     private readonly roundArchives: RoundArchiveBuilder,
     private readonly lineage: LineageService,
+    private readonly archives: RoundArchiveService,
   ) {}
 
   /**
@@ -144,7 +152,10 @@ export class ChangeSetService {
    * included: they are still open procedures, so they keep blocking conflicting ones
    * even though they never enter a round (D87).
    */
-  private async queue(area: { landOfficeId?: number } = {}): Promise<{
+  private async queue(
+    area: { landOfficeId?: number } = {},
+    client: Prisma.TransactionClient = this.prisma,
+  ): Promise<{
     issuances: IssuanceRequest[];
     transfers: TransferRequest[];
     revocations: Revocation[];
@@ -152,22 +163,35 @@ export class ChangeSetService {
     const open = { changeSetId: null, ...area };
     const orderBy = { createdAt: 'asc' as const };
     const [issuances, transfers, revocations] = await Promise.all([
-      this.prisma.issuanceRequest.findMany({ where: { status: 'READY', ...open }, orderBy }),
-      this.prisma.transferRequest.findMany({ where: { status: 'APPROVED', ...open }, orderBy }),
-      this.prisma.revocation.findMany({ where: { status: 'PENDING', ...open }, orderBy }),
+      client.issuanceRequest.findMany({ where: { status: 'READY', ...open }, orderBy }),
+      client.transferRequest.findMany({ where: { status: 'APPROVED', ...open }, orderBy }),
+      client.revocation.findMany({ where: { status: 'PENDING', ...open }, orderBy }),
     ]);
     return { issuances, transfers, revocations };
   }
 
   /**
    * Phase 1 — take the whole queue, project the ONE root that applying all of it
-   * produces, and store it as a draft. Nothing but the new ChangeSet row is written:
-   * the items are only `connect`ed, so an abandoned draft leaves nothing half-applied.
+   * produces, and store it as a draft. Nothing but the new ChangeSet row and its items'
+   * `changeSetId` is written, so an abandoned draft leaves nothing half-applied.
+   * One transaction under an advisory lock, so two concurrent calls cannot both open a draft.
    */
   async createDraft(actor: Actor): Promise<ChangeSetDraftDetail> {
-    await this.lock.assertNoOpenDraft();
+    return this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRawUnsafe(ROUND_DRAFT_LOCK_SQL);
+        await this.lock.assertNoOpenDraft(tx);
+        return this.buildDraft(tx, actor);
+      },
+      { timeout: DRAFT_TRANSACTION_TIMEOUT_MS },
+    );
+  }
 
-    const queued = await this.queue();
+  private async buildDraft(
+    tx: Prisma.TransactionClient,
+    actor: Actor,
+  ): Promise<ChangeSetDraftDetail> {
+    const queued = await this.queue({}, tx);
     const issuances = notHeld(queued.issuances);
     const transfers = notHeld(queued.transfers);
     const pendingRevocations = notHeld(queued.revocations);
@@ -216,19 +240,17 @@ export class ChangeSetService {
 
     // Only the plots in this round are read (D72): the projection walks up from
     // their leaves instead of rebuilding the registry.
-    const { updates } = await this.leafUpdatesFor(issuances, transfers, revocations);
+    const { updates } = await this.leafUpdatesFor(issuances, transfers, revocations, tx);
     const overlay = await this.nodes.projectRoot(updates);
 
-    const draft = await this.prisma.changeSet.create({
+    const draft = await tx.changeSet.create({
       data: {
         status: 'DRAFT',
         newRoot: overlay.root.toString(),
         createdByOfficeId: actor.officeId,
-        issuances: { connect: issuances.map((r) => ({ id: r.id })) },
-        transfers: { connect: transfers.map((t) => ({ id: t.id })) },
-        revocations: { connect: revocations.map((r) => ({ id: r.id })) },
       },
     });
+    await this.attachItems(tx, draft.id, issuances, transfers, revocations);
 
     this.logger.log(
       `change set draft #${draft.id}: ${issuances.length} issuance(s), ` +
@@ -243,6 +265,56 @@ export class ChangeSetService {
       revocations,
       pendingRevocations.length - revocations.length,
     );
+  }
+
+  /**
+   * Attaches each item only if it is still open, unheld and in no round. A withdraw or hold
+   * that committed after the queue read leaves a count short: 409 QueueChanged, rolled back.
+   */
+  private async attachItems(
+    tx: Prisma.TransactionClient,
+    changeSetId: number,
+    issuances: { id: number }[],
+    transfers: { id: number }[],
+    revocations: { id: number }[],
+  ): Promise<void> {
+    const data = { changeSetId };
+    const open = (rows: { id: number }[]) => ({
+      id: { in: rows.map((row) => row.id) },
+      changeSetId: null,
+      heldAt: null,
+    });
+    const check = (kind: string, count: number, expected: number) => {
+      if (count === expected) return;
+      throw new ConflictException({
+        reason: 'QueueChanged',
+        message:
+          `The queue changed while round #${changeSetId} was being built: only ${count} of ` +
+          `${expected} ${kind} item(s) were still open. Create the round again.`,
+      });
+    };
+
+    if (issuances.length > 0) {
+      const { count } = await tx.issuanceRequest.updateMany({
+        where: { ...open(issuances), status: 'READY' },
+        data,
+      });
+      check('issuance', count, issuances.length);
+    }
+    if (transfers.length > 0) {
+      const { count } = await tx.transferRequest.updateMany({
+        where: { ...open(transfers), status: 'APPROVED' },
+        data,
+      });
+      check('transfer', count, transfers.length);
+    }
+    if (revocations.length > 0) {
+      const { count } = await tx.revocation.updateMany({
+        where: { ...open(revocations), status: 'PENDING' },
+        data,
+      });
+      check('revocation', count, revocations.length);
+    }
   }
 
   /** D87: ids of requests whose stored secret does not open the stored commitment. */
@@ -389,6 +461,9 @@ export class ChangeSetService {
     transferIds: number[];
     revocationIds: number[];
   }> {
+    // D88: expired archives lose their server copy here, so their secrets do not linger.
+    await this.archives.purgeExpired(new Date());
+
     const draft = await this.prisma.changeSet.findUnique({
       where: { id },
       include: { issuances: true, transfers: true, revocations: true },
@@ -459,26 +534,27 @@ export class ChangeSetService {
     }
 
     const decidedAt = new Date();
-    // Every secret this round clears lives on an issuance or a transfer, so a round
-    // with neither has no archive and nothing to clear.
-    const archives =
-      draft.issuances.length > 0 || draft.transfers.length > 0
-        ? await this.roundArchives.build({
-            changeSetId: draft.id,
-            txHash: draft.txHash,
-            rootVersion,
-            overlay,
-            issuances: draft.issuances,
-            transfers: draft.transfers,
-            before: beforeById,
-            newLeaves,
-            publishedAt: decidedAt,
-            offices: await officeCodes(this.prisma),
-          })
-        : [];
     const archiveExpiresAt = new Date(decidedAt.getTime() + ARCHIVE_TTL_DAYS * 24 * 60 * 60 * 1000);
 
     try {
+      // Every secret this round clears lives on an issuance or a transfer, so a round
+      // with neither has no archive and nothing to clear.
+      const archives =
+        draft.issuances.length > 0 || draft.transfers.length > 0
+          ? await this.roundArchives.build({
+              changeSetId: draft.id,
+              txHash: draft.txHash,
+              rootVersion,
+              overlay,
+              issuances: draft.issuances,
+              transfers: draft.transfers,
+              before: beforeById,
+              newLeaves,
+              publishedAt: decidedAt,
+              offices: await officeCodes(this.prisma),
+            })
+          : [];
+
       await this.prisma.$transaction([
         ...draft.issuances.map((request) =>
           this.prisma.property.update({
@@ -597,8 +673,8 @@ export class ChangeSetService {
         }),
       ]);
     } catch (error) {
-      // The wallet already published this root (checked above), so a failure here
-      // leaves the database behind the chain — surface it for manual reconciliation.
+      // The wallet already published this root (checked above), so a failure here —
+      // archive build or transaction — leaves the database behind the chain.
       this.roots.warnChainAheadOfDatabase(draft.txHash ?? '', error);
       throw error;
     }
@@ -628,13 +704,14 @@ export class ChangeSetService {
     issuances: IssuanceItem[],
     transfers: TransferItem[],
     revocations: { propertyId: string }[],
+    client: Prisma.TransactionClient = this.prisma,
   ): Promise<{
     updates: Map<number, bigint | null>;
     newLeaves: Map<string, string>;
     before: Map<string, Property>;
   }> {
     const propertyIds = [...issuances, ...transfers, ...revocations].map((item) => item.propertyId);
-    const rows = await this.prisma.property.findMany({
+    const rows = await client.property.findMany({
       where: { propertyId: { in: propertyIds } },
     });
     const before = new Map(rows.map((property) => [property.propertyId, property]));
@@ -696,7 +773,7 @@ export class ChangeSetService {
     return { updates, newLeaves, before };
   }
 
-  /** Abandon a draft. Its items were only `connect`ed, so releasing them returns them to the queue. */
+  /** Abandon a draft. Its items were only attached, so releasing them returns them to the queue. */
   async discard(id: number): Promise<void> {
     const draft = await this.prisma.changeSet.findUnique({ where: { id } });
     if (!draft) throw new NotFoundException(`Change set #${id} not found`);

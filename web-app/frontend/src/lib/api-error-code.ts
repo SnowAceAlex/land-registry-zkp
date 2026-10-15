@@ -40,6 +40,7 @@ export type ApiErrorCode =
   | 'central-scope-required'
   | 'predecessor-not-revoked'
   | 'item-in-open-draft'
+  | 'queue-changed'
   | 'forbidden'
   | 'unreachable'
   | 'unknown';
@@ -55,6 +56,7 @@ const REASON_CODES: Record<ApiReason, ApiErrorCode> = {
   CentralScopeRequired: 'central-scope-required',
   PredecessorNotRevoked: 'predecessor-not-revoked',
   ItemInOpenDraft: 'item-in-open-draft',
+  QueueChanged: 'queue-changed',
 };
 
 const STATUS_CODES: Record<number, ApiErrorCode> = {

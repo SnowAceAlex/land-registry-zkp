@@ -31,8 +31,9 @@ export type ProofRejectionReason =
 /**
  * Every `reason` a screen may branch on: the proof rejections above, the 409
  * the attestation route answers while the plot has an open procedure (D82), the
- * two 403s of the office scope (D86) and the two 409s of the shared queue and
- * the issuance of a re-issued certificate (D87, D90).
+ * two 403s of the office scope (D86), the two 409s of the shared queue and
+ * the issuance of a re-issued certificate (D87, D90), and the 409 a round draft
+ * answers when the queue changed while it was being built.
  */
 export type ApiReason =
   | ProofRejectionReason
@@ -40,7 +41,8 @@ export type ApiReason =
   | 'OutsideOfficeArea'
   | 'CentralScopeRequired'
   | 'PredecessorNotRevoked'
-  | 'ItemInOpenDraft';
+  | 'ItemInOpenDraft'
+  | 'QueueChanged';
 const API_REASONS: readonly string[] = [
   'InvalidProof',
   'RootMismatch',
@@ -52,6 +54,7 @@ const API_REASONS: readonly string[] = [
   'CentralScopeRequired',
   'PredecessorNotRevoked',
   'ItemInOpenDraft',
+  'QueueChanged',
 ];
 
 /**

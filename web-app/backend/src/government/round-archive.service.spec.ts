@@ -128,6 +128,36 @@ describe('RoundArchiveService (D88)', () => {
         officeId: BRANCH_ACTOR.officeId,
       });
     });
+
+    it('purges every expired archive before it lists', async () => {
+      const { service, prisma } = setup();
+
+      await service.archivesForActor(BRANCH_ACTOR);
+
+      // Every office's expired copy, not only the caller's: the purge is about secrets, not scope.
+      expect(prisma.changeSetArchive.updateMany).toHaveBeenCalledWith({
+        where: { expiresAt: { lte: expect.any(Date) }, zip: { not: null } },
+        data: { zip: null },
+      });
+      expect(prisma.changeSetArchive.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.changeSetArchive.findMany.mock.invocationCallOrder[0],
+      );
+    });
+  });
+
+  describe('purgeExpired', () => {
+    it('drops the zip of every archive whose expiry has passed, keeping the row', async () => {
+      const { service, prisma } = setup();
+      const now = new Date('2026-10-22T03:00:00Z');
+      prisma.changeSetArchive.updateMany.mockResolvedValue({ count: 2 });
+
+      await expect(service.purgeExpired(now)).resolves.toBe(2);
+
+      expect(prisma.changeSetArchive.updateMany).toHaveBeenCalledWith({
+        where: { expiresAt: { lte: now }, zip: { not: null } },
+        data: { zip: null },
+      });
+    });
   });
 
   describe('archiveFor', () => {
