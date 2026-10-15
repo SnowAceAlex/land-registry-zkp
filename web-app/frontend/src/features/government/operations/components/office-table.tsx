@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, TriangleAlert } from 'lucide-react';
 
 import type { Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { format } from '@/i18n/format';
 
-import type { OfficeRow, QueueKind } from '../../api/types';
+import type { Alert, OfficeRow, QueueKind } from '../../api/types';
+import { isOfficeStale } from '../lib/stale';
 import { type OfficeSortKey, type SortDir, sortOfficeRows } from '../lib/office-sort';
 
 type T = Dictionary['govOperations'];
@@ -37,12 +38,14 @@ function ageText(hours: number | null, t: T): string {
  */
 export function OfficeTable({
   rows,
+  alerts,
   summary = false,
   linkCounts,
   lang,
   t,
 }: {
   rows: OfficeRow[];
+  alerts: Alert[];
   summary?: boolean;
   linkCounts: boolean;
   lang: Locale;
@@ -129,9 +132,19 @@ export function OfficeTable({
                   </th>
                 ) : (
                   <td key={c.key} className="px-4 py-2 text-right font-mono text-xs">
-                    {c.key === 'oldestAgeHours'
-                      ? ageText(row.oldestAgeHours, t)
-                      : count(row, c.kind, row[c.key])}
+                    {c.key === 'oldestAgeHours' ? (
+                      <span className="inline-flex items-center justify-end gap-1">
+                        {isOfficeStale(alerts, row.officeCode) ? (
+                          <>
+                            <TriangleAlert className="h-3.5 w-3.5 text-amber-600" aria-hidden />
+                            <span className="sr-only">{t.staleMarker}</span>
+                          </>
+                        ) : null}
+                        {ageText(row.oldestAgeHours, t)}
+                      </span>
+                    ) : (
+                      count(row, c.kind, row[c.key])
+                    )}
                   </td>
                 ),
               )}

@@ -59,12 +59,13 @@ export function OperationsView({
               ) : offices.error ? (
                 <Notice tone="danger" title={apiFailure(offices.error, errors).title} />
               ) : (
-                <OfficeTable rows={offices.data} linkCounts lang={lang} t={t} />
+                <OfficeTable rows={offices.data} alerts={overview.data.alerts} linkCounts lang={lang} t={t} />
               )
             ) : (
               <>
                 <OfficeTable
                   rows={[branchRow(me.data, overview.data.queue)]}
+                  alerts={overview.data.alerts}
                   summary
                   linkCounts={false}
                   lang={lang}

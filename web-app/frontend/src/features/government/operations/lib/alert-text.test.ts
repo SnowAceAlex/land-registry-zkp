@@ -58,9 +58,18 @@ describe.each([
     }
   });
 
-  it('appends the office when the sentence does not name it', () => {
-    const { title } = alertText({ code: 'StaleQueueItem', severity: 'warning', count: 2, officeCode: 'CN02' }, t);
-    expect(title).toContain('CN02');
+  it('names the office inside the sentence, never after it', () => {
+    for (const code of Object.keys(CODES) as AlertCode[]) {
+      const { title } = alertText(sample(code), t);
+      expect(title).not.toContain('. (');
+    }
+    const stale = alertText({ code: 'StaleQueueItem', severity: 'warning', count: 2, officeCode: 'CN02' }, t);
+    expect(stale.title).toContain('CN02');
+  });
+
+  it('speaks of unassigned plots when the alert has no office', () => {
+    const { title } = alertText({ code: 'StaleQueueItem', severity: 'warning', count: 2 }, t);
+    expect(title).toContain(t.alertNoOffice);
   });
 });
 
