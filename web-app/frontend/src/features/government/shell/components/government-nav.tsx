@@ -11,12 +11,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  Archive,
   ArrowRightLeft,
   FileSignature,
   FileUp,
   FileX2,
   FolderSync,
   Landmark,
+  LayoutDashboard,
   LogOut,
 } from 'lucide-react';
 
@@ -24,21 +26,21 @@ import type { Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { clearGovKey } from '@/features/government/auth/lib/gov-session';
 import { LocaleSwitcher } from '@/i18n/components/locale-switcher';
+import { useMe } from '../../api/hooks';
+import { navItemsFor, type GovNavSlug } from '../nav-items';
 
 type NavStrings = Dictionary['govNav'];
 
-/** Slugs are not translated: they are route identifiers. */
-const ITEMS = [
-  { slug: 'import', icon: FileUp, key: 'import' },
-  { slug: 'issuance', icon: FileSignature, key: 'issuance' },
-  { slug: 'transfers', icon: ArrowRightLeft, key: 'transfers' },
-  { slug: 'revocations', icon: FileX2, key: 'revocations' },
-  { slug: 'changes', icon: FolderSync, key: 'changes' },
-] as const satisfies ReadonlyArray<{
-  slug: string;
-  icon: typeof FileUp;
-  key: keyof NavStrings;
-}>;
+/** Slugs are not translated: they are route identifiers. Which ones show is `navItemsFor`. */
+const ITEM_META: Record<GovNavSlug, { icon: typeof FileUp; key: keyof NavStrings }> = {
+  operations: { icon: LayoutDashboard, key: 'overview' },
+  import: { icon: FileUp, key: 'import' },
+  issuance: { icon: FileSignature, key: 'issuance' },
+  transfers: { icon: ArrowRightLeft, key: 'transfers' },
+  revocations: { icon: FileX2, key: 'revocations' },
+  changes: { icon: FolderSync, key: 'changes' },
+  archives: { icon: Archive, key: 'archives' },
+};
 
 export function GovernmentNav({
   lang,
@@ -50,6 +52,7 @@ export function GovernmentNav({
   switcherLabel: string;
 }) {
   const pathname = usePathname();
+  const items = navItemsFor(useMe().data?.scope).map((slug) => ({ slug, ...ITEM_META[slug] }));
   const hrefFor = (slug: string) => `/${lang}/government/${slug}`;
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -79,7 +82,7 @@ export function GovernmentNav({
           <h2 className="mb-2 px-3 text-xs font-medium tracking-wider text-steel uppercase">
             {t.operations}
           </h2>
-          {ITEMS.map(({ slug, icon: Icon, key }) => {
+          {items.map(({ slug, icon: Icon, key }) => {
             const href = hrefFor(slug);
             const active = isActive(href);
             return (
@@ -114,8 +117,8 @@ export function GovernmentNav({
       </aside>
 
       {/* Phones: header + bottom tab bar, so the 250px rail never eats the
-          content column. Five tabs fit a 320px viewport without scrolling; long
-          labels wrap to two lines. */}
+          content column. A central office has seven tabs, so the bar scrolls
+          sideways when they do not fit. */}
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-whisper bg-white px-4 md:hidden">
         <Link href={`/${lang}`} className="flex items-center gap-2 rounded-lg">
           <Landmark className="h-4 w-4 text-ink" strokeWidth={1.5} aria-hidden />
@@ -136,9 +139,9 @@ export function GovernmentNav({
 
       <nav
         aria-label={t.ariaLabel}
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-whisper bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-whisper bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
       >
-        {ITEMS.map(({ slug, icon: Icon, key }) => {
+        {items.map(({ slug, icon: Icon, key }) => {
           const href = hrefFor(slug);
           const active = isActive(href);
           return (
@@ -146,7 +149,7 @@ export function GovernmentNav({
               key={slug}
               href={href}
               aria-current={active ? 'page' : undefined}
-              className={`flex flex-col items-center gap-1 px-1 py-2.5 text-center text-[11px] leading-tight font-medium ui-transition ${
+              className={`flex min-w-16 flex-1 flex-col items-center gap-1 px-1 py-2.5 text-center text-[11px] leading-tight font-medium ui-transition ${
                 active ? 'text-ink' : 'text-steel'
               }`}
             >

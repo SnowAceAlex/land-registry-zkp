@@ -27,6 +27,7 @@ import type { Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { PageHeader } from '@/components/ui/page-header';
 
+import { CentralOnly } from '../../shell/components/central-only';
 import { ChangesWorkbench } from './changes-workbench';
 
 export function ChangesView({
@@ -43,7 +44,9 @@ export function ChangesView({
   return (
     <div className="space-y-8">
       <PageHeader title={t.title} description={t.description} />
-      <ChangesWorkbench lang={lang} t={t} draftT={draftT} errors={errors} />
+      <CentralOnly t={errors}>
+        <ChangesWorkbench lang={lang} t={t} draftT={draftT} errors={errors} />
+      </CentralOnly>
     </div>
   );
 }

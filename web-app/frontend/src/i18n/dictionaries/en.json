@@ -35,11 +35,13 @@
     "brand": "Government",
     "brandSub": "Land Registry ZKP",
     "operations": "Operations",
+    "overview": "Operations",
     "import": "Import",
     "issuance": "Issuance",
     "transfers": "Transfers",
     "revocations": "Revocations",
-    "changes": "Changes",
+    "changes": "Close the register",
+    "archives": "Issued files",
     "signOut": "Sign out"
   },
   "residentNav": {
@@ -530,7 +532,8 @@
     "draftOpenIssuance": "Issuance draft #{id} is waiting to be signed or confirmed.",
     "draftOpenChangeset": "Change set draft #{id} is waiting to be signed or confirmed.",
     "openDraft": "Open draft",
-    "connectWallet": "Connect wallet"
+    "connectWallet": "Connect wallet",
+    "office": "Office: {name}"
   },
   "govDraft": {
     "titleIssuance": "Issuance draft #{id}",
@@ -651,5 +654,13 @@
     "withheld_tenureType": "Tenure type",
     "withheld_offchainMetadata": "Address, area, and certificate details",
     "withheld_ownerSecret": "Owner private key"
+  },
+  "govOperations": {
+    "title": "Operations",
+    "description": "The state of the register, the work waiting, and what needs attention."
+  },
+  "govArchives": {
+    "title": "Issued files",
+    "description": "Archives of issued certificates and buyers' bundles, kept for a limited time."
   }
 }

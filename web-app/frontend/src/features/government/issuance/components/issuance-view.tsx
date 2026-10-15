@@ -13,6 +13,7 @@ import type { Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { PageHeader } from '@/components/ui/page-header';
 
+import { CentralOnly } from '../../shell/components/central-only';
 import { IssuanceWorkbench } from './issuance-workbench';
 
 export function IssuanceView({
@@ -27,7 +28,9 @@ export function IssuanceView({
   return (
     <div className="space-y-8">
       <PageHeader title={t.title} description={t.description} />
-      <IssuanceWorkbench lang={lang} t={t} errors={errors} />
+      <CentralOnly t={errors}>
+        <IssuanceWorkbench lang={lang} t={t} errors={errors} />
+      </CentralOnly>
     </div>
   );
 }

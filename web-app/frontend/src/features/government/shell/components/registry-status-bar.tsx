@@ -21,11 +21,12 @@ import { format } from '@/i18n/format';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { useOpenDraft, useRegistryStatus } from '../../api/hooks';
+import { useMe, useOpenDraft, useRegistryStatus } from '../../api/hooks';
 
 export function RegistryStatusBar({ lang, t }: { lang: Locale; t: Dictionary['govShell'] }) {
   const status = useRegistryStatus();
   const openDraft = useOpenDraft();
+  const me = useMe();
   const pathname = usePathname();
 
   const draft = openDraft.data;
@@ -50,6 +51,7 @@ export function RegistryStatusBar({ lang, t }: { lang: Locale; t: Dictionary['go
                 : t.noRoot}
             </li>
             {status.data.inSync ? <li>{t.inSync}</li> : null}
+            {me.data ? <li>{format(t.office, { name: me.data.office.name })}</li> : null}
           </ul>
         ) : status.isPending ? (
           <Skeleton className="h-4 w-64" />

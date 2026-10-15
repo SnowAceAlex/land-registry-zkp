@@ -35,11 +35,13 @@
     "brand": "Cơ quan quản lý",
     "brandSub": "Land Registry ZKP",
     "operations": "Nghiệp vụ",
+    "overview": "Điều hành",
     "import": "Nhập dữ liệu",
     "issuance": "Cấp giấy",
     "transfers": "Chuyển nhượng",
     "revocations": "Thu hồi",
-    "changes": "Đợt thay đổi",
+    "changes": "Chốt sổ",
+    "archives": "Hồ sơ phát hành",
     "signOut": "Đăng xuất"
   },
   "residentNav": {
@@ -530,7 +532,8 @@
     "draftOpenIssuance": "Bản nháp cấp giấy #{id} đang chờ ký hoặc xác nhận.",
     "draftOpenChangeset": "Bản nháp ChangeSet #{id} đang chờ ký hoặc xác nhận.",
     "openDraft": "Mở bản nháp",
-    "connectWallet": "Kết nối ví"
+    "connectWallet": "Kết nối ví",
+    "office": "Đơn vị: {name}"
   },
   "govDraft": {
     "titleIssuance": "Bản nháp cấp giấy #{id}",
@@ -651,5 +654,13 @@
     "withheld_tenureType": "Hình thức sử dụng đất",
     "withheld_offchainMetadata": "Địa chỉ, diện tích và thông tin chi tiết trên giấy",
     "withheld_ownerSecret": "Khóa bí mật của chủ sở hữu"
+  },
+  "govOperations": {
+    "title": "Điều hành",
+    "description": "Tình trạng sổ đăng ký, công việc đang chờ và những việc cần chú ý."
+  },
+  "govArchives": {
+    "title": "Hồ sơ phát hành",
+    "description": "Các gói hồ sơ giấy chứng nhận đã phát hành và gói của người mua, lưu trong thời hạn nhất định."
   }
 }
