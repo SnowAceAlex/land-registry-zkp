@@ -41,7 +41,7 @@
     "transfers": "Chuyển nhượng",
     "revocations": "Thu hồi",
     "changes": "Chốt sổ",
-    "archives": "Hồ sơ phát hành",
+    "archives": "Hồ sơ các đợt vào sổ",
     "signOut": "Đăng xuất"
   },
   "residentNav": {
@@ -722,7 +722,34 @@
     "noValue": "—"
   },
   "govArchives": {
-    "title": "Hồ sơ phát hành",
-    "description": "Các gói hồ sơ giấy chứng nhận đã phát hành và gói của người mua, lưu trong thời hạn nhất định."
+    "title": "Hồ sơ các đợt vào sổ",
+    "description": "Mỗi đợt vào sổ tạo một gói hồ sơ cho mỗi chi nhánh. Hãy tải gói của đơn vị mình trước khi hết hạn.",
+    "warningTitle": "Gói hồ sơ chứa các tệp bí mật",
+    "warning": "Mỗi gói chứa các tệp secret.json của chủ sở hữu mới và người mua. Người tải gói chỉ được giao từng thư mục thửa đất cho đúng chủ của thửa đó và phải giữ kín phần còn lại. Bản trên máy chủ hết hạn sau 7 ngày kể từ khi đợt vào sổ được công bố; sau đó các bí mật bị xoá và các thửa đất liên quan phải được cấp lại với mã thửa mới.",
+    "empty": "Chưa có đợt vào sổ nào tạo ra gói hồ sơ.",
+    "colRound": "Đợt vào sổ",
+    "colPublished": "Công bố",
+    "colOffice": "Đơn vị",
+    "colPlots": "Số thửa",
+    "colExpires": "Hết hạn sau",
+    "colStatus": "Trạng thái",
+    "colAction": "Tải về",
+    "roundLabel": "#{id}",
+    "versionLabel": "v{version}",
+    "expiresDaysHours": "{days} ngày {hours} giờ",
+    "expiresHours": "{hours} giờ",
+    "expiredShort": "Đã hết hạn",
+    "status": {
+      "waiting": "Chờ tải về",
+      "expiring": "Sắp hết hạn",
+      "downloaded": "Đã tải về",
+      "expired": "Đã hết hạn"
+    },
+    "firstDownloaded": "Tải lần đầu {date}",
+    "downloadedByOther": "bởi {office} (thay thế)",
+    "expiredHint": "Bí mật đã bị xoá; cần cấp lại các thửa này.",
+    "download": "Tải ZIP",
+    "downloading": "Đang tải…",
+    "noValue": "—"
   }
 }

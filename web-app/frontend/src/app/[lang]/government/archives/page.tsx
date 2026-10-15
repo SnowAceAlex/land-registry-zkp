@@ -9,5 +9,5 @@ export default async function Page({ params }: PageProps<'/[lang]'>) {
   if (!isLocale(lang)) notFound();
   const dict = await getDictionary(lang);
 
-  return <ArchivesView t={dict.govArchives} />;
+  return <ArchivesView lang={lang} t={dict.govArchives} errors={dict.govErrors} />;
 }
