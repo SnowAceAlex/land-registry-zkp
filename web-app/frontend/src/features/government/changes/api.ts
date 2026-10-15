@@ -9,8 +9,8 @@
  * through usePendingChanges() in the portal's api/hooks.
  */
 
-import { govDelete, govGet, govPost } from '../api/gov-client';
-import type { ChangeSetDraftDetail, ChangeSetSummary, DraftConfirmation } from '../api/types';
+import { govDelete, govPost } from '../api/gov-client';
+import type { ChangeSetDraftDetail, DraftConfirmation } from '../api/types';
 
 export function createChangeSetDraft(): Promise<ChangeSetDraftDetail> {
   return govPost<ChangeSetDraftDetail>('/government/changesets');
@@ -23,9 +23,4 @@ export function confirmChangeSetDraft(id: number, txHash?: string): Promise<Draf
 
 export function discardChangeSetDraft(id: number): Promise<{ discarded: number }> {
   return govDelete<{ discarded: number }>(`/government/changesets/${id}`);
-}
-
-/** Every change set, newest first — summary columns only (D77). */
-export function listChangeSets(): Promise<ChangeSetSummary[]> {
-  return govGet<ChangeSetSummary[]>('/government/changesets');
 }

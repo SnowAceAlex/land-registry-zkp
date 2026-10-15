@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import { govGet } from './gov-client';
 import type {
   ArchiveSummary,
+  ChangeSetSummary,
   Me,
   OfficeRow,
   OpenDraft,
@@ -115,6 +116,14 @@ export function useQueue(filter: QueueFilter) {
   return useQuery({
     queryKey: govKeys.queue(filter),
     queryFn: () => govGet<QueueList>(`/government/queue${queryString(filter)}`),
+  });
+}
+
+/** GET /government/changesets — every round, newest first, summary columns only (D77). */
+export function useChangeSets() {
+  return useQuery({
+    queryKey: govKeys.changeSets,
+    queryFn: () => govGet<ChangeSetSummary[]>('/government/changesets'),
   });
 }
 

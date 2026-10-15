@@ -5,16 +5,13 @@
  * download moves to the archives page, so this table only counts them.
  */
 
-import { useQuery } from '@tanstack/react-query';
-
 import type { Dictionary } from '@/i18n/dictionaries';
 import { HashText } from '@/components/ui/hash-text';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { apiFailure } from '../../api/error-message';
-import { govKeys } from '../../api/hooks';
-import { listChangeSets } from '../api';
+import { useChangeSets } from '../../api/hooks';
 
 export function ChangeSetHistory({
   t,
@@ -23,7 +20,7 @@ export function ChangeSetHistory({
   t: Dictionary['govChanges'];
   errors: Dictionary['govErrors'];
 }) {
-  const changeSets = useQuery({ queryKey: govKeys.changeSets, queryFn: listChangeSets });
+  const changeSets = useChangeSets();
   return (
     <section className="space-y-4">
       <h2 className="font-medium text-ink">{t.historyTitle}</h2>

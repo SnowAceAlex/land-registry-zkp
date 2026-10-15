@@ -36,21 +36,25 @@ export function RegistryStatusBar({ lang, t }: { lang: Locale; t: Dictionary['go
   return (
     <div className="mb-8 space-y-3">
       <div className="flex flex-col gap-3 border-b border-whisper pb-4 sm:flex-row sm:items-center sm:justify-between">
-        {status.data ? (
+        {status.data || me.data ? (
           <ul
             aria-label={t.network}
             className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-steel"
           >
-            <li className="font-mono">
-              <span className="text-ink">{status.data.network}</span>{' '}
-              {format(t.chain, { chainId: status.data.chainId })}
-            </li>
-            <li className="font-mono">
-              {status.data.onChain.version > 0
-                ? format(t.rootVersion, { version: status.data.onChain.version })
-                : t.noRoot}
-            </li>
-            {status.data.inSync ? <li>{t.inSync}</li> : null}
+            {status.data ? (
+              <>
+                <li className="font-mono">
+                  <span className="text-ink">{status.data.network}</span>{' '}
+                  {format(t.chain, { chainId: status.data.chainId })}
+                </li>
+                <li className="font-mono">
+                  {status.data.onChain.version > 0
+                    ? format(t.rootVersion, { version: status.data.onChain.version })
+                    : t.noRoot}
+                </li>
+                {status.data.inSync ? <li>{t.inSync}</li> : null}
+              </>
+            ) : null}
             {me.data ? <li>{format(t.office, { name: me.data.office.name })}</li> : null}
           </ul>
         ) : status.isPending ? (
