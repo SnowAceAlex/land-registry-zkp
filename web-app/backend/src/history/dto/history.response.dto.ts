@@ -44,10 +44,57 @@ export class PropertyEventDto {
   occurredAt!: Date;
 }
 
+/** Direct neighbours of a certificate across re-issues (D90: certificate lineage). */
+export class DirectLineageDto {
+  /** Certificates this one supersedes */
+  @ApiProperty({ type: [String] })
+  predecessors!: string[];
+
+  /** Certificates that supersede this one */
+  @ApiProperty({ type: [String] })
+  successors!: string[];
+}
+
 export class PropertyHistoryResponseDto {
   @ApiProperty()
   propertyId!: string;
 
   @ApiProperty({ type: [PropertyEventDto] })
   events!: PropertyEventDto[];
+
+  @ApiProperty({ type: DirectLineageDto })
+  lineage!: DirectLineageDto;
+}
+
+export class LineageNodeDto {
+  @ApiProperty()
+  propertyId!: string;
+
+  @ApiProperty({ enum: ['IMPORTED', 'ISSUED', 'REVOKED'] })
+  status!: 'IMPORTED' | 'ISSUED' | 'REVOKED';
+
+  /** 0 = the queried certificate, negative = ancestors, positive = descendants */
+  @ApiProperty()
+  generation!: number;
+
+  @ApiProperty({ type: [String] })
+  predecessors!: string[];
+
+  @ApiProperty({ type: [String] })
+  successors!: string[];
+
+  @ApiProperty({ type: [PropertyEventDto] })
+  events!: PropertyEventDto[];
+}
+
+export class LineageResponseDto {
+  @ApiProperty()
+  propertyId!: string;
+
+  @ApiProperty({ type: [LineageNodeDto] })
+  nodes!: LineageNodeDto[];
+
+  /** True when the chain was cut at the node limit */
+  @ApiProperty()
+  truncated!: boolean;
 }

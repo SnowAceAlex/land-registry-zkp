@@ -1,8 +1,10 @@
-import { Controller, Get, Param } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
+import { ApiNotFoundResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+import { LineageService } from '../lineage/lineage.service';
 import { PropertyEventService } from './property-event.service';
-import { PropertyHistoryResponseDto } from './dto/history.response.dto';
+import { toPropertyEventDto } from './property-event.serializer';
+import { LineageResponseDto, PropertyHistoryResponseDto } from './dto/history.response.dto';
 
 /**
  * HistoryController — the public change log of one plot (D48).
@@ -21,30 +23,47 @@ import { PropertyHistoryResponseDto } from './dto/history.response.dto';
 @ApiTags('records')
 @Controller('records')
 export class HistoryController {
-  constructor(private readonly events: PropertyEventService) {}
+  constructor(
+    private readonly events: PropertyEventService,
+    private readonly lineage: LineageService,
+  ) {}
 
   @Get(':propertyId/history')
   @ApiOperation({
     summary: 'Public change history of one property',
     description:
       'Every change that altered the leaf: issuance, transfer, revocation, encumbrance and ' +
-      'validity changes. Oldest first. No authentication — the data is pseudonymous.',
+      'validity changes. Oldest first, plus the direct predecessor and successor ' +
+      'certificates (D90). No authentication — the data is pseudonymous.',
   })
   async history(@Param('propertyId') propertyId: string): Promise<PropertyHistoryResponseDto> {
-    const events = await this.events.listFor(propertyId);
+    const [events, predecessors, successors] = await Promise.all([
+      this.events.listFor(propertyId),
+      this.lineage.predecessorsOf([propertyId]),
+      this.lineage.successorsOf([propertyId]),
+    ]);
     return {
       propertyId,
-      events: events.map((event) => ({
-        kind: event.kind,
-        rootVersion: event.rootVersion,
-        txHash: event.txHash,
-        previousOwnerCommitment: event.previousOwnerCommitment,
-        newOwnerCommitment: event.newOwnerCommitment,
-        previousLeaf: event.previousLeaf,
-        newLeaf: event.newLeaf,
-        detail: event.detail,
-        occurredAt: event.occurredAt,
-      })),
+      events: events.map(toPropertyEventDto),
+      lineage: {
+        predecessors: predecessors.get(propertyId) ?? [],
+        successors: successors.get(propertyId) ?? [],
+      },
     };
+  }
+
+  // D90: the chain of certificates across re-issues; links only ids that are already public.
+  @Get(':propertyId/lineage')
+  @ApiOperation({
+    summary: 'Chain of certificates a property was re-issued through',
+    description:
+      'Ancestors (negative generation) and descendants (positive) of one certificate, each ' +
+      'with its status and history. Capped at 200 nodes; `truncated` says when it was cut.',
+  })
+  @ApiNotFoundResponse({ description: 'No such property' })
+  async lineageOf(@Param('propertyId') propertyId: string): Promise<LineageResponseDto> {
+    const result = await this.lineage.lineageOf(propertyId);
+    if (!result) throw new NotFoundException(`Property ${propertyId} not found`);
+    return result;
   }
 }
