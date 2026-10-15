@@ -13,6 +13,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { IssuanceRequestStatus } from '@prisma/client';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBody,
@@ -30,6 +31,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 
 import { ApiKeyGuard, GOV_API_KEY_HEADER, GOV_API_KEY_SECURITY } from '../common/api-key.guard';
 import { Actor } from '../common/actor';
+import { CentralOnly } from '../common/central-only.guard';
 import { CurrentActor } from '../common/current-actor.decorator';
 import { parsePageQuery } from '../common/pagination';
 import { ChangeSetService } from './changeset.service';
@@ -37,6 +39,11 @@ import { GovernmentService, parsePropertyStatus } from './government.service';
 import { ImportService } from '../import/import.service';
 import { ImportResult } from '../import/dto/import.response.dto';
 import { IssuanceBatchService } from '../issuance/issuance-batch.service';
+import {
+  CreateIssuanceRequestsDto,
+  IssuanceRequestDto,
+} from '../issuance/dto/issuance-request.dto';
+import { IssuanceRequestService } from '../issuance/issuance-request.service';
 import { ConfirmDraftDto } from './dto/confirm-draft.dto';
 import { CreateIssuanceDraftDto } from './dto/issue-batch.dto';
 import { CreateRevocationDto } from './dto/revocation.dto';
@@ -48,6 +55,16 @@ import {
 } from './dto/government.response.dto';
 import { OpenDraftService } from './open-draft.service';
 import { RevocationService } from './revocation.service';
+
+const ISSUANCE_REQUEST_STATUSES = ['READY', 'PUBLISHED', 'WITHDRAWN'] as const;
+
+function parseIssuanceRequestStatus(raw?: string): IssuanceRequestStatus | undefined {
+  if (raw === undefined || raw === '') return undefined;
+  if (!(ISSUANCE_REQUEST_STATUSES as readonly string[]).includes(raw)) {
+    throw new BadRequestException(`status must be one of ${ISSUANCE_REQUEST_STATUSES.join(', ')}`);
+  }
+  return raw as IssuanceRequestStatus;
+}
 
 @ApiTags('Government')
 @ApiSecurity(GOV_API_KEY_SECURITY)
@@ -63,6 +80,7 @@ export class GovernmentController {
     private readonly government: GovernmentService,
     private readonly importService: ImportService,
     private readonly issuanceBatches: IssuanceBatchService,
+    private readonly issuanceRequests: IssuanceRequestService,
     private readonly revocations: RevocationService,
     private readonly changeSets: ChangeSetService,
     private readonly openDrafts: OpenDraftService,
@@ -240,6 +258,33 @@ export class GovernmentController {
       'Content-Length': String(zip.length),
     });
     res.end(zip);
+  }
+
+  @Post('issuance-requests')
+  @CentralOnly()
+  @ApiOperation({
+    summary: 'Queue plots for issuance (central office only)',
+    description:
+      'D87: generates each owner secret now and keeps it on the request; the plot stays ' +
+      'IMPORTED until a change set confirms.',
+  })
+  @ApiOkResponse({ type: [IssuanceRequestDto] })
+  @ApiConflictResponse({
+    description:
+      'A plot is not IMPORTED, is already queued, or supersedes a certificate that is not ' +
+      'REVOKED yet (reason PredecessorNotRevoked, D90)',
+  })
+  requestIssuance(@Body() dto: CreateIssuanceRequestsDto, @CurrentActor() actor: Actor) {
+    return this.issuanceRequests.request(dto.propertyIds, actor);
+  }
+
+  @Get('issuance-requests')
+  @CentralOnly()
+  @ApiOperation({ summary: 'List issuance requests (central office only)' })
+  @ApiQuery({ name: 'status', required: false, enum: ['READY', 'PUBLISHED', 'WITHDRAWN'] })
+  @ApiOkResponse({ type: [IssuanceRequestDto] })
+  listIssuanceRequests(@CurrentActor() actor: Actor, @Query('status') status?: string) {
+    return this.issuanceRequests.list(parseIssuanceRequestStatus(status), actor);
   }
 
   @Post('revocations')

@@ -5,8 +5,10 @@ import { ChainModule } from '../chain/chain.module';
 import { DraftLockModule } from '../common/draft-lock.module';
 import { HistoryModule } from '../history/history.module';
 import { IssuanceBatchService } from './issuance-batch.service';
+import { IssuanceRequestService } from './issuance-request.service';
 import { IssuanceService } from './issuance.service';
 import { IssuerService } from './issuer.service';
+import { LineageModule } from '../lineage/lineage.module';
 import { PdfService } from './pdf.service';
 import { RootModule } from '../government/root.module';
 import { TreeModule } from '../tree/tree.module';
@@ -33,7 +35,7 @@ import { ZipService } from './zip.service';
  * to avoid a cycle, since GovernmentModule imports IssuanceModule already.
  */
 @Module({
-  imports: [ChainModule, TreeModule, HistoryModule, DraftLockModule, RootModule],
+  imports: [ChainModule, TreeModule, HistoryModule, DraftLockModule, RootModule, LineageModule],
   providers: [
     IssuanceService,
     IssuerService,
@@ -41,7 +43,14 @@ import { ZipService } from './zip.service';
     ZipService,
     ArchiveService,
     IssuanceBatchService,
+    IssuanceRequestService,
   ],
-  exports: [IssuanceService, IssuerService, IssuanceBatchService, ArchiveService],
+  exports: [
+    IssuanceService,
+    IssuerService,
+    IssuanceBatchService,
+    IssuanceRequestService,
+    ArchiveService,
+  ],
 })
 export class IssuanceModule {}
