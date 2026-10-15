@@ -213,17 +213,19 @@ export class ImportService {
 
     return rows.filter((entry) => {
       const propertyId = entry.input.propertyId;
-      const failures: { code: ImportRowCode; message: string }[] = [];
+      const failures: { code: ImportRowCode; message: string; predecessorPropertyId: string }[] = [];
       for (const predecessor of entry.supersedes) {
         const status = found.get(predecessor);
         if (status === undefined) {
           failures.push({
             code: 'PredecessorNotFound',
+            predecessorPropertyId: predecessor,
             message: `supersedesPropertyIds: plot ${predecessor} is not in the registry`,
           });
         } else if (status === 'IMPORTED') {
           failures.push({
             code: 'PredecessorNeverIssued',
+            predecessorPropertyId: predecessor,
             message: `supersedesPropertyIds: plot ${predecessor} was never issued, so there is no certificate to replace`,
           });
         }
@@ -243,6 +245,7 @@ export class ImportService {
             row: entry.lineNumber,
             propertyId,
             code: 'PredecessorAlreadySucceeded',
+            predecessorPropertyId: predecessor,
             message: `plot ${predecessor} already has a successor (${others.join(', ')}); this row is recorded as another`,
           });
         }

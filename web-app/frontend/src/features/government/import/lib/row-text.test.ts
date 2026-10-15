@@ -19,10 +19,22 @@ describe.each([
   ['vi', vi.govImport],
 ])('rowText (%s)', (_name, t) => {
   it.each(Object.keys(CODES) as ImportRowCode[])('words %s from the dictionary', (code) => {
-    const text = rowText({ code, message: 'backend text' }, t);
+    const text = rowText({ code, message: 'backend text', predecessorPropertyId: '4242' }, t);
     expect(text.length).toBeGreaterThan(0);
     expect(text).not.toBe('backend text');
     expect(text).not.toMatch(/[{}]/);
+  });
+
+  it.each(['PredecessorNotFound', 'PredecessorNeverIssued', 'PredecessorAlreadySucceeded'] as const)(
+    'names the predecessor in %s',
+    (code) => {
+      expect(rowText({ code, message: 'x', predecessorPropertyId: '4242' }, t)).toContain('4242');
+    },
+  );
+
+  it('does not read inherited keys as codes', () => {
+    const row = { code: 'toString' as ImportRowCode, message: 'raw' };
+    expect(rowText(row, t)).toBe('raw');
   });
 
   it('falls back to the message for a row without a code', () => {

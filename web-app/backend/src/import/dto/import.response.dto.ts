@@ -31,6 +31,10 @@ export class ImportRowError {
 
   @ApiPropertyOptional({ example: 'PredecessorNotFound' })
   code?: ImportRowCode;
+
+  /** The one predecessor a lineage code (not found / never issued) is about. */
+  @ApiPropertyOptional({ example: '77' })
+  predecessorPropertyId?: string;
 }
 
 export class ImportRowWarning {
@@ -45,6 +49,10 @@ export class ImportRowWarning {
 
   @ApiPropertyOptional({ example: 'PredecessorAlreadySucceeded' })
   code?: ImportRowCode;
+
+  /** The predecessor that already has a replacement. */
+  @ApiPropertyOptional({ example: '1' })
+  predecessorPropertyId?: string;
 }
 
 export class ImportOfficeCount {

@@ -268,7 +268,11 @@ describe('ImportService', () => {
       const result = await service.importCsv(successor('1;2'));
 
       expect(result.errors).toHaveLength(1);
-      expect(result.errors[0]).toMatchObject({ row: 2, code: 'PredecessorNotFound' });
+      expect(result.errors[0]).toMatchObject({
+        row: 2,
+        code: 'PredecessorNotFound',
+        predecessorPropertyId: '2',
+      });
       expect(result.errors[0].message).toContain('2');
       expect(result.imported).toBe(0);
     });
@@ -278,7 +282,10 @@ describe('ImportService', () => {
 
       const result = await service.importCsv(successor('1'));
 
-      expect(result.errors[0]).toMatchObject({ code: 'PredecessorNeverIssued' });
+      expect(result.errors[0]).toMatchObject({
+        code: 'PredecessorNeverIssued',
+        predecessorPropertyId: '1',
+      });
       expect(result.imported).toBe(0);
     });
 
@@ -302,7 +309,12 @@ describe('ImportService', () => {
       expect(result.errors).toEqual([]);
       expect(result.imported).toBe(1);
       expect(result.warnings).toEqual([
-        expect.objectContaining({ row: 2, propertyId: '10', code: 'PredecessorAlreadySucceeded' }),
+        expect.objectContaining({
+          row: 2,
+          propertyId: '10',
+          code: 'PredecessorAlreadySucceeded',
+          predecessorPropertyId: '1',
+        }),
       ]);
     });
 

@@ -203,6 +203,8 @@ export interface ImportRowIssue {
   propertyId?: string;
   message: string;
   code?: ImportRowCode;
+  /** The one predecessor a lineage code is about. */
+  predecessorPropertyId?: string;
 }
 
 /** One issuance request — IssuanceRequestDto (D87). */

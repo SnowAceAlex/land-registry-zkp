@@ -85,11 +85,11 @@
     "goToIssuance": "Go to issuance",
     "importAnother": "Import another file",
     "rowCodes": {
-      "InvalidSupersedes": "The supersedesPropertyIds value is malformed. Use property IDs separated by ;, for example 1001;1002.",
-      "PredecessorNotFound": "A property this certificate replaces is not in the registry.",
+      "InvalidSupersedes": "The supersedesPropertyIds value is malformed or out of range. Use property IDs from 0 to 16,777,215 separated by ;, for example 1001;1002.",
+      "PredecessorNotFound": "No certificate {predecessor} exists in the registry. Remove it from supersedesPropertyIds or correct the ID.",
       "SelfSupersession": "A certificate cannot replace itself.",
-      "PredecessorNeverIssued": "A property this certificate replaces was never issued, so there is nothing to replace.",
-      "PredecessorAlreadySucceeded": "A property named here already has a successor in this file or the registry. This is expected when one certificate is split into several."
+      "PredecessorNeverIssued": "{predecessor} was imported but never issued, so it cannot be replaced. Remove it from supersedesPropertyIds.",
+      "PredecessorAlreadySucceeded": "{predecessor} already has a replacement in the registry. This is expected when one certificate is split into several, and the row is still imported."
     },
     "byOfficeTitle": "By branch",
     "byOfficeBody": "The branch is derived from the commune in each address.",
