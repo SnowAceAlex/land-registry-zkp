@@ -15,3 +15,11 @@ export function roundGate(alerts: Alert[]): RoundGate {
 
   return { state: 'clear' };
 }
+
+/** Identifies a set of warnings, so a tick applies only to the set the officer saw. */
+export function ackSignature(reasons: Alert[]): string {
+  return reasons
+    .map((alert) => `${alert.code}:${alert.officeCode ?? ''}:${alert.ref ?? ''}`)
+    .sort()
+    .join('|');
+}

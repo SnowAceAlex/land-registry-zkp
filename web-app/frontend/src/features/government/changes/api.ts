@@ -1,12 +1,4 @@
-/**
- * features/government/changes/api.ts - the closing session's backend calls (D84, D87).
- *
- * One round batches everything open: issuance requests, approved transfers and
- * up to `revocationCap` pending revocations (D56 + D73; the backend reports the
- * cap with the queue) into ONE new root. Same draft → sign → confirm shape as
- * ever; the draft carries the revocation calldata to sign. What goes into the
- * round is read through usePendingChanges() / useQueue() in the portal's api/hooks.
- */
+/** Backend calls of the closing session: draft, confirm, discard a round; hold, release an item (D84, D87). */
 
 import { govDelete, govPost } from '../api/gov-client';
 import type {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Alert } from '../../api/types';
-import { roundGate } from './round-gate';
+import { ackSignature, roundGate } from './round-gate';
 
 const alert = (severity: Alert['severity'], code: Alert['code'] = 'HeldItems'): Alert => ({
   code,
@@ -28,5 +28,23 @@ describe('roundGate (D84)', () => {
     const error = alert('error', 'ChainAheadOfDatabase');
     const gate = roundGate([alert('warning'), error, alert('info')]);
     expect(gate).toEqual({ state: 'blocked', reasons: [error] });
+  });
+});
+
+describe('ackSignature (D84)', () => {
+  const a: Alert = { code: 'RevocationBacklog', severity: 'warning', count: 3, ref: 2 };
+  const b: Alert = { code: 'StaleQueueItem', severity: 'warning', count: 1, officeCode: 'CN02' };
+
+  it('is the same for the same warnings in any order', () => {
+    expect(ackSignature([a, b])).toBe(ackSignature([b, a]));
+  });
+
+  it('ignores a count that moved but not which warnings are showing', () => {
+    expect(ackSignature([a])).toBe(ackSignature([{ ...a, count: 9 }]));
+  });
+
+  it('changes when a warning is added, removed or moves to another office', () => {
+    expect(ackSignature([a, b])).not.toBe(ackSignature([a]));
+    expect(ackSignature([b])).not.toBe(ackSignature([{ ...b, officeCode: 'CN03' }]));
   });
 });

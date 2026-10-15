@@ -1,13 +1,9 @@
 'use client';
 
 /**
- * "Chốt sổ" interaction. The screen follows the open draft (D44, D84):
- *   - a draft is open → DraftPanel (signs publishRootWithRevocations when the
- *     round revokes anything, publishRoot otherwise);
- *   - no draft        → what the round would carry, the overview alerts that
- *     gate it, the waiting items (hold / release) and "Create the round".
- * A draft is immutable: to drop an item, hold it, discard the draft, create again.
- * The history below lists every round with how many of its archives were downloaded.
+ * Follows the open draft (D44): DraftPanel when there is one, else the round's
+ * contents, the alert gate and the queue. To drop an item from a draft: discard
+ * the draft, hold the item, create again.
  */
 
 import { useState } from 'react';
@@ -35,7 +31,7 @@ import type { ChangeSetDraftDetail } from '../../api/types';
 import { type DraftOutcome, DraftPanel } from '../../publishing/components/draft-panel';
 import { confirmChangeSetDraft, createChangeSetDraft, discardChangeSetDraft } from '../api';
 import { composeRound } from '../lib/round-composition';
-import { roundGate } from '../lib/round-gate';
+import { ackSignature, roundGate } from '../lib/round-gate';
 import { ChangeSetHistory } from './changeset-history';
 import { QueueTable } from './queue-table';
 
@@ -67,15 +63,17 @@ export function ChangesWorkbench({
   /** Revocations the last confirmed round left behind (D56); offers the next round. */
   const [leftover, setLeftover] = useState(0);
 
-  async function refresh() {
+  /** `reset` drops the cached gate inputs, so the next round is never decided on pre-publish data. */
+  async function refresh(reset = false) {
+    const gateInputs = [govKeys.overview, govKeys.pendingChanges, govKeys.queueAll];
     await Promise.all([
+      ...gateInputs.map((queryKey) =>
+        reset ? queryClient.resetQueries({ queryKey }) : queryClient.invalidateQueries({ queryKey }),
+      ),
       queryClient.invalidateQueries({ queryKey: govKeys.openDraft }),
       queryClient.invalidateQueries({ queryKey: govKeys.status }),
-      queryClient.invalidateQueries({ queryKey: govKeys.pendingChanges }),
       queryClient.invalidateQueries({ queryKey: govKeys.changeSets }),
-      queryClient.invalidateQueries({ queryKey: govKeys.overview }),
       queryClient.invalidateQueries({ queryKey: govKeys.offices }),
-      queryClient.invalidateQueries({ queryKey: ['gov', 'queue'] }),
       queryClient.invalidateQueries({ queryKey: ['gov', 'transfers'] }),
     ]);
   }
@@ -113,7 +111,7 @@ export function ChangesWorkbench({
     } else {
       setMessage({ tone: 'info', title: t.discardedTitle });
     }
-    await refresh();
+    await refresh(true);
   }
 
   return (
@@ -238,7 +236,7 @@ function RoundCreator({
 }) {
   const pending = usePendingChanges();
   const overview = useOverview();
-  const [acknowledged, setAcknowledged] = useState(false);
+  const [ackedSignature, setAckedSignature] = useState<string | null>(null);
 
   if (pending.isPending) return <Skeleton className="h-40 w-full" />;
   if (pending.error) return <Notice tone="danger" title={t.loadError} />;
@@ -251,8 +249,15 @@ function RoundCreator({
   }
 
   const gate = overview.data ? roundGate(overview.data.alerts) : null;
+  const signature = gate?.state === 'needs-ack' ? ackSignature(gate.reasons) : null;
+  // A tick belongs to the warnings it was given for; any other state forgets it.
+  if (ackedSignature !== null && ackedSignature !== signature) setAckedSignature(null);
+  const acknowledged = signature !== null && ackedSignature === signature;
+
+  // Fail closed: a failed poll (even with cached data) or a refetch in flight is not a green light.
+  const fresh = overview.status === 'success' && !overview.isFetching && !pending.isFetching;
   const canCreate =
-    gate !== null && (gate.state === 'clear' || (gate.state === 'needs-ack' && acknowledged));
+    fresh && gate !== null && (gate.state === 'clear' || (gate.state === 'needs-ack' && acknowledged));
 
   return (
     <section className="space-y-6">
@@ -284,13 +289,15 @@ function RoundCreator({
               <input
                 type="checkbox"
                 checked={acknowledged}
-                onChange={(event) => setAcknowledged(event.target.checked)}
+                onChange={(event) => setAckedSignature(event.target.checked ? signature : null)}
               />
               {t.gateAck}
             </label>
           ) : null}
         </div>
       ) : null}
+
+      {!fresh && !overview.error ? <p className="text-sm text-steel">{t.dataRefreshing}</p> : null}
 
       <button
         type="button"

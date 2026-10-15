@@ -6,7 +6,7 @@
  * and kind filters start from the query string the operations page links with.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -76,7 +76,7 @@ export function QueueTable({ t, errors }: { t: Strings; errors: Dictionary['govE
     } finally {
       setBusy(null);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['gov', 'queue'] }),
+        queryClient.invalidateQueries({ queryKey: govKeys.queueAll }),
         queryClient.invalidateQueries({ queryKey: govKeys.pendingChanges }),
         queryClient.invalidateQueries({ queryKey: govKeys.overview }),
         queryClient.invalidateQueries({ queryKey: govKeys.offices }),
@@ -247,6 +247,19 @@ function QueueRows({
   onHold: () => void;
   onRelease: () => void;
 }) {
+  const actionRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wasHolding = useRef(false);
+
+  // Focus follows the inline prompt: into it on open, back to the row's button when it closes.
+  useEffect(() => {
+    if (holding) inputRef.current?.focus();
+    else if (wasHolding.current) actionRef.current?.focus();
+    wasHolding.current = holding;
+  }, [holding]);
+
+  const context = { kind: t[KIND_LABEL[item.kind]], id: item.id };
+
   return (
     <>
       <tr className="align-top">
@@ -272,8 +285,10 @@ function QueueRows({
         <td className="px-4 py-2 text-right">
           {item.held ? (
             <button
+              ref={actionRef}
               type="button"
               className={buttonStyles.secondary}
+              aria-label={format(t.releaseAria, context)}
               disabled={anyBusy}
               onClick={onRelease}
             >
@@ -281,8 +296,10 @@ function QueueRows({
             </button>
           ) : (
             <button
+              ref={actionRef}
               type="button"
               className={buttonStyles.secondary}
+              aria-label={format(t.holdAria, context)}
               disabled={anyBusy || holding}
               onClick={onStartHold}
             >
@@ -299,6 +316,7 @@ function QueueRows({
             </label>
             <div className="mt-1 flex flex-wrap gap-2">
               <input
+                ref={inputRef}
                 id={`hold-${item.kind}-${item.id}`}
                 value={reason}
                 maxLength={500}

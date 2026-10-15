@@ -35,6 +35,7 @@ export const govKeys = {
   me: ['gov', 'me'] as const,
   overview: ['gov', 'operations', 'overview'] as const,
   offices: ['gov', 'operations', 'offices'] as const,
+  queueAll: ['gov', 'queue'] as const,
   queue: (filter: QueueFilter) => ['gov', 'queue', filter] as const,
   archives: ['gov', 'archives'] as const,
   issuanceRequests: (status: string) => ['gov', 'issuance-requests', status] as const,
