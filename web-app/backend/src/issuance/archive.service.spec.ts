@@ -66,4 +66,22 @@ describe('ArchiveService (D42)', () => {
       ],
     });
   });
+
+  it('tags each plot in the manifest as issued or transferred (D84)', async () => {
+    const round = {
+      ...input,
+      kind: 'changeset' as const,
+      entries: [
+        { ...input.entries[0], kind: 'issued' as const },
+        { ...input.entries[1], kind: 'transferred' as const },
+      ],
+    };
+    const directory = await unzipper.Open.buffer(await service.build(round));
+    const manifestFile = directory.files.find((f) => f.path === 'manifest.json')!;
+
+    expect(JSON.parse((await manifestFile.buffer()).toString()).properties).toEqual([
+      { propertyId: '1001', certificateSerial: 'AA-001', leaf: '555', kind: 'issued' },
+      { propertyId: '1002', certificateSerial: 'AA-002', leaf: '666', kind: 'transferred' },
+    ]);
+  });
 });

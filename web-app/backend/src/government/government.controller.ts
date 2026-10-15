@@ -300,46 +300,58 @@ export class GovernmentController {
 
   @Get('pending-changes')
   @ApiOperation({
-    summary: 'Approved transfers and pending revocations waiting for the next change set',
+    summary:
+      'Issuance requests, approved transfers and pending revocations waiting for the next round',
+    description:
+      'Held items and items already in a draft are left out. A branch sees only its own area (D86).',
   })
-  pendingChanges() {
-    return this.changeSets.pending();
+  pendingChanges(@CurrentActor() actor: Actor) {
+    return this.changeSets.pending(actor);
   }
 
-  // Change-set draft — batches approved transfers + pending revocations into
-  // one root, two-phase flow (D44/D46), Metamask signs instead of the backend
+  // The publishing round (D84) — issuances, transfers and revocations under one root,
+  // two-phase flow (D43/D46), Metamask signs instead of the backend
   @Post('changesets')
+  @CentralOnly()
   @ApiOperation({
-    summary: 'Create a change-set draft (phase 1 of 2)',
+    summary: 'Create a change-set draft (phase 1 of 2, central office only)',
     description:
-      'Gathers every approved transfer and pending revocation, projects the single root that ' +
-      'applying all of them produces, and stores it as a durable draft. No Property, ' +
-      'TransferRequest or Revocation row is modified until confirm. Sign the returned newRoot ' +
-      '(and, when the round includes any revocations, the revocationCalldata for ' +
+      'Gathers every READY issuance request, approved transfer and pending revocation that is ' +
+      'not held, projects the single root that applying all of them produces, and stores it as ' +
+      'a durable draft. No Property or request row is modified until confirm. Sign the returned ' +
+      'newRoot (and, when the round includes any revocations, the revocationCalldata for ' +
       'publishRootWithRevocations) with Metamask, then call confirm.',
   })
   @ApiConflictResponse({
     description:
-      'Another draft is already open (D44), or the queue holds conflicting procedures for one plot',
+      'Another draft is already open (D44), the queue holds conflicting procedures for one plot, ' +
+      'or an issuance supersedes a certificate that is not REVOKED yet (reason ' +
+      'PredecessorNotRevoked, D90)',
   })
-  async createChangeSetDraft() {
-    return this.changeSets.createDraft();
+  async createChangeSetDraft(@CurrentActor() actor: Actor) {
+    return this.changeSets.createDraft(actor);
   }
 
   @Post('changesets/:id/confirm')
+  @CentralOnly()
   @ApiOperation({
-    summary: 'Confirm a change-set draft (phase 2 of 2)',
+    summary: 'Confirm a change-set draft (phase 2 of 2, central office only)',
     description:
       'Re-reads latestRoot from the chain and applies the draft only if it matches. The ' +
       'request body carries no chain evidence on purpose — the optional txHash is a display ' +
       'label only, never trusted as proof the publish happened.',
   })
-  async confirmChangeSetDraft(@Param('id', ParseIntPipe) id: number, @Body() dto: ConfirmDraftDto) {
-    return this.changeSets.confirm(id, dto.txHash);
+  async confirmChangeSetDraft(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ConfirmDraftDto,
+    @CurrentActor() actor: Actor,
+  ) {
+    return this.changeSets.confirm(id, dto.txHash, actor);
   }
 
   @Delete('changesets/:id')
-  @ApiOperation({ summary: 'Discard an unsigned change-set draft' })
+  @CentralOnly()
+  @ApiOperation({ summary: 'Discard an unsigned change-set draft (central office only)' })
   async discardChangeSetDraft(@Param('id', ParseIntPipe) id: number) {
     await this.changeSets.discard(id);
     return { discarded: id };
@@ -350,7 +362,7 @@ export class GovernmentController {
     summary: 'List change sets, newest first',
     description:
       'Summary columns plus transfer/revocation counts — never archiveZip. Download the ' +
-      'buyers’ archive via GET changesets/:id/archive (D77).',
+      'round’s archive via GET changesets/:id/archive (D77, D84).',
   })
   listChangeSets() {
     return this.changeSets.list();
@@ -358,10 +370,11 @@ export class GovernmentController {
 
   @Get('changesets/:id/archive')
   @ApiOperation({
-    summary: 'Download the buyers’ bundles as one ZIP, one folder per transferred plot (D77)',
+    summary: 'Download the round’s bundles as one ZIP, one folder per issued or transferred plot',
     description:
-      'Each folder holds receipt.json, secret.json, certificate.pdf and README.txt — the same ' +
-      'four files as an issuance folder; manifest.json ties the archive to a root version. ' +
+      'Each folder holds receipt.json, secret.json, certificate.pdf and README.txt; ' +
+      'manifest.json ties the archive to a root version and tags each plot issued or ' +
+      'transferred (D77, D84). ' +
       "Available until the change set's archiveExpiresAt. A round with only revocations has " +
       'no archive.',
   })

@@ -9,6 +9,8 @@ export interface ArchiveEntry {
   propertyId: string;
   certificateSerial: string;
   leaf: string;
+  /** D84: a round's archive holds both. Optional only while IssuanceBatchService still exists. */
+  kind?: 'issued' | 'transferred';
   files: ZipEntry[];
 }
 
@@ -55,6 +57,7 @@ export class ArchiveService {
         propertyId: entry.propertyId,
         certificateSerial: entry.certificateSerial,
         leaf: entry.leaf,
+        kind: entry.kind,
       })),
     };
 
