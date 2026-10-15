@@ -151,7 +151,7 @@ export interface TransferPreview {
   newPathIndices: number[];
 }
 
-/** A Revocation row as GET /government/pending-changes returns it (the Prisma row, unmapped). */
+/** A revocation as GET /government/pending-changes returns it (RevocationDto, office codes not ids). */
 export interface RevocationRow {
   id: number;
   propertyId: string;
@@ -159,12 +159,12 @@ export interface RevocationRow {
   detailText: string;
   detailHash: string;
   status: 'PENDING' | 'PUBLISHED' | 'REJECTED';
-  changeSetId: number | null;
-  /** Numeric ids of the filing office and the plot's office; the queue has the codes. */
-  officeId: number;
-  landOfficeId: number | null;
-  heldAt: string | null;
+  officeCode: string | null;
+  landOfficeCode: string | null;
+  byFallback: boolean;
+  held: boolean;
   heldReason: string | null;
+  changeSetId: number | null;
   createdAt: string;
   publishedAt: string | null;
 }

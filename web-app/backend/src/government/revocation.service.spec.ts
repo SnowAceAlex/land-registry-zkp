@@ -14,6 +14,7 @@ describe('RevocationService (D45)', () => {
     property: { findUnique },
     revocation: { findFirst, create, findMany },
     transferRequest: { findFirst: transferFindFirst },
+    landOffice: { findMany: jest.fn().mockResolvedValue([]) },
   } as never;
   const service = new RevocationService(prisma);
 
@@ -129,6 +130,15 @@ describe('RevocationService (D45)', () => {
 
       await service.pending(CENTRAL_ACTOR);
       expect(findMany.mock.calls[1][0].where).toEqual({ status: 'PENDING' });
+    });
+
+    it('pending: returns serialized rows with office codes, not raw rows', async () => {
+      findMany.mockResolvedValue([
+        { id: 1, propertyId: '1001', officeId: 1, landOfficeId: null, heldAt: null },
+      ]);
+      const [dto] = await service.pending(CENTRAL_ACTOR);
+      expect(dto).toMatchObject({ id: 1, held: false, byFallback: false });
+      expect(dto).not.toHaveProperty('officeId');
     });
   });
 });

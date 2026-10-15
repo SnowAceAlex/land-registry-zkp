@@ -30,6 +30,8 @@ import { toLURRecord } from '../records/record.mapper';
 import { TransferRequestDto } from '../transfers/dto/transfer.response.dto';
 import { officeCodes } from '../common/office-codes';
 import { toTransferRequestDto } from '../transfers/transfer-request.serializer';
+import { RevocationDto } from './dto/revocation.response.dto';
+import { toRevocationDto } from './revocation.serializer';
 import { RootService } from './root.service';
 import { RoundArchiveBuilder } from './round-archive.builder';
 
@@ -123,7 +125,7 @@ export class ChangeSetService {
   async pending(actor: Actor): Promise<{
     issuances: IssuanceRequestDto[];
     transfers: TransferRequestDto[];
-    revocations: Revocation[];
+    revocations: RevocationDto[];
     revocationCap: number;
   }> {
     // D86: a branch sees only the plots of its own area.
@@ -132,7 +134,7 @@ export class ChangeSetService {
     return {
       issuances: notHeld(queue.issuances).map((row) => toIssuanceRequestDto(row, offices)),
       transfers: notHeld(queue.transfers).map((row) => toTransferRequestDto(row, offices)),
-      revocations: notHeld(queue.revocations),
+      revocations: notHeld(queue.revocations).map((row) => toRevocationDto(row, offices)),
       revocationCap: revocationCap(),
     };
   }

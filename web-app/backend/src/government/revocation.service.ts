@@ -7,9 +7,12 @@ import {
 import { keccak256, toUtf8Bytes } from 'ethers';
 
 import { Actor } from '../common/actor';
+import { officeCodes } from '../common/office-codes';
 import { assertCanActOn } from '../common/office-scope';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRevocationDto } from './dto/revocation.dto';
+import { RevocationDto } from './dto/revocation.response.dto';
+import { toRevocationDto } from './revocation.serializer';
 
 /** Must stay in lockstep with MIN/MAX_REASON_CODE in RootRegistry.sol. */
 export const REASON_CODES: Record<number, string> = {
@@ -89,14 +92,18 @@ export class RevocationService {
     return { id: created.id, propertyId: created.propertyId, detailHash: created.detailHash };
   }
 
-  async pending(actor: Actor) {
-    return this.prisma.revocation.findMany({
-      // D86: a branch sees only its own area.
-      where: {
-        status: 'PENDING',
-        ...(actor.scope === 'BRANCH' ? { landOfficeId: actor.officeId } : {}),
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+  async pending(actor: Actor): Promise<RevocationDto[]> {
+    const [rows, offices] = await Promise.all([
+      this.prisma.revocation.findMany({
+        // D86: a branch sees only its own area.
+        where: {
+          status: 'PENDING',
+          ...(actor.scope === 'BRANCH' ? { landOfficeId: actor.officeId } : {}),
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      officeCodes(this.prisma),
+    ]);
+    return rows.map((row) => toRevocationDto(row, offices));
   }
 }

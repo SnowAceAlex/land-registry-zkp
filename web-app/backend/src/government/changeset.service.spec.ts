@@ -256,6 +256,9 @@ describe('ChangeSetService (D44)', () => {
     });
     expect(pending.issuances).toEqual([]);
     expect(pending.revocations.map((r) => r.id)).toEqual([3]);
+    // Serialized with office codes, not the raw row.
+    expect(pending.revocations[0]).not.toHaveProperty('officeId');
+    expect(pending.revocations[0]).toHaveProperty('officeCode');
   });
 
   it('refuses to draft when there is nothing pending', async () => {
