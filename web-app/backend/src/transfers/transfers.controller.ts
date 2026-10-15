@@ -110,8 +110,8 @@ export class TransfersController {
       'D28 step 4 — the step that needs a person. A transfer proof shows someone holds the old ' +
       "owner's secret; it cannot show they ARE the old owner (ownerCommitment is pseudonymous, " +
       'D8). Verifies on chain, then moves the request from PENDING to APPROVED. Publishing the ' +
-      'new root — and applying it to the registry — happens later, when a change set batches ' +
-      'every approved transfer (and revocation) and an officer signs it (D46).',
+      'new root — and applying it to the registry — happens later, when a round batches ' +
+      'every approved transfer, queued issuance and revocation and the head office signs it (D46, D84).',
   })
   @ApiOkResponse({ type: TransferApprovalResponseDto })
   @ApiUnprocessableEntityResponse({

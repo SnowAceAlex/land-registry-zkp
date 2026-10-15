@@ -186,6 +186,8 @@ AUTHORITY_ADDRESS=          # để trống = dùng luôn địa chỉ deployer
 AUTHORITY_ORG_NAME="So Tai nguyen va Moi truong TP.HCM"
 ```
 
+Backend đọc thêm hai biến tuỳ chọn trong `web-app/backend/.env`: `REVOCATION_CAP` (số thu hồi tối đa mỗi vòng công bố, mặc định 150) và `QUEUE_STALE_DAYS` (số ngày trước khi hàng chờ bị đánh dấu quá hạn, mặc định 2). **Trên Sepolia đặt `REVOCATION_CAP` ≤ 60**: từ fork Glamsterdam mỗi thu hồi tốn ~448k gas, 150 không còn vừa một block.
+
 `AUTHORITY_ORG_NAME` sẽ được `keccak256` rồi neo on-chain (D30) — **phải khớp field Subject `O` của X.509 certificate** mà verifier portal dùng ở Phase 9. Đổi tên này sau khi deploy = phải deploy lại hoặc gọi `registerAuthority` lần nữa.
 
 ### 2.2 Xin ETH testnet
@@ -315,7 +317,7 @@ thực thi bằng attestation mà verifier kiểm. Phần `verify*` tăng ~7.205
 `ATTESTER_ROLE` và đổi chữ ký `verifyOwnership`/`verifyMortgage`) buộc redeploy cả hai; contract nay
 biên dịch với `evmVersion: cancun`. Local: theo Giai đoạn 1 ở trên (compile → restart node →
 `deploy:localhost`, tự cấp `ATTESTER_ROLE` cho Hardhat account #1 — khớp key mặc định của backend),
-rồi `prisma migrate reset` và làm lại luồng Phase 8. Sepolia: đặt `ATTESTER_ADDRESS` (bắt buộc) trong
+rồi `prisma migrate reset`, `seed:admin-units` và `pnpm --filter backend run seed:land-offices` (lưu các khoá chi nhánh được in ra), rồi làm lại luồng Phase 8. Sepolia: đặt `ATTESTER_ADDRESS` (bắt buộc) trong
 `.env` gốc và `ATTESTER_PRIVATE_KEY` tương ứng trong `web-app/backend/.env`, `deploy:sepolia` (ghi
 `deployments/sepolia.json` mới kèm `attester`), rồi re-issue dữ liệu demo — **do người dùng tự chạy**;
 root history và revocations trên contract cũ không mang sang được.

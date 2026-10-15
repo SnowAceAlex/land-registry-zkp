@@ -258,7 +258,7 @@ describe('contracts/LandRegistryVerifier — real proofs (integration, Phase 4)'
 
       if (circuit === 'transfer') {
         it('two-step flow (§3): verify BEFORE publishRoot(newRoot); afterwards the proof is spent', async () => {
-          const { registry, dispatcher, authority, verifyArgs } = await deployStack();
+          const { registry, dispatcher, authority } = await deployStack();
           const { a, b, c } = toSolidityCalldata(pkg(circuit).proof);
           const oldRoot = asRoot(pkg(circuit).publicSignals[0]);
           const newRootIndex = PUBLIC_SIGNAL_ORDER.transfer.indexOf('newMerkleRoot');

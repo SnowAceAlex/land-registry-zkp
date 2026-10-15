@@ -35,7 +35,6 @@
 import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as http from 'http';
-import * as os from 'os';
 import * as path from 'path';
 
 import { Prisma, PrismaClient } from '@prisma/client';

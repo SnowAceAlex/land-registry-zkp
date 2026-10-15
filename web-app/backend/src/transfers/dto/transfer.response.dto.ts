@@ -76,8 +76,8 @@ export class TransferApprovalResponseDto {
 
   /**
    * Approval only records the officer's decision (D46) — the root that makes
-   * it effective on chain is published later, when a change set batches this
-   * transfer with others and an officer signs it.
+   * it effective on chain is published later, when a round batches this
+   * transfer with other queued items and the head office signs it.
    */
   @ApiPropertyOptional({ nullable: true, format: 'date-time' })
   decidedAt!: Date | null;

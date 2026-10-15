@@ -71,8 +71,13 @@ SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<KEY>
 AUTHORITY_PRIVATE_KEY=0x<khoá ví demo>
 ATTESTER_PRIVATE_KEY=0x<khoá attester> # khớp ATTESTER_ADDRESS; thiếu là backend không khởi động (D82)
 GOV_API_KEY=<giống gốc>
+REVOCATION_CAP=60 # tối đa thu hồi mỗi vòng; Sepolia ≤ 60 (xem dưới)
 FRONTEND_URL=http://localhost:3000
 ```
+
+⚠️ **`REVOCATION_CAP` trên Sepolia phải ≤ 60.** Từ fork Glamsterdam mỗi thu hồi tốn ~448k gas, nên mặc
+định 150 không còn nằm gọn trong một block. `GOV_API_KEY` là khoá của trụ sở (`HQ`, phạm vi trung
+ương); chi nhánh dùng khoá riêng in ra khi `seed:land-offices`.
 
 ⚠️ **Xoá dòng `RPC_URL=http://127.0.0.1:8545`** nếu còn: `RPC_URL` thắng mọi cấu hình khác, backend sẽ
 âm thầm đọc node local thay vì Sepolia.
@@ -178,7 +183,12 @@ pnpm run db:up
 pnpm --filter backend prisma migrate reset --force
 pnpm --filter backend run db:generate
 pnpm --filter backend run seed:admin-units DVHC_TPHCM.csv --province "TP.HCM"
+pnpm --filter backend run seed:land-offices
 ```
+
+`seed:land-offices` tạo các chi nhánh `CN01`…`CN38` và **in khoá API của từng chi nhánh một lần duy nhất**
+— lưu lại ngay (mất thì `pnpm --filter backend run office:rotate-key <MÃ>` cấp khoá mới). `HQ`, `CS2`,
+`CS3` đã có sẵn từ migration. Chạy sau `seed:admin-units` vì nó đối chiếu danh mục phường/xã.
 
 `seed:admin-units` chạy với thư mục `web-app/backend/`, nên đường dẫn `DVHC_TPHCM.csv` là tương đối
 tới đó.
@@ -226,17 +236,21 @@ export CHAIN_NETWORK=sepolia SEPOLIA_RPC_URL=<RPC> GOV_API_KEY=<key>
 
 ### 8.1 Đăng nhập + nhập dữ liệu (UC-2)
 
-1. `http://localhost:3000/vi/government` → nhập `GOV_API_KEY`.
+1. `http://localhost:3000/vi/government` → nhập `GOV_API_KEY` (đăng nhập với tư cách trụ sở `HQ`).
 2. Thanh trạng thái: `sepolia · Chain 11155111`, chưa có gốc Merkle.
 3. Trang Nhập dữ liệu → chọn `demoImport.csv` → dry-run liệt kê dòng hợp lệ / lỗi, **chưa ghi gì**
    (D52) → **Nhập các dòng hợp lệ**. Các thửa ở bảng trên phải có mặt.
 
 ### 8.2 Cấp giấy (UC-1, D43)
 
-1. Trang Cấp giấy → chọn cả 10 thửa → **Tạo nháp cấp giấy**.
-2. Kết nối Metamask → **Ký và công bố gốc** → xác nhận `publishRoot` → chờ block (~12 s) → tự confirm
-   → "đã công bố ở gốc phiên bản 1".
-3. **Tải ZIP** → giải nén, ví dụ vào `demo/batch-1/` (mỗi thửa một thư mục `201/`, `202/`, …).
+1. Trang Cấp giấy (chỉ trụ sở) → chọn cả 10 thửa → **Gửi yêu cầu cấp giấy** — mỗi thửa thành một
+   yêu cầu trong hàng chờ chung (D87); chưa ký gì.
+2. Chốt sổ: tạo nháp vòng công bố → kết nối Metamask → **Ký và công bố gốc** → xác nhận
+   `publishRoot` → chờ block (~12 s) → tự confirm → "đã công bố ở gốc phiên bản 1". Một vòng gom cả
+   cấp giấy, chuyển nhượng và thu hồi dưới một gốc (D84).
+3. **Tải archive** theo từng chi nhánh (mỗi chi nhánh một ZIP, chi nhánh chỉ tải được ZIP của mình,
+   D88; trụ sở tải được tất cả) → giải nén hết vào cùng `demo/batch-1/` (mỗi thửa một thư mục
+   `201/`, `202/`, …).
 4. Kiểm một bundle bằng CLI (chuỗi D30 + root on-chain):
 
    ```bash
@@ -286,12 +300,12 @@ export CHAIN_NETWORK=sepolia SEPOLIA_RPC_URL=<RPC> GOV_API_KEY=<key>
 2. **Tấn công — chủ bị thu hồi đem sổ đi vay:** lặp lại 8.4.3 với `203/`
    (`proof:bodies demo/batch-1/203 demo/attack-203`) → UC-5 ngõ cụt, UC-6 `InvalidAttestation`.
 
-### 8.6 Công bố change set (UC-4, D46)
+### 8.6 Chốt sổ vòng công bố (UC-4, D46, D84)
 
 1. Trang Thay đổi → hàng chờ có 1 chuyển nhượng + 1 thu hồi →
    **Tạo nháp** → **Ký** (`publishRootWithRevocations`) → confirm → gốc v2.
-2. Tải archive của change set → giải nén vào `demo/changeset-1/` → có `201/` của **bên mua** (receipt +
-   secret mới, D77).
+2. Tải archive của vòng theo chi nhánh → giải nén vào `demo/changeset-1/` → có `201/` của **bên mua**
+   (receipt + secret mới, D77).
 3. Sau publish:
    - Bên mua: UC-5 với `demo/changeset-1/201/` → tạo proof → UC-6 xanh cả 5 check.
    - Bên bán cũ: UC-5 với `demo/batch-1/201/` → "Giấy chứng nhận không còn hiệu lực" (lá đã đổi).

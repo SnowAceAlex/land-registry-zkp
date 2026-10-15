@@ -27,8 +27,9 @@ export function setupSwagger(app: INestApplication): string | null {
         'Privacy-preserving Land Use Rights registry: off-chain records, on-chain Merkle root,',
         'Groth16 proofs.',
         '',
-        '**Roles.** `Government` endpoints belong to the state authority and are gated by a static',
-        'API key — press **Authorize** and paste the value of `GOV_API_KEY`. `Transfers` is split',
+        '**Roles.** `Government` endpoints belong to the state authority and are gated by an API key —',
+        'press **Authorize** and paste `GOV_API_KEY` (the head office) or a land office key (D86).',
+        'A branch acts only on plots in its own area. `Transfers` is split',
         'deliberately: computing a projected root reveals nothing and needs no judgement, so',
         'preview/submit are open, while approving a transfer is the step that requires a person',
         'at the authority.',
@@ -44,7 +45,10 @@ export function setupSwagger(app: INestApplication): string | null {
     )
     .setVersion('0.1.0')
     .addApiKey({ type: 'apiKey', name: GOV_API_KEY_HEADER, in: 'header' }, GOV_API_KEY_SECURITY)
-    .addTag('Government', 'State authority: bulk import, batch issuance, root publishing')
+    .addTag(
+      'Government',
+      'State authority: bulk import, issuance requests, the shared queue, root publishing rounds',
+    )
     .addTag('Transfers', 'Two-step transfer flow — automatic preview, human approval')
     .addTag('Bundles', 'One-time owner bundle download')
     .addTag('Records', 'Read-only registry queries')
