@@ -1,6 +1,7 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
 import { IssuanceRequestService } from './issuance-request.service';
+import { LineageService } from '../lineage/lineage.service';
 import { CENTRAL_ACTOR, makeProperty } from '../../test/factories';
 
 describe('IssuanceRequestService (D87, D90)', () => {
@@ -15,8 +16,9 @@ describe('IssuanceRequestService (D87, D90)', () => {
     landOffice: { findMany: landOfficeFindMany },
     $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   } as never;
-  const unrevokedPredecessors = jest.fn();
-  const lineage = { unrevokedPredecessors } as never;
+  // Real LineageService so the 409 body comes from assertPredecessorsRevoked itself.
+  const lineage = new LineageService({} as never);
+  const unrevokedPredecessors = jest.spyOn(lineage, 'unrevokedPredecessors');
   let nextSecret = 10n;
   const issuance = {
     generateOwnerSecret: jest.fn(() => nextSecret++),

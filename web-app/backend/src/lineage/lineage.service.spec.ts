@@ -1,3 +1,5 @@
+import { ConflictException } from '@nestjs/common';
+
 import { LineageService } from './lineage.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -94,6 +96,27 @@ describe('LineageService', () => {
       const { service } = makeService(edges);
 
       expect((await service.unrevokedPredecessors(['99'])).size).toBe(0);
+    });
+  });
+
+  describe('assertPredecessorsRevoked', () => {
+    it('passes when every predecessor is REVOKED', async () => {
+      const { service } = makeService(edges, { '1': 'REVOKED', '2': 'REVOKED', '3': 'REVOKED' });
+
+      await expect(service.assertPredecessorsRevoked(['10', '11'])).resolves.toBeUndefined();
+    });
+
+    it('409s PredecessorNotRevoked naming each blocked successor and its open predecessors', async () => {
+      const { service } = makeService(edges, { '3': 'REVOKED' });
+
+      const error = await service.assertPredecessorsRevoked(['10', '11']).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getResponse()).toEqual({
+        reason: 'PredecessorNotRevoked',
+        message: 'Superseded certificates are not revoked yet: 10',
+        details: { '10': '1,2' },
+      });
     });
   });
 

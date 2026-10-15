@@ -50,15 +50,7 @@ export class IssuanceRequestService {
       );
     }
 
-    // D90: a re-issued certificate waits until every one it supersedes is REVOKED.
-    const blocked = await this.lineage.unrevokedPredecessors(ids);
-    if (blocked.size > 0) {
-      throw new ConflictException({
-        reason: 'PredecessorNotRevoked',
-        message: `Superseded certificates are not revoked yet: ${[...blocked.keys()].join(', ')}`,
-        details: Object.fromEntries([...blocked].map(([id, preds]) => [id, preds.join(',')])),
-      });
-    }
+    await this.lineage.assertPredecessorsRevoked(ids);
 
     const creates = [];
     for (const id of ids) {

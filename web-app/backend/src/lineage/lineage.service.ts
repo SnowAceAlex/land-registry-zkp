@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -61,6 +61,17 @@ export class LineageService {
       if (open.length > 0) result.set(successor, open);
     }
     return result;
+  }
+
+  /** D90: a re-issued certificate waits until every one it supersedes is REVOKED. */
+  async assertPredecessorsRevoked(propertyIds: string[]): Promise<void> {
+    const blocked = await this.unrevokedPredecessors(propertyIds);
+    if (blocked.size === 0) return;
+    throw new ConflictException({
+      reason: 'PredecessorNotRevoked',
+      message: `Superseded certificates are not revoked yet: ${[...blocked.keys()].join(', ')}`,
+      details: Object.fromEntries([...blocked].map(([id, preds]) => [id, preds.join(',')])),
+    });
   }
 
   edgesStatement(edges: LineageEdge[]): Prisma.PrismaPromise<unknown> {

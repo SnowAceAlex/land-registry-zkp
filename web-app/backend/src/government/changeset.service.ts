@@ -87,6 +87,9 @@ export interface ChangeSetDraftDetail {
 type IssuanceItem = Pick<IssuanceRequest, 'id' | 'propertyId' | 'ownerCommitment'>;
 type TransferItem = Pick<TransferRequest, 'id' | 'propertyId' | 'newOwnerCommitment'>;
 
+const notHeld = <T extends { heldAt: Date | null }>(rows: T[]): T[] =>
+  rows.filter((row) => row.heldAt === null);
+
 /**
  * The one publishing round (D84): READY issuances, APPROVED transfers and PENDING
  * revocations projected into a single root. Same draft → sign → confirm shape as D43:
@@ -122,26 +125,26 @@ export class ChangeSetService {
   }> {
     // D86: a branch sees only the plots of its own area.
     const area = actor.scope === 'BRANCH' ? { landOfficeId: actor.officeId } : {};
-    const [{ issuances, transfers, revocations }, offices] = await Promise.all([
-      this.queue(area),
-      officeCodes(this.prisma),
-    ]);
+    const [queue, offices] = await Promise.all([this.queue(area), officeCodes(this.prisma)]);
     return {
-      issuances: issuances.map((row) => toIssuanceRequestDto(row, offices)),
-      transfers: transfers.map((row) => toTransferRequestDto(row, offices)),
-      revocations,
+      issuances: notHeld(queue.issuances).map((row) => toIssuanceRequestDto(row, offices)),
+      transfers: notHeld(queue.transfers).map((row) => toTransferRequestDto(row, offices)),
+      revocations: notHeld(queue.revocations),
       revocationCap: revocationCap(),
     };
   }
 
-  /** The raw queue — rows with their secrets, for this service only. */
+  /**
+   * The raw queue, rows with their secrets, for this service only. Held items are
+   * included: they are still open procedures, so they keep blocking conflicting ones
+   * even though they never enter a round (D87).
+   */
   private async queue(area: { landOfficeId?: number } = {}): Promise<{
     issuances: IssuanceRequest[];
     transfers: TransferRequest[];
     revocations: Revocation[];
   }> {
-    // Not yet in a draft, and not held back by the central office (D87).
-    const open = { changeSetId: null, heldAt: null, ...area };
+    const open = { changeSetId: null, ...area };
     const orderBy = { createdAt: 'asc' as const };
     const [issuances, transfers, revocations] = await Promise.all([
       this.prisma.issuanceRequest.findMany({ where: { status: 'READY', ...open }, orderBy }),
@@ -159,14 +162,18 @@ export class ChangeSetService {
   async createDraft(actor: Actor): Promise<ChangeSetDraftDetail> {
     await this.lock.assertNoOpenDraft();
 
-    const { issuances, transfers, revocations: pendingRevocations } = await this.queue();
+    const queued = await this.queue();
+    const issuances = notHeld(queued.issuances);
+    const transfers = notHeld(queued.transfers);
+    const pendingRevocations = notHeld(queued.revocations);
     if (issuances.length === 0 && transfers.length === 0 && pendingRevocations.length === 0) {
       throw new ConflictException(
         'Nothing to publish — no issuance requests, approved transfers or revocations',
       );
     }
 
-    this.assertNoConflicts(issuances, transfers, pendingRevocations);
+    // Held items are left out of the round, not out of the conflict check.
+    this.assertNoConflicts(queued.issuances, queued.transfers, queued.revocations);
 
     // D77 — the buyer's secret travels with the request into this round's
     // archive. A request submitted before D77 has none, and publishing its
@@ -186,17 +193,17 @@ export class ChangeSetService {
           `secret. Withdraw them and queue the plots again.`,
       );
     }
+    const mismatched = await this.mismatchedCommitments(issuances);
+    if (mismatched.length > 0) {
+      throw new ConflictException(
+        `Issuance request(s) ${mismatched.map((id) => `#${id}`).join(', ')} hold a secret that ` +
+          `does not open their commitment. Withdraw them and queue the plots again.`,
+      );
+    }
 
     // D90, re-checked: a re-issued certificate publishes only once all it replaces are REVOKED.
     if (issuances.length > 0) {
-      const blocked = await this.lineage.unrevokedPredecessors(issuances.map((r) => r.propertyId));
-      if (blocked.size > 0) {
-        throw new ConflictException({
-          reason: 'PredecessorNotRevoked',
-          message: `Superseded certificates are not revoked yet: ${[...blocked.keys()].join(', ')}`,
-          details: Object.fromEntries([...blocked].map(([id, preds]) => [id, preds.join(',')])),
-        });
-      }
+      await this.lineage.assertPredecessorsRevoked(issuances.map((r) => r.propertyId));
     }
 
     // D56 — oldest first (queue() orders by createdAt), the rest wait.
@@ -231,6 +238,18 @@ export class ChangeSetService {
       revocations,
       pendingRevocations.length - revocations.length,
     );
+  }
+
+  /** D87: ids of requests whose stored secret does not open the stored commitment. */
+  private async mismatchedCommitments(
+    issuances: Pick<IssuanceRequest, 'id' | 'ownerSecret' | 'ownerCommitment'>[],
+  ): Promise<number[]> {
+    const mismatched: number[] = [];
+    for (const request of issuances) {
+      const commitment = await this.issuance.commitmentFor(BigInt(request.ownerSecret!));
+      if (commitment.toString() !== request.ownerCommitment) mismatched.push(request.id);
+    }
+    return mismatched;
   }
 
   /**
@@ -388,6 +407,14 @@ export class ChangeSetService {
       throw new UnprocessableEntityException(
         `Issuance request(s) ${keyless.map((r) => `#${r.id}`).join(', ')} in change set #${id} ` +
           `carry no owner secret. Discard this change set, withdraw them, and queue the plots again.`,
+      );
+    }
+    const mismatched = await this.mismatchedCommitments(draft.issuances);
+    if (mismatched.length > 0) {
+      throw new UnprocessableEntityException(
+        `Issuance request(s) ${mismatched.map((r) => `#${r}`).join(', ')} in change set #${id} ` +
+          `hold a secret that does not open their commitment. Discard this change set, ` +
+          `withdraw them, and queue the plots again.`,
       );
     }
 
