@@ -1,13 +1,13 @@
 /**
  * features/government/publishing/next-draft-step.ts
  * ─────────────────────────────────────────────────────────────────────────────
- * The one decision both publishing screens (UC-1 issuance, UC-4 change sets)
- * make on every render: what can the officer do with the draft right now?
+ * The one decision the closing session (D84) makes on every render: what can
+ * the officer do with the round's draft right now?
  *
  * It is a pure function of five facts so the resume path of D43/D53 is
  * testable without a browser, a wallet or a chain:
  *
- *   - the open draft (D44 allows one, across both kinds);
+ *   - the open draft (D44 allows one);
  *   - the chain's latestRoot — equal to the draft's root means the signature
  *     already landed (possibly in a tab that has since been closed), so only
  *     confirm() is left, and confirm needs no wallet: the backend reads the

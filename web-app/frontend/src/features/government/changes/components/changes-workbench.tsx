@@ -1,18 +1,16 @@
 'use client';
 
 /**
- * UC-4 interaction. Like issuance, the screen follows the open draft (D44):
- *   - a change set draft is open → DraftPanel (signs publishRootWithRevocations
- *     when the round revokes anything, publishRoot otherwise);
- *   - an issuance draft is open  → blocked, with a link to it;
- *   - no draft                   → the queue and "Draft a change set".
- * Revocation requests are queued on the Revocations page; this screen only
- * publishes them.
- * The history below lists every round with its buyers' archive (D77).
+ * "Chốt sổ" interaction. The screen follows the open draft (D44, D84):
+ *   - a draft is open → DraftPanel (signs publishRootWithRevocations when the
+ *     round revokes anything, publishRoot otherwise);
+ *   - no draft        → what the round would carry, the overview alerts that
+ *     gate it, the waiting items (hold / release) and "Create the round".
+ * A draft is immutable: to drop an item, hold it, discard the draft, create again.
+ * The history below lists every round with how many of its archives were downloaded.
  */
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { FolderSync, LoaderCircle } from 'lucide-react';
 
@@ -21,16 +19,25 @@ import type { Dictionary } from '@/i18n/dictionaries';
 import { format } from '@/i18n/format';
 import { buttonStyles } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { HashText } from '@/components/ui/hash-text';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 
+import { type AlertStrings, alertText } from '../../api/alert-text';
 import { type Failure, apiFailure } from '../../api/error-message';
-import { govKeys, useOpenDraft, usePendingChanges, usePendingTransferCount } from '../../api/hooks';
-import type { ChangeSetDraftDetail, PendingChanges } from '../../api/types';
+import {
+  govKeys,
+  useOpenDraft,
+  useOverview,
+  usePendingChanges,
+  usePendingTransferCount,
+} from '../../api/hooks';
+import type { ChangeSetDraftDetail } from '../../api/types';
 import { type DraftOutcome, DraftPanel } from '../../publishing/components/draft-panel';
 import { confirmChangeSetDraft, createChangeSetDraft, discardChangeSetDraft } from '../api';
+import { composeRound } from '../lib/round-composition';
+import { roundGate } from '../lib/round-gate';
 import { ChangeSetHistory } from './changeset-history';
+import { QueueTable } from './queue-table';
 
 type Strings = Dictionary['govChanges'];
 type Message = { tone: 'success' | 'info'; title: string; detail?: string };
@@ -42,20 +49,23 @@ export function ChangesWorkbench({
   lang,
   t,
   draftT,
+  alertT,
   errors,
 }: {
   lang: Locale;
   t: Strings;
   draftT: Dictionary['govDraft'];
+  alertT: AlertStrings;
   errors: Dictionary['govErrors'];
 }) {
   const queryClient = useQueryClient();
   const openDraft = useOpenDraft();
   const pendingTransfers = usePendingTransferCount();
-  const pending = usePendingChanges();
   const [creating, setCreating] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
+  /** Revocations the last confirmed round left behind (D56); offers the next round. */
+  const [leftover, setLeftover] = useState(0);
 
   async function refresh() {
     await Promise.all([
@@ -63,6 +73,9 @@ export function ChangesWorkbench({
       queryClient.invalidateQueries({ queryKey: govKeys.status }),
       queryClient.invalidateQueries({ queryKey: govKeys.pendingChanges }),
       queryClient.invalidateQueries({ queryKey: govKeys.changeSets }),
+      queryClient.invalidateQueries({ queryKey: govKeys.overview }),
+      queryClient.invalidateQueries({ queryKey: govKeys.offices }),
+      queryClient.invalidateQueries({ queryKey: ['gov', 'queue'] }),
       queryClient.invalidateQueries({ queryKey: ['gov', 'transfers'] }),
     ]);
   }
@@ -71,6 +84,7 @@ export function ChangesWorkbench({
     setCreating(true);
     setFailure(null);
     setMessage(null);
+    setLeftover(0);
     try {
       const draft = await createChangeSetDraft();
       queryClient.setQueryData(govKeys.openDraft, draft);
@@ -83,23 +97,24 @@ export function ChangesWorkbench({
     }
   }
 
+  const draft = openDraft.data;
+
   async function settled(outcome: DraftOutcome) {
-    setMessage(
-      outcome.kind === 'confirmed'
-        ? {
-            tone: 'success',
-            title: format(t.confirmedTitle, {
-              id: outcome.confirmation.id,
-              version: outcome.confirmation.rootVersion,
-            }),
-            detail: t.confirmedBody,
-          }
-        : { tone: 'info', title: t.discardedTitle },
-    );
+    if (outcome.kind === 'confirmed') {
+      setLeftover(draft?.deferredRevocations ?? 0);
+      setMessage({
+        tone: 'success',
+        title: format(t.confirmedTitle, {
+          id: outcome.confirmation.id,
+          version: outcome.confirmation.rootVersion,
+        }),
+        detail: t.confirmedBody,
+      });
+    } else {
+      setMessage({ tone: 'info', title: t.discardedTitle });
+    }
     await refresh();
   }
-
-  const draft = openDraft.data;
 
   return (
     <div className="space-y-10">
@@ -119,7 +134,7 @@ export function ChangesWorkbench({
           <Skeleton className="h-48 w-full" />
         ) : openDraft.error ? (
           <Notice tone="danger" title={apiFailure(openDraft.error, errors).title} />
-        ) : draft?.kind === 'changeset' ? (
+        ) : draft ? (
           <DraftPanel
             key={draft.id}
             draft={draft}
@@ -128,7 +143,7 @@ export function ChangesWorkbench({
             summary={<DraftSummary draft={draft} t={t} />}
             warnings={
               <>
-                {draft.transferIds.length > 0 ? (
+                {draft.transferIds.length > 0 || draft.issuanceRequestIds.length > 0 ? (
                   <Notice tone="warning" title={t.archiveWarning} />
                 ) : null}
                 {draft.revocationIds.length > 0 ? (
@@ -147,37 +162,20 @@ export function ChangesWorkbench({
             onDiscard={discardChangeSetDraft}
             onSettled={settled}
           />
-        ) : draft?.kind === 'issuance' ? (
-          <Notice
-            tone="warning"
-            title={format(t.blockedTitle, { id: draft.id })}
-            action={
-              <Link
-                href={`/${lang}/government/issuance`}
-                className="text-sm font-medium text-authority underline underline-offset-4"
-              >
-                {t.openIssuance}
-              </Link>
-            }
-          >
-            {t.blockedBody}
-          </Notice>
-        ) : pending.isPending ? (
-          <Skeleton className="h-40 w-full" />
-        ) : pending.error ? (
-          <Notice tone="danger" title={t.loadError} />
         ) : (
-          <PendingQueue
-            lang={lang}
-            pending={pending.data}
+          <RoundCreator
             t={t}
+            alertT={alertT}
             creating={creating}
+            leftover={leftover}
             onCreate={create}
           />
         )}
       </div>
 
-      <ChangeSetHistory t={t} errors={errors} />
+      {!openDraft.isPending && !draft ? <QueueTable t={t} errors={errors} /> : null}
+
+      <ChangeSetHistory lang={lang} t={t} errors={errors} />
     </div>
   );
 }
@@ -186,6 +184,11 @@ function DraftSummary({ draft, t }: { draft: ChangeSetDraftDetail; t: Strings })
   const { propertyIds, reasonCodes } = draft.revocationCalldata;
   return (
     <div className="space-y-3 text-sm">
+      {draft.issuanceRequestIds.length > 0 ? (
+        <p className="text-ink">
+          {format(t.draftIssuances, { count: draft.issuanceRequestIds.length })}
+        </p>
+      ) : null}
       {draft.transferIds.length > 0 ? (
         <p className="text-ink">
           {format(t.draftTransfers, {
@@ -220,148 +223,172 @@ function DraftSummary({ draft, t }: { draft: ChangeSetDraftDetail; t: Strings })
   );
 }
 
-function PendingQueue({
-  lang,
-  pending,
+function RoundCreator({
   t,
+  alertT,
   creating,
+  leftover,
   onCreate,
 }: {
-  lang: Locale;
-  pending: PendingChanges;
   t: Strings;
+  alertT: AlertStrings;
   creating: boolean;
+  leftover: number;
   onCreate: () => void;
 }) {
-  const { transfers, revocations, revocationCap } = pending;
+  const pending = usePendingChanges();
+  const overview = useOverview();
+  const [acknowledged, setAcknowledged] = useState(false);
 
-  if (transfers.length === 0 && revocations.length === 0) {
+  if (pending.isPending) return <Skeleton className="h-40 w-full" />;
+  if (pending.error) return <Notice tone="danger" title={t.loadError} />;
+
+  const round = composeRound(pending.data);
+  const total = round.byKind.issuance + round.byKind.transfer + round.byKind.revocation;
+
+  if (total === 0) {
     return <EmptyState icon={FolderSync} title={t.emptyTitle} description={t.emptyBody} />;
   }
 
+  const gate = overview.data ? roundGate(overview.data.alerts) : null;
+  const canCreate =
+    gate !== null && (gate.state === 'clear' || (gate.state === 'needs-ack' && acknowledged));
+
   return (
     <section className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="font-medium text-ink">{t.pendingTitle}</h2>
-          {revocations.length > revocationCap ? (
-            <p className="mt-1 text-sm text-steel">{format(t.capNote, { cap: revocationCap })}</p>
+      <h2 className="font-medium text-ink">{t.composeTitle}</h2>
+
+      {leftover > 0 ? <Notice tone="info" title={format(t.nextRoundHint, { count: leftover })} /> : null}
+
+      <Composition round={round} cap={pending.data.revocationCap} t={t} />
+
+      {overview.error ? <Notice tone="danger" title={t.gateError} /> : null}
+      {gate && gate.state !== 'clear' ? (
+        <div className="space-y-2">
+          <Notice
+            tone={gate.state === 'blocked' ? 'danger' : 'warning'}
+            title={gate.state === 'blocked' ? t.gateBlockedTitle : t.gateAckTitle}
+          />
+          <ul className="space-y-2">
+            {gate.reasons.map((alert) => {
+              const { tone, title } = alertText(alert, alertT);
+              return (
+                <li key={`${alert.code}:${alert.officeCode ?? ''}:${alert.ref ?? ''}`}>
+                  <Notice tone={tone} title={title} />
+                </li>
+              );
+            })}
+          </ul>
+          {gate.state === 'needs-ack' ? (
+            <label className="flex items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={acknowledged}
+                onChange={(event) => setAcknowledged(event.target.checked)}
+              />
+              {t.gateAck}
+            </label>
           ) : null}
         </div>
-        <button
-          type="button"
-          className={buttonStyles.primary}
-          disabled={creating}
-          onClick={onCreate}
-        >
-          {creating ? (
-            <>
-              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
-              {t.creating}
-            </>
-          ) : (
-            t.createDraft
-          )}
-        </button>
-      </div>
+      ) : null}
 
-      <div className="space-y-3">
-        <h3 className="text-sm font-medium text-ink">{t.transfersTitle}</h3>
-        {transfers.length === 0 ? (
-          <p className="text-sm text-steel">{t.noTransfers}</p>
+      <button
+        type="button"
+        className={buttonStyles.primary}
+        disabled={creating || !canCreate}
+        onClick={onCreate}
+      >
+        {creating ? (
+          <>
+            <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
+            {t.creating}
+          </>
+        ) : leftover > 0 ? (
+          t.createNext
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-hairline bg-white">
-            <table className="w-full min-w-[36rem] text-left text-sm">
-              <thead className="border-b border-hairline text-xs text-steel">
-                <tr>
-                  <th scope="col" className="px-4 py-2 font-medium">
-                    {t.colRequest}
-                  </th>
-                  <th scope="col" className="px-4 py-2 font-medium">
-                    {t.colProperty}
-                  </th>
-                  <th scope="col" className="px-4 py-2 font-medium">
-                    {t.colBuyer}
-                  </th>
-                  <th scope="col" className="px-4 py-2 font-medium">
-                    {t.colApproved}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-whisper">
-                {transfers.map((transfer) => (
-                  <tr key={transfer.id}>
-                    <td className="px-4 py-2 font-mono text-xs">#{transfer.id}</td>
-                    <td className="px-4 py-2 font-mono text-xs">{transfer.propertyId}</td>
-                    <td className="px-4 py-2">
-                      <HashText value={transfer.newOwnerCommitment} />
-                    </td>
-                    <td className="px-4 py-2 text-xs text-steel">
-                      {transfer.decidedAt ? new Date(transfer.decidedAt).toLocaleString() : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          t.createDraft
         )}
-      </div>
-
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-medium text-ink">{t.revocationsTitle}</h3>
-          <Link
-            href={`/${lang}/government/revocations`}
-            className="text-sm font-medium text-authority underline underline-offset-4"
-          >
-            {t.openRevocations}
-          </Link>
-        </div>
-        {revocations.length === 0 ? (
-          <p className="text-sm text-steel">{t.noRevocations}</p>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-hairline bg-white">
-            <table className="w-full min-w-[48rem] text-left text-sm">
-              <thead className="border-b border-hairline text-xs text-steel">
-                <tr>
-                  <th scope="col" className="px-4 py-2 font-medium">
-                    {t.colProperty}
-                  </th>
-                  <th scope="col" className="px-4 py-2 font-medium">
-                    {t.colReason}
-                  </th>
-                  <th scope="col" className="px-4 py-2 font-medium">
-                    {t.colDetail}
-                  </th>
-                  <th scope="col" className="px-4 py-2 font-medium">
-                    {t.colDetailHash}
-                  </th>
-                  <th scope="col" className="px-4 py-2 font-medium">
-                    {t.colRequested}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-whisper">
-                {revocations.map((revocation) => (
-                  <tr key={revocation.id} className="align-top">
-                    <td className="px-4 py-2 font-mono text-xs">{revocation.propertyId}</td>
-                    <td className="px-4 py-2">{reasonLabel(t, revocation.reasonCode)}</td>
-                    <td className="max-w-[16rem] px-4 py-2 break-words text-ink">
-                      {revocation.detailText}
-                    </td>
-                    <td className="px-4 py-2">
-                      <HashText value={revocation.detailHash} />
-                    </td>
-                    <td className="px-4 py-2 text-xs text-steel">
-                      {new Date(revocation.createdAt).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      </button>
     </section>
+  );
+}
+
+function Composition({
+  round,
+  cap,
+  t,
+}: {
+  round: ReturnType<typeof composeRound>;
+  cap: number;
+  t: Strings;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="overflow-x-auto rounded-lg border border-hairline bg-white">
+          <table className="w-full text-left text-sm">
+            <caption className="px-4 pt-3 text-left text-xs font-medium text-steel">
+              {t.byKindTitle}
+            </caption>
+            <thead className="border-b border-hairline text-xs text-steel">
+              <tr>
+                <th scope="col" className="px-4 py-2 font-medium">{t.colKind}</th>
+                <th scope="col" className="px-4 py-2 text-right font-medium">{t.colCount}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-whisper">
+              <tr>
+                <td className="px-4 py-2">{t.kindIssuance}</td>
+                <td className="px-4 py-2 text-right font-mono text-xs">{round.byKind.issuance}</td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2">{t.kindTransfer}</td>
+                <td className="px-4 py-2 text-right font-mono text-xs">{round.byKind.transfer}</td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2">{t.kindRevocation}</td>
+                <td className="px-4 py-2 text-right font-mono text-xs">{round.byKind.revocation}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="overflow-x-auto rounded-lg border border-hairline bg-white">
+          <table className="w-full text-left text-sm">
+            <caption className="px-4 pt-3 text-left text-xs font-medium text-steel">
+              {t.byOfficeTitle}
+            </caption>
+            <thead className="border-b border-hairline text-xs text-steel">
+              <tr>
+                <th scope="col" className="px-4 py-2 font-medium">{t.colOffice}</th>
+                <th scope="col" className="px-4 py-2 text-right font-medium">{t.colIssuance}</th>
+                <th scope="col" className="px-4 py-2 text-right font-medium">{t.colTransfers}</th>
+                <th scope="col" className="px-4 py-2 text-right font-medium">{t.colRevocations}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-whisper">
+              {round.byOffice.map((row) => (
+                <tr key={row.officeCode ?? 'unassigned'}>
+                  <td className="px-4 py-2 font-mono text-xs">{row.officeCode ?? t.unassigned}</td>
+                  <td className="px-4 py-2 text-right font-mono text-xs">{row.issuance}</td>
+                  <td className="px-4 py-2 text-right font-mono text-xs">{row.transfer}</td>
+                  <td className="px-4 py-2 text-right font-mono text-xs">{row.revocation}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {round.deferredRevocations > 0 ? (
+        <Notice
+          tone="info"
+          title={format(t.deferredNote, {
+            count: round.deferredRevocations,
+            cap,
+          })}
+        />
+      ) : null}
+    </div>
   );
 }

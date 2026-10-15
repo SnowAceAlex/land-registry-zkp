@@ -3,8 +3,8 @@
 /**
  * features/government/publishing/components/draft-panel.tsx
  * ─────────────────────────────────────────────────────────────────────────────
- * The sign → mine → confirm workflow of D43, shared by UC-1 (issuance) and
- * UC-4 (change sets). The screen supplies what the draft contains and how to
+ * The sign → mine → confirm workflow of D43 for a registration round (D84).
+ * The screen supplies what the draft contains and how to
  * confirm or discard it; this panel owns everything about the chain.
  *
  * The ordering is load-bearing:

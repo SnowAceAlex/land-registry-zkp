@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import en from '@/i18n/dictionaries/en.json';
 import vi from '@/i18n/dictionaries/vi.json';
 
-import type { Alert, AlertCode } from '../../api/types';
+import type { Alert, AlertCode } from './types';
 import { alertText } from './alert-text';
 
 // Record forces a new AlertCode to be listed here, and so to be worded below.

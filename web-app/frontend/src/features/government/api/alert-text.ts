@@ -1,14 +1,17 @@
 import type { Dictionary } from '@/i18n/dictionaries';
 import { format } from '@/i18n/format';
 
-import type { Alert } from '../../api/types';
+import type { Alert } from './types';
+
+/** The slice of the operations dictionary that words an alert. */
+export type AlertStrings = Pick<Dictionary['govOperations'], 'alerts' | 'alertNoOffice'>;
 
 const TONES = { error: 'danger', warning: 'warning', info: 'info' } as const;
 
 /** Words a coded alert (D89); an alert with no office speaks of the unassigned plots. */
 export function alertText(
   alert: Alert,
-  t: Dictionary['govOperations'],
+  t: AlertStrings,
 ): { tone: 'danger' | 'warning' | 'info'; title: string } {
   const template = t.alerts[alert.code];
   const values: Record<string, string | number> = { office: alert.officeCode ?? t.alertNoOffice };

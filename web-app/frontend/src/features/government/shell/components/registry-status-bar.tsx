@@ -6,7 +6,7 @@
  * The facts every operation depends on, visible on every government page:
  * which chain the registry is on (D54), the published root version, whether
  * the database agrees with the chain, and whether a draft is already waiting
- * (D44 — at most one, so it blocks the next publish wherever it was started).
+ * (D44 — at most one, so it blocks the next round).
  * The wallet button lives here too: signing is a portal-wide concern, not a
  * per-page one.
  */
@@ -29,7 +29,8 @@ export function RegistryStatusBar({ lang, t }: { lang: Locale; t: Dictionary['go
   const me = useMe();
   const pathname = usePathname();
 
-  const draft = openDraft.data;
+  // Only the central office signs rounds, so a branch is never pointed at a draft.
+  const draft = me.data?.scope === 'CENTRAL' ? openDraft.data : null;
   const draftHref = draft ? `/${lang}/government/changes` : null;
   const onDraftPage = draftHref !== null && pathname.startsWith(draftHref);
 

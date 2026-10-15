@@ -2,7 +2,7 @@ import type { Dictionary } from '@/i18n/dictionaries';
 import { Notice } from '@/components/ui/notice';
 
 import type { Alert } from '../../api/types';
-import { alertText } from '../lib/alert-text';
+import { alertText } from '../../api/alert-text';
 
 export function AlertList({ alerts, t }: { alerts: Alert[]; t: Dictionary['govOperations'] }) {
   return (

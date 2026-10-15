@@ -1,10 +1,13 @@
 'use client';
 
 /**
- * Every change set, newest first. Archives are per office now (D88); the
- * download moves to the archives page, so this table only counts them.
+ * Every round, newest first. Archives are per office (D88); the download lives
+ * on the archives page, so this table only counts them and links there.
  */
 
+import Link from 'next/link';
+
+import type { Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { HashText } from '@/components/ui/hash-text';
 import { Notice } from '@/components/ui/notice';
@@ -14,16 +17,26 @@ import { apiFailure } from '../../api/error-message';
 import { useChangeSets } from '../../api/hooks';
 
 export function ChangeSetHistory({
+  lang,
   t,
   errors,
 }: {
+  lang: Locale;
   t: Dictionary['govChanges'];
   errors: Dictionary['govErrors'];
 }) {
   const changeSets = useChangeSets();
   return (
     <section className="space-y-4">
-      <h2 className="font-medium text-ink">{t.historyTitle}</h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-medium text-ink">{t.historyTitle}</h2>
+        <Link
+          href={`/${lang}/government/archives`}
+          className="text-sm font-medium text-authority underline underline-offset-4"
+        >
+          {t.archivesLink}
+        </Link>
+      </div>
 
       {changeSets.isPending ? (
         <Skeleton className="h-24 w-full" />
@@ -33,11 +46,12 @@ export function ChangeSetHistory({
         <p className="text-sm text-steel">{t.historyEmpty}</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-hairline bg-white">
-          <table className="w-full min-w-[52rem] text-left text-sm">
+          <table className="w-full min-w-[56rem] text-left text-sm">
             <thead className="border-b border-hairline text-xs text-steel">
               <tr>
                 <th scope="col" className="px-4 py-2 font-medium">{t.colChangeSet}</th>
                 <th scope="col" className="px-4 py-2 font-medium">{t.colStatus}</th>
+                <th scope="col" className="px-4 py-2 text-right font-medium">{t.colIssuance}</th>
                 <th scope="col" className="px-4 py-2 text-right font-medium">{t.colTransfers}</th>
                 <th scope="col" className="px-4 py-2 text-right font-medium">{t.colRevocations}</th>
                 <th scope="col" className="px-4 py-2 font-medium">{t.colRootVersion}</th>
@@ -47,30 +61,29 @@ export function ChangeSetHistory({
               </tr>
             </thead>
             <tbody className="divide-y divide-whisper">
-              {changeSets.data.map((changeSet) => {
-                return (
-                  <tr key={changeSet.id} className="align-middle">
-                    <td className="px-4 py-2 font-mono text-xs">#{changeSet.id}</td>
-                    <td className="px-4 py-2">{t[`status${changeSet.status}`]}</td>
-                    <td className="px-4 py-2 text-right font-mono text-xs">{changeSet.transferCount}</td>
-                    <td className="px-4 py-2 text-right font-mono text-xs">{changeSet.revocationCount}</td>
-                    <td className="px-4 py-2 font-mono text-xs">
-                      {changeSet.rootVersion !== null ? `v${changeSet.rootVersion}` : '—'}
-                    </td>
-                    <td className="px-4 py-2">
-                      {changeSet.txHash ? <HashText value={changeSet.txHash} /> : '—'}
-                    </td>
-                    <td className="px-4 py-2 text-xs text-steel">
-                      {changeSet.publishedAt ? new Date(changeSet.publishedAt).toLocaleString() : '—'}
-                    </td>
-                    <td className="px-4 py-2">
-                      {changeSet.archiveCount === 0
-                        ? '—'
-                        : `${changeSet.archivesDownloaded}/${changeSet.archiveCount}`}
-                    </td>
-                  </tr>
-                );
-              })}
+              {changeSets.data.map((changeSet) => (
+                <tr key={changeSet.id} className="align-middle">
+                  <td className="px-4 py-2 font-mono text-xs">#{changeSet.id}</td>
+                  <td className="px-4 py-2">{t[`status${changeSet.status}`]}</td>
+                  <td className="px-4 py-2 text-right font-mono text-xs">{changeSet.issuanceCount}</td>
+                  <td className="px-4 py-2 text-right font-mono text-xs">{changeSet.transferCount}</td>
+                  <td className="px-4 py-2 text-right font-mono text-xs">{changeSet.revocationCount}</td>
+                  <td className="px-4 py-2 font-mono text-xs">
+                    {changeSet.rootVersion !== null ? `v${changeSet.rootVersion}` : '—'}
+                  </td>
+                  <td className="px-4 py-2">
+                    {changeSet.txHash ? <HashText value={changeSet.txHash} /> : '—'}
+                  </td>
+                  <td className="px-4 py-2 text-xs text-steel">
+                    {changeSet.publishedAt ? new Date(changeSet.publishedAt).toLocaleString() : '—'}
+                  </td>
+                  <td className="px-4 py-2 font-mono text-xs">
+                    {changeSet.archiveCount === 0
+                      ? '—'
+                      : `${changeSet.archivesDownloaded}/${changeSet.archiveCount}`}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
