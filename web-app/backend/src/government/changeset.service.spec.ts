@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException, UnprocessableEntityException } fr
 import { hashRecord } from '@land-registry/blockchain/shared';
 
 import { ChangeSetService, DEFAULT_REVOCATION_CAP, revocationCap } from './changeset.service';
+import { ARCHIVE_TTL_DAYS } from '../issuance/archive.service';
 import { LineageService } from '../lineage/lineage.service';
 import { toLURRecord } from '../records/record.mapper';
 import { BRANCH_ACTOR, CENTRAL_ACTOR, makeProperty } from '../../test/factories';
@@ -670,13 +671,19 @@ describe('ChangeSetService (D44)', () => {
       OFFICE_ARCHIVE,
       { officeId: 1, officeCode: 'HQ', zip: Buffer.from('PK-hq'), propertyCount: 2 },
     ]);
-    const before = Date.now();
+    const now = new Date('2026-10-15T03:00:00.000Z');
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] }).setSystemTime(now);
 
-    await service.confirm(9, undefined, CENTRAL_ACTOR);
+    try {
+      await service.confirm(9, undefined, CENTRAL_ACTOR);
+    } finally {
+      jest.useRealTimers();
+    }
 
     expect(archiveCreate.mock.calls.map((c) => c[0].data.officeId)).toEqual([9, 1]);
-    const { expiresAt } = archiveCreate.mock.calls[0][0].data;
-    expect(expiresAt.getTime() - before).toBeGreaterThanOrEqual(7 * 24 * 60 * 60 * 1000 - 1000);
+    // decidedAt (frozen) + exactly ARCHIVE_TTL_DAYS days, the same on every office row.
+    const expected = new Date(now.getTime() + ARCHIVE_TTL_DAYS * 24 * 60 * 60 * 1000);
+    expect(archiveCreate.mock.calls.map((c) => c[0].data.expiresAt)).toEqual([expected, expected]);
   });
 
   it('confirm refuses a transfer that carries no secret, before touching the chain (D77)', async () => {

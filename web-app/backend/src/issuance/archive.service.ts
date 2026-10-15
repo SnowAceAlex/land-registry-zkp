@@ -43,8 +43,9 @@ export const roundArchiveFilename = (roundId: number, officeCode: string): strin
 
 /**
  * Packs bundles into one ZIP, one folder per plot plus a manifest.json. The ZIP holds
- * every owner's secret.json, so whoever downloads it holds those secrets until the TTL
- * expires (D14 limitation). A "/" in an entry name makes the folder (archiver).
+ * every owner's secret.json, so whoever downloads it holds those secrets (D14 limitation).
+ * The TTL limits the server's copy only; a downloaded copy never expires.
+ * A "/" in an entry name makes the folder (archiver).
  */
 @Injectable()
 export class ArchiveService {

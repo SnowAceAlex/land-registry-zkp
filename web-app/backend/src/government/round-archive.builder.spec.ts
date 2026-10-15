@@ -109,17 +109,49 @@ describe('RoundArchiveBuilder (D88)', () => {
 
     await builder.build(input());
 
-    expect(nodes.proofInOverlay).toHaveBeenCalledWith(
+    const context = expect.objectContaining({
+      rootVersion: 4,
+      merkleRoot: 555n,
+      transactionHash: '0xfeed',
+    });
+
+    // Calls follow the input order: issuances first, then transfers.
+    // ISSUED plot: its own commitment (888), leaf (111) and secret (77).
+    expect(nodes.proofInOverlay).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ propertyId: '6006', ownerCommitment: '888' }),
+      111n,
+      overlay,
+    );
+    expect(issuance.buildBundleFiles).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        property: expect.objectContaining({ propertyId: '6006', ownerCommitment: '888' }),
+        ownerSecret: 77n,
+      }),
+      context,
+      expect.anything(),
+      expect.any(String),
+    );
+
+    // TRANSFERRED plot: the buyer's commitment (999), leaf (222) and secret (43).
+    expect(nodes.proofInOverlay).toHaveBeenNthCalledWith(
+      2,
       expect.objectContaining({ propertyId: '1001', ownerCommitment: '999' }),
       222n,
       overlay,
     );
-    expect(issuance.buildBundleFiles).toHaveBeenCalledWith(
-      expect.objectContaining({ ownerSecret: 43n }),
-      expect.objectContaining({ rootVersion: 4, merkleRoot: 555n, transactionHash: '0xfeed' }),
+    expect(issuance.buildBundleFiles).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        property: expect.objectContaining({ propertyId: '1001', ownerCommitment: '999' }),
+        ownerSecret: 43n,
+      }),
+      context,
       expect.anything(),
       expect.any(String),
     );
+    expect(nodes.proofInOverlay).toHaveBeenCalledTimes(2);
   });
 
   it('builds nothing for a round without issuances or transfers', async () => {
