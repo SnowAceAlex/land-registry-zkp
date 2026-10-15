@@ -12,6 +12,8 @@ import { LineageModule } from '../lineage/lineage.module';
 import { OpenDraftService } from './open-draft.service';
 import { RevocationService } from './revocation.service';
 import { RootModule } from './root.module';
+import { RoundArchiveBuilder } from './round-archive.builder';
+import { RoundArchiveService } from './round-archive.service';
 import { TreeModule } from '../tree/tree.module';
 
 /**
@@ -56,7 +58,14 @@ import { TreeModule } from '../tree/tree.module';
     LineageModule,
   ],
   controllers: [GovernmentController],
-  providers: [GovernmentService, RevocationService, ChangeSetService, OpenDraftService],
+  providers: [
+    GovernmentService,
+    RevocationService,
+    ChangeSetService,
+    RoundArchiveBuilder,
+    RoundArchiveService,
+    OpenDraftService,
+  ],
   exports: [RootModule],
 })
 export class GovernmentModule {}

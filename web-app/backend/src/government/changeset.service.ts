@@ -1,6 +1,5 @@
 import {
   ConflictException,
-  GoneException,
   Injectable,
   Logger,
   NotFoundException,
@@ -14,12 +13,12 @@ import {
   Revocation,
   TransferRequest,
 } from '@prisma/client';
-import { type TreeOverlay, hashRecord } from '@land-registry/blockchain/shared';
+import { hashRecord } from '@land-registry/blockchain/shared';
 
 import { ChainService } from '../chain/chain.service';
 import { Actor } from '../common/actor';
 import { DraftLockService } from '../common/draft-lock.service';
-import { ARCHIVE_TTL_DAYS, ArchiveEntry, ArchiveService } from '../issuance/archive.service';
+import { ARCHIVE_TTL_DAYS } from '../issuance/archive.service';
 import { IssuanceRequestDto } from '../issuance/dto/issuance-request.dto';
 import { toIssuanceRequestDto } from '../issuance/issuance-request.serializer';
 import { IssuanceService } from '../issuance/issuance.service';
@@ -32,6 +31,7 @@ import { TransferRequestDto } from '../transfers/dto/transfer.response.dto';
 import { officeCodes } from '../common/office-codes';
 import { toTransferRequestDto } from '../transfers/transfer-request.serializer';
 import { RootService } from './root.service';
+import { RoundArchiveBuilder } from './round-archive.builder';
 
 /**
  * Most revocations one round carries (D56/D73) — past the block gas limit the
@@ -56,7 +56,7 @@ export interface RevocationCalldata {
   detailHashes: string[];
 }
 
-/** Summary row for `list()` — deliberately excludes `archiveZip` (D77). */
+/** Summary row for `list()` — never carries archive bytes (D77, D88). */
 export interface ChangeSetSummary {
   id: number;
   status: DraftStatus;
@@ -65,9 +65,12 @@ export interface ChangeSetSummary {
   txHash: string | null;
   createdAt: Date;
   publishedAt: Date | null;
-  archiveExpiresAt: Date | null;
+  issuanceCount: number;
   transferCount: number;
   revocationCount: number;
+  /** One archive per office that received bundles (D88). */
+  archiveCount: number;
+  archivesDownloaded: number;
 }
 
 /** What a portal needs to sign (or resume signing) a change-set draft (D53). */
@@ -109,7 +112,7 @@ export class ChangeSetService {
     private readonly lock: DraftLockService,
     private readonly events: PropertyEventService,
     private readonly issuance: IssuanceService,
-    private readonly archive: ArchiveService,
+    private readonly roundArchives: RoundArchiveBuilder,
     private readonly lineage: LineageService,
   ) {}
 
@@ -456,9 +459,9 @@ export class ChangeSetService {
     const decidedAt = new Date();
     // Every secret this round clears lives on an issuance or a transfer, so a round
     // with neither has no archive and nothing to clear.
-    const archiveZip =
+    const archives =
       draft.issuances.length > 0 || draft.transfers.length > 0
-        ? await this.buildArchive({
+        ? await this.roundArchives.build({
             changeSetId: draft.id,
             txHash: draft.txHash,
             rootVersion,
@@ -468,8 +471,9 @@ export class ChangeSetService {
             before: beforeById,
             newLeaves,
             publishedAt: decidedAt,
+            offices: await officeCodes(this.prisma),
           })
-        : null;
+        : [];
     const archiveExpiresAt = new Date(decidedAt.getTime() + ARCHIVE_TTL_DAYS * 24 * 60 * 60 * 1000);
 
     try {
@@ -489,8 +493,7 @@ export class ChangeSetService {
         ...draft.issuances.map((request) =>
           this.prisma.issuanceRequest.update({
             where: { id: request.id },
-            // D87 — the archive written by the changeSet update below, in this
-            // same transaction, is now the secret's copy of record.
+            // D87 — the archive rows in this same transaction are now the secret's copy of record.
             data: { status: 'PUBLISHED', publishedAt: decidedAt, ownerSecret: null },
           }),
         ),
@@ -566,6 +569,20 @@ export class ChangeSetService {
           { rootVersion, txHash: draft.txHash },
         ),
 
+        // D88: the secrets above are cleared only because these archives land in the same
+        // transaction. Buffer IS a Uint8Array; the cast narrows its buffer type.
+        ...archives.map((archive) =>
+          this.prisma.changeSetArchive.create({
+            data: {
+              changeSetId: draft.id,
+              officeId: archive.officeId,
+              zip: archive.zip as Uint8Array<ArrayBuffer>,
+              propertyCount: archive.propertyCount,
+              expiresAt: archiveExpiresAt,
+            },
+          }),
+        ),
+
         this.prisma.changeSet.update({
           where: { id: draft.id },
           data: {
@@ -574,11 +591,6 @@ export class ChangeSetService {
             publishedAt: decidedAt,
             txHash: draft.txHash,
             confirmedByOfficeId: actor.officeId,
-            // The secrets above are cleared only because this archive lands in the
-            // same transaction. Buffer IS a Uint8Array; the cast narrows its buffer type.
-            ...(archiveZip
-              ? { archiveZip: archiveZip as Uint8Array<ArrayBuffer>, archiveExpiresAt }
-              : {}),
           },
         }),
       ]);
@@ -682,80 +694,6 @@ export class ChangeSetService {
     return { updates, newLeaves, before };
   }
 
-  /**
-   * The round's bundles: one folder per issued or transferred plot, built by the same
-   * IssuanceService.buildBundleFiles. Every path comes from the projected overlay —
-   * the node table still holds the tree from BEFORE this round, so a receipt built
-   * from it would not verify against the root just signed.
-   */
-  private async buildArchive(input: {
-    changeSetId: number;
-    txHash: string | null;
-    rootVersion: number;
-    overlay: TreeOverlay;
-    issuances: { propertyId: string; ownerCommitment: string; ownerSecret: string | null }[];
-    transfers: { propertyId: string; newOwnerCommitment: string; newOwnerSecret: string | null }[];
-    before: Map<string, Property>;
-    newLeaves: Map<string, string>;
-    publishedAt: Date;
-  }): Promise<Buffer> {
-    const { issuer, issuedOn } = this.issuance.batchContext();
-    const context = {
-      rootVersion: input.rootVersion,
-      merkleRoot: input.overlay.root,
-      transactionHash: input.txHash ?? '',
-      contractAddress: this.chain.rootRegistryAddress,
-      explorerTxUrlPrefix: this.chain.explorerTxUrlPrefix,
-    };
-
-    const owners = [
-      ...input.issuances.map((request) => ({
-        kind: 'issued' as const,
-        propertyId: request.propertyId,
-        ownerCommitment: request.ownerCommitment,
-        ownerSecret: request.ownerSecret,
-      })),
-      ...input.transfers.map((transfer) => ({
-        kind: 'transferred' as const,
-        propertyId: transfer.propertyId,
-        ownerCommitment: transfer.newOwnerCommitment,
-        ownerSecret: transfer.newOwnerSecret,
-      })),
-    ];
-
-    const entries: ArchiveEntry[] = [];
-    for (const owner of owners) {
-      const property = {
-        ...input.before.get(owner.propertyId)!,
-        ownerCommitment: owner.ownerCommitment,
-      };
-      const leaf = BigInt(input.newLeaves.get(owner.propertyId)!);
-      const merkleProof = await this.nodes.proofInOverlay(property, leaf, input.overlay);
-      const built = await this.issuance.buildBundleFiles(
-        { property, ownerSecret: BigInt(owner.ownerSecret!), merkleProof },
-        context,
-        issuer,
-        issuedOn,
-      );
-      entries.push({
-        propertyId: property.propertyId,
-        certificateSerial: property.certificateSerial,
-        leaf: leaf.toString(),
-        kind: owner.kind,
-        files: built.files,
-      });
-    }
-
-    return this.archive.build({
-      kind: 'changeset',
-      batchId: input.changeSetId,
-      rootVersion: input.rootVersion,
-      txHash: input.txHash,
-      publishedAt: input.publishedAt,
-      entries,
-    });
-  }
-
   /** Abandon a draft. Its items were only `connect`ed, so releasing them returns them to the queue. */
   async discard(id: number): Promise<void> {
     const draft = await this.prisma.changeSet.findUnique({ where: { id } });
@@ -777,7 +715,7 @@ export class ChangeSetService {
     });
   }
 
-  /** Every change set, newest first. Summary columns only — never `archiveZip` (D77). */
+  /** Every change set, newest first. Counts and download stamps only — never archive bytes. */
   async list(): Promise<ChangeSetSummary[]> {
     const rows = await this.prisma.changeSet.findMany({
       orderBy: { createdAt: 'desc' },
@@ -789,33 +727,17 @@ export class ChangeSetService {
         txHash: true,
         createdAt: true,
         publishedAt: true,
-        archiveExpiresAt: true,
-        _count: { select: { transfers: true, revocations: true } },
+        archives: { select: { firstDownloadedAt: true } },
+        _count: { select: { issuances: true, transfers: true, revocations: true } },
       },
     });
-    return rows.map(({ _count, ...row }) => ({
+    return rows.map(({ _count, archives, ...row }) => ({
       ...row,
+      issuanceCount: _count.issuances,
       transferCount: _count.transfers,
       revocationCount: _count.revocations,
+      archiveCount: archives.length,
+      archivesDownloaded: archives.filter((a) => a.firstDownloadedAt !== null).length,
     }));
-  }
-
-  /** The round's archive, while it still exists. An expired archive is gone for good. */
-  async archiveFor(id: number): Promise<{ zip: Buffer; filename: string }> {
-    const changeSet = await this.prisma.changeSet.findUnique({
-      where: { id },
-      select: { archiveZip: true, archiveExpiresAt: true },
-    });
-    if (!changeSet || !changeSet.archiveZip) {
-      throw new NotFoundException(`Change set #${id} has no archive`);
-    }
-    if (changeSet.archiveExpiresAt && changeSet.archiveExpiresAt.getTime() < Date.now()) {
-      await this.prisma.changeSet.update({ where: { id }, data: { archiveZip: null } });
-      throw new GoneException(
-        `The archive for change set #${id} expired on ${changeSet.archiveExpiresAt.toISOString()}. ` +
-          `The owners' secrets are unrecoverable — the affected plots must be re-issued.`,
-      );
-    }
-    return { zip: Buffer.from(changeSet.archiveZip), filename: `changeset-${id}.zip` };
   }
 }

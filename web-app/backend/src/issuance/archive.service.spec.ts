@@ -1,6 +1,6 @@
 import * as unzipper from 'unzipper';
 
-import { ArchiveService } from './archive.service';
+import { ArchiveService, roundArchiveFilename } from './archive.service';
 import { ZipService } from './zip.service';
 
 describe('ArchiveService (D42)', () => {
@@ -83,5 +83,44 @@ describe('ArchiveService (D42)', () => {
       { propertyId: '1001', certificateSerial: 'AA-001', leaf: '555', kind: 'issued' },
       { propertyId: '1002', certificateSerial: 'AA-002', leaf: '666', kind: 'transferred' },
     ]);
+  });
+  describe('buildRound (D88)', () => {
+    const round = {
+      roundId: 12,
+      officeCode: 'CN01',
+      rootVersion: 7,
+      txHash: '0xabc',
+      publishedAt: new Date('2026-10-15T10:00:00Z'),
+      entries: [
+        { ...input.entries[0], kind: 'issued' as const },
+        { ...input.entries[1], kind: 'transferred' as const },
+      ],
+    };
+
+    it('writes a round manifest naming the office and tagging each plot', async () => {
+      const directory = await unzipper.Open.buffer(await service.buildRound(round));
+      const manifestFile = directory.files.find((f) => f.path === 'manifest.json')!;
+
+      expect(JSON.parse((await manifestFile.buffer()).toString())).toEqual({
+        kind: 'round',
+        roundId: 12,
+        officeCode: 'CN01',
+        rootVersion: 7,
+        txHash: '0xabc',
+        publishedAt: '2026-10-15T10:00:00.000Z',
+        properties: [
+          { propertyId: '1001', certificateSerial: 'AA-001', leaf: '555', kind: 'issued' },
+          { propertyId: '1002', certificateSerial: 'AA-002', leaf: '666', kind: 'transferred' },
+        ],
+      });
+    });
+
+    it('keeps one folder per plot, like every other archive', async () => {
+      expect(await namesOf(await service.buildRound(round))).toContain('1002/secret.json');
+    });
+
+    it('names the file round-<id>-<officeCode>.zip', () => {
+      expect(roundArchiveFilename(12, 'CN01')).toBe('round-12-CN01.zip');
+    });
   });
 });

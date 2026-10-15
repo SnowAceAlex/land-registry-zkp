@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  GoneException,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { hashRecord } from '@land-registry/blockchain/shared';
 
 import { ChangeSetService, DEFAULT_REVOCATION_CAP, revocationCap } from './changeset.service';
@@ -22,6 +17,20 @@ const propertyRow = (over: Record<string, unknown> = {}) =>
 
 /** The shape `NodeStoreService.projectRoot` returns. */
 const overlayOf = (root: bigint) => ({ root, touched: new Map<string, bigint>(), removed: [] });
+
+/** A write that returns a labelled statement, so a test can see what shares a $transaction. */
+const tagged = (label: string) => jest.fn((args: any) => ({ label, args }));
+
+const OFFICES = [
+  { id: 1, code: 'HQ' },
+  { id: 9, code: 'CN01' },
+];
+const OFFICE_ARCHIVE = {
+  officeId: 9,
+  officeCode: 'CN01',
+  zip: Buffer.from('PK-changeset'),
+  propertyCount: 1,
+};
 
 // revocationCap() reads the env at call time; keep every test on the default unless it sets one.
 const savedCap = process.env.REVOCATION_CAP;
@@ -355,9 +364,10 @@ describe('ChangeSetService (D44)', () => {
   function buildConfirmScenario(options: { rebuiltRoot?: bigint; secret?: string | null } = {}) {
     const { rebuiltRoot = 555n, secret = '43' } = options;
     const propertyUpdate = jest.fn();
-    const changeSetUpdate = jest.fn().mockResolvedValue(undefined);
+    const changeSetUpdate = tagged('changeSet.update');
+    const archiveCreate = tagged('changeSetArchive.create');
     const transaction = jest.fn().mockResolvedValue([]);
-    const transferUpdate = jest.fn();
+    const transferUpdate = tagged('transferRequest.update');
 
     const draft = {
       id: 9,
@@ -377,6 +387,8 @@ describe('ChangeSetService (D44)', () => {
         create: jest.fn(),
         update: changeSetUpdate,
       },
+      changeSetArchive: { create: archiveCreate },
+      landOffice: { findMany: jest.fn().mockResolvedValue(OFFICES) },
       issuanceRequest: { findMany: jest.fn(), update: jest.fn() },
       transferRequest: { findMany: jest.fn(), update: transferUpdate },
       revocation: { findMany: jest.fn(), update: jest.fn() },
@@ -411,15 +423,8 @@ describe('ChangeSetService (D44)', () => {
       root: rebuiltRoot,
     });
     const nodes = { projectRoot, applyStatements, proofInOverlay };
-    const issuance = {
-      batchContext: jest
-        .fn()
-        .mockReturnValue({ issuer: {}, issuedOn: '2026-09-24T10:00:00+07:00' }),
-      buildBundleFiles: jest.fn().mockResolvedValue({
-        files: [{ name: 'receipt.json', content: '{}' }],
-      }),
-    };
-    const archive = { build: jest.fn().mockResolvedValue(Buffer.from('PK-changeset')) };
+    const issuance = { commitmentFor: jest.fn() };
+    const roundArchives = { build: jest.fn().mockResolvedValue([OFFICE_ARCHIVE]) };
     const roots = { recordRootStatement: jest.fn().mockReturnValue('RECORD_ROOT_STMT') };
     const events = {
       issuedStatements: jest.fn().mockReturnValue([]),
@@ -435,7 +440,7 @@ describe('ChangeSetService (D44)', () => {
       { assertNoOpenDraft: jest.fn() } as never,
       events as never,
       issuance as never,
-      archive as never,
+      roundArchives as never,
       {} as never,
     );
 
@@ -445,12 +450,11 @@ describe('ChangeSetService (D44)', () => {
       transferUpdate,
       projectRoot,
       applyStatements,
-      proofInOverlay,
       changeSetUpdate,
+      archiveCreate,
       transaction,
       events,
-      issuance,
-      archive,
+      roundArchives,
       chain,
     };
   }
@@ -599,52 +603,80 @@ describe('ChangeSetService (D44)', () => {
     expect(changeSetUpdate.mock.calls[0][0].data).toMatchObject({ confirmedByOfficeId: 2 });
   });
 
-  it("confirm archives each transfer's bundle from the projected tree (D77)", async () => {
-    const { service, proofInOverlay, issuance, archive } = buildConfirmScenario();
+  it('confirm hands the round to the archive builder with the projected tree and the office map (D88)', async () => {
+    const { service, roundArchives } = buildConfirmScenario();
 
     await service.confirm(9, '0xfeed', CENTRAL_ACTOR);
 
-    // The path comes from the overlay: applyStatements has not run yet, so the
-    // node table still describes the tree BEFORE this round.
-    expect(proofInOverlay).toHaveBeenCalledTimes(1);
-    expect(proofInOverlay.mock.calls[0][0]).toMatchObject({
-      propertyId: '1001',
-      ownerCommitment: '999',
-    });
-    expect(issuance.buildBundleFiles).toHaveBeenCalledWith(
-      expect.objectContaining({ ownerSecret: 43n }),
-      expect.objectContaining({ rootVersion: 9, merkleRoot: 555n, transactionHash: '0xfeed' }),
-      expect.anything(),
-      expect.any(String),
+    expect(roundArchives.build).toHaveBeenCalledTimes(1);
+    expect(roundArchives.build).toHaveBeenCalledWith(
+      expect.objectContaining({
+        changeSetId: 9,
+        txHash: '0xfeed',
+        rootVersion: 9,
+        overlay: expect.objectContaining({ root: 555n }),
+        transfers: [expect.objectContaining({ propertyId: '1001', newOwnerSecret: '43' })],
+        offices: new Map([
+          [1, 'HQ'],
+          [9, 'CN01'],
+        ]),
+      }),
     );
-    expect(archive.build).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'changeset', batchId: 9, rootVersion: 9 }),
-    );
-    expect(archive.build.mock.calls[0][0].entries).toEqual([
-      expect.objectContaining({ propertyId: '1001', kind: 'transferred' }),
-    ]);
   });
 
-  it('confirm writes the archive and clears the secrets in one transaction (D77)', async () => {
-    const { service, changeSetUpdate, transferUpdate, transaction } = buildConfirmScenario();
+  it('confirm writes each office archive and clears the secrets in one transaction (D77, D88)', async () => {
+    const { service, transaction, archiveCreate } = buildConfirmScenario();
 
     await service.confirm(9, undefined, CENTRAL_ACTOR);
 
-    expect(transferUpdate).toHaveBeenCalledWith({
-      where: { id: 1 },
-      data: expect.objectContaining({ status: 'PUBLISHED', newOwnerSecret: null }),
+    expect(archiveCreate).toHaveBeenCalledWith({
+      data: {
+        changeSetId: 9,
+        officeId: 9,
+        zip: Buffer.from('PK-changeset'),
+        propertyCount: 1,
+        expiresAt: expect.any(Date),
+      },
     });
-    expect(changeSetUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          archiveZip: Buffer.from('PK-changeset'),
-          archiveExpiresAt: expect.any(Date),
-        }),
-      }),
-    );
-    // Both writes are statements of the one $transaction call — the secrets
-    // cannot be cleared unless the archive lands with them.
+    // The archive row and the secret-clearing statements are elements of the ONE
+    // $transaction array — the secrets cannot be cleared unless the archive lands.
     expect(transaction).toHaveBeenCalledTimes(1);
+    const statements = transaction.mock.calls[0][0] as { label: string; args: unknown }[];
+    expect(statements.map((st) => st?.label)).toEqual(
+      expect.arrayContaining(['transferRequest.update', 'changeSetArchive.create']),
+    );
+    expect(statements).toContainEqual({
+      label: 'transferRequest.update',
+      args: {
+        where: { id: 1 },
+        data: expect.objectContaining({ status: 'PUBLISHED', newOwnerSecret: null }),
+      },
+    });
+  });
+
+  it('confirm no longer writes the single-archive columns on the change set (D88)', async () => {
+    const { service, changeSetUpdate } = buildConfirmScenario();
+
+    await service.confirm(9, undefined, CENTRAL_ACTOR);
+
+    const data = changeSetUpdate.mock.calls[0][0].data;
+    expect(data).not.toHaveProperty('archiveZip');
+    expect(data).not.toHaveProperty('archiveExpiresAt');
+  });
+
+  it('confirm writes one archive row per office, expiring after the TTL (D88)', async () => {
+    const { service, archiveCreate, roundArchives } = buildConfirmScenario();
+    roundArchives.build.mockResolvedValue([
+      OFFICE_ARCHIVE,
+      { officeId: 1, officeCode: 'HQ', zip: Buffer.from('PK-hq'), propertyCount: 2 },
+    ]);
+    const before = Date.now();
+
+    await service.confirm(9, undefined, CENTRAL_ACTOR);
+
+    expect(archiveCreate.mock.calls.map((c) => c[0].data.officeId)).toEqual([9, 1]);
+    const { expiresAt } = archiveCreate.mock.calls[0][0].data;
+    expect(expiresAt.getTime() - before).toBeGreaterThanOrEqual(7 * 24 * 60 * 60 * 1000 - 1000);
   });
 
   it('confirm refuses a transfer that carries no secret, before touching the chain (D77)', async () => {
@@ -657,7 +689,7 @@ describe('ChangeSetService (D44)', () => {
     expect(transaction).not.toHaveBeenCalled();
   });
 
-  it('a revocation-only round writes no archive', async () => {
+  it('a revocation-only round writes no archive row', async () => {
     changeSetFindUnique.mockResolvedValue({
       id: 4,
       status: 'DRAFT',
@@ -667,7 +699,7 @@ describe('ChangeSetService (D44)', () => {
       transfers: [],
       revocations: [{ id: 2, propertyId: '2002', reasonCode: 3, detailHash: '0xaa' }],
     });
-    const archive = { build: jest.fn() };
+    const roundArchives = { build: jest.fn() };
     const service = new ChangeSetService(
       prisma,
       {
@@ -686,14 +718,14 @@ describe('ChangeSetService (D44)', () => {
         transferredStatements: jest.fn().mockReturnValue([]),
         revokedStatements: jest.fn().mockReturnValue([]),
       } as never,
-      { batchContext: jest.fn() } as never,
-      archive as never,
+      {} as never,
+      roundArchives as never,
       {} as never,
     );
 
     await service.confirm(4, undefined, CENTRAL_ACTOR);
 
-    expect(archive.build).not.toHaveBeenCalled();
+    expect(roundArchives.build).not.toHaveBeenCalled();
     expect(changeSetUpdate.mock.calls[0][0].data).not.toHaveProperty('archiveZip');
   });
 
@@ -1164,6 +1196,8 @@ describe('ChangeSetService — issuance in the round (D84)', () => {
         findMany: jest.fn().mockResolvedValue(properties),
         update: statement('property.update'),
       },
+      changeSetArchive: { create: statement('changeSetArchive.create') },
+      landOffice: { findMany: jest.fn().mockResolvedValue(OFFICES) },
       changeSet: {
         create: jest.fn(async ({ data }: { data: { newRoot: string } }) => ({
           id: 30,
@@ -1193,14 +1227,14 @@ describe('ChangeSetService — issuance in the round (D84)', () => {
     const issuance = {
       // The fixture's secret 77 opens commitment 888; anything else opens nothing.
       commitmentFor: jest.fn(async (secret: bigint) => (secret === 77n ? 888n : -1n)),
-      batchContext: jest
-        .fn()
-        .mockReturnValue({ issuer: {}, issuedOn: '2026-10-15T10:00:00+07:00' }),
-      buildBundleFiles: jest
-        .fn()
-        .mockResolvedValue({ files: [{ name: 'receipt.json', content: '{}' }] }),
     };
-    const archive = { build: jest.fn().mockResolvedValue(Buffer.from('PK-round')) };
+    const roundArchives = {
+      build: jest
+        .fn()
+        .mockResolvedValue([
+          { officeId: 9, officeCode: 'CN01', zip: Buffer.from('PK-round'), propertyCount: 1 },
+        ]),
+    };
     const events = {
       issuedStatements: jest.fn().mockReturnValue([]),
       transferredStatements: jest.fn().mockReturnValue([]),
@@ -1218,10 +1252,10 @@ describe('ChangeSetService — issuance in the round (D84)', () => {
       { assertNoOpenDraft: jest.fn() } as never,
       events as never,
       issuance as never,
-      archive as never,
+      roundArchives as never,
       lineage as never,
     );
-    return { service, prisma, chain, nodes, issuance, archive, events, lineage };
+    return { service, prisma, chain, nodes, issuance, roundArchives, events, lineage };
   }
 
   const expectedLeaf = async (property = importedPlot(), ownerCommitment = '888') =>
@@ -1383,7 +1417,7 @@ describe('ChangeSetService — issuance in the round (D84)', () => {
       });
     });
 
-    it('clears ownerSecret in the same $transaction that writes the archive (D87)', async () => {
+    it('clears ownerSecret in the same $transaction that writes the archives (D87, D88)', async () => {
       const { service, prisma } = scenario();
 
       await service.confirm(30, undefined, { ...CENTRAL_ACTOR, officeId: 2 });
@@ -1404,11 +1438,26 @@ describe('ChangeSetService — issuance in the round (D84)', () => {
           data: expect.objectContaining({
             status: 'PUBLISHED',
             confirmedByOfficeId: 2,
-            archiveZip: Buffer.from('PK-round'),
-            archiveExpiresAt: expect.any(Date),
           }),
         },
       });
+      expect(statements).toContainEqual({
+        label: 'changeSetArchive.create',
+        args: {
+          data: {
+            changeSetId: 30,
+            officeId: 9,
+            zip: Buffer.from('PK-round'),
+            propertyCount: 1,
+            expiresAt: expect.any(Date),
+          },
+        },
+      });
+      // Archive rows come before the change set closes, all in the one array.
+      const labels = statements.map((st) => st.label);
+      expect(labels.indexOf('changeSetArchive.create')).toBeLessThan(
+        labels.indexOf('changeSet.update'),
+      );
     });
 
     it('records an ISSUED event with the new commitment and leaf', async () => {
@@ -1422,42 +1471,35 @@ describe('ChangeSetService — issuance in the round (D84)', () => {
       );
     });
 
-    it('builds the issued bundle from the projected tree, with the new commitment', async () => {
-      const { service, nodes, issuance } = scenario();
+    it('passes the issued request, the new leaf and the projected tree to the archive builder', async () => {
+      const { service, roundArchives } = scenario();
 
       await service.confirm(30, undefined, CENTRAL_ACTOR);
 
-      expect(nodes.proofInOverlay).toHaveBeenCalledWith(
-        expect.objectContaining({ propertyId: '6006', ownerCommitment: '888' }),
-        await expectedLeaf(),
-        expect.objectContaining({ root: 555n }),
-      );
-      expect(issuance.buildBundleFiles).toHaveBeenCalledWith(
-        expect.objectContaining({
-          property: expect.objectContaining({ propertyId: '6006', ownerCommitment: '888' }),
-          ownerSecret: 77n,
-        }),
-        expect.objectContaining({ rootVersion: 12, merkleRoot: 555n }),
-        expect.anything(),
-        expect.any(String),
-      );
+      const input = roundArchives.build.mock.calls[0][0];
+      expect(input).toMatchObject({
+        changeSetId: 30,
+        rootVersion: 12,
+        overlay: expect.objectContaining({ root: 555n }),
+        issuances: [expect.objectContaining({ propertyId: '6006', ownerSecret: '77' })],
+        transfers: [],
+      });
+      expect(input.newLeaves.get('6006')).toBe((await expectedLeaf()).toString());
     });
 
-    it('packs issued and transferred plots into one archive, each entry tagged with its kind', async () => {
-      const { service, archive, prisma } = scenario({
+    it('hands issued and transferred plots to the builder together, and clears both secrets in the one $transaction', async () => {
+      const { service, roundArchives, prisma } = scenario({
         transfers: [{ id: 1, propertyId: '1001', newOwnerCommitment: '999', newOwnerSecret: '43' }],
         properties: [importedPlot(), propertyRow({ propertyId: '1001', ownerCommitment: 'old' })],
       });
 
       await service.confirm(30, undefined, CENTRAL_ACTOR);
 
-      expect(archive.build).toHaveBeenCalledTimes(1);
-      expect(archive.build.mock.calls[0][0].entries).toEqual([
-        expect.objectContaining({ propertyId: '6006', kind: 'issued' }),
-        expect.objectContaining({ propertyId: '1001', kind: 'transferred' }),
-      ]);
+      expect(roundArchives.build).toHaveBeenCalledTimes(1);
+      const input = roundArchives.build.mock.calls[0][0];
+      expect(input.issuances.map((r: { propertyId: string }) => r.propertyId)).toEqual(['6006']);
+      expect(input.transfers.map((t: { propertyId: string }) => t.propertyId)).toEqual(['1001']);
 
-      // Both secrets are cleared by statements of the one $transaction that stores the archive.
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       const statements = prisma.$transaction.mock.calls[0][0] as { label: string; args: unknown }[];
       expect(statements).toContainEqual({
@@ -1471,12 +1513,7 @@ describe('ChangeSetService — issuance in the round (D84)', () => {
         label: 'issuanceRequest.update',
         args: { where: { id: 21 }, data: expect.objectContaining({ ownerSecret: null }) },
       });
-      expect(statements).toContainEqual({
-        label: 'changeSet.update',
-        args: expect.objectContaining({
-          data: expect.objectContaining({ archiveZip: Buffer.from('PK-round') }),
-        }),
-      });
+      expect(statements.map((st) => st.label)).toContain('changeSetArchive.create');
     });
 
     it('refuses a plot that stopped being IMPORTED after the draft (422)', async () => {
@@ -1566,8 +1603,12 @@ describe('ChangeSetService — buyer secrets and the archive (D77)', () => {
         txHash: null,
         createdAt: new Date(),
         publishedAt: new Date(),
-        archiveExpiresAt: new Date(),
-        _count: { transfers: 2, revocations: 1 },
+        archives: [
+          { firstDownloadedAt: new Date() },
+          { firstDownloadedAt: null },
+          { firstDownloadedAt: null },
+        ],
+        _count: { issuances: 5, transfers: 2, revocations: 1 },
       },
     ]);
     const service = new ChangeSetService(
@@ -1584,43 +1625,19 @@ describe('ChangeSetService — buyer secrets and the archive (D77)', () => {
 
     const [row] = await service.list();
 
-    expect(row).toMatchObject({ id: 3, transferCount: 2, revocationCount: 1 });
+    expect(row).toMatchObject({
+      id: 3,
+      issuanceCount: 5,
+      transferCount: 2,
+      revocationCount: 1,
+      archiveCount: 3,
+      archivesDownloaded: 1,
+    });
     expect(row).not.toHaveProperty('_count');
-    expect(findMany.mock.calls[0][0].select).not.toHaveProperty('archiveZip');
-  });
-
-  it('archiveFor 404s without an archive and 410s + drops it once expired', async () => {
-    const findUnique = jest.fn();
-    const update = jest.fn();
-    const service = new ChangeSetService(
-      { changeSet: { findUnique, update } } as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-    );
-
-    findUnique.mockResolvedValue({ archiveZip: null, archiveExpiresAt: null });
-    await expect(service.archiveFor(3)).rejects.toBeInstanceOf(NotFoundException);
-
-    findUnique.mockResolvedValue({
-      archiveZip: Buffer.from('PK'),
-      archiveExpiresAt: new Date(Date.now() - 1000),
-    });
-    await expect(service.archiveFor(3)).rejects.toBeInstanceOf(GoneException);
-    expect(update).toHaveBeenCalledWith({ where: { id: 3 }, data: { archiveZip: null } });
-
-    findUnique.mockResolvedValue({
-      archiveZip: Buffer.from('PK'),
-      archiveExpiresAt: new Date(Date.now() + 60_000),
-    });
-    await expect(service.archiveFor(3)).resolves.toEqual({
-      zip: Buffer.from('PK'),
-      filename: 'changeset-3.zip',
-    });
+    expect(row).not.toHaveProperty('archives');
+    const select = findMany.mock.calls[0][0].select;
+    expect(select).not.toHaveProperty('archiveZip');
+    // Only the download stamp of each archive is read, never its bytes.
+    expect(select.archives).toEqual({ select: { firstDownloadedAt: true } });
   });
 });

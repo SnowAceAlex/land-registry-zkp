@@ -19,6 +19,7 @@ import {
   ApiBody,
   ApiConflictResponse,
   ApiConsumes,
+  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
@@ -44,6 +45,7 @@ import {
   IssuanceRequestDto,
 } from '../issuance/dto/issuance-request.dto';
 import { IssuanceRequestService } from '../issuance/issuance-request.service';
+import { ArchiveSummaryDto } from './dto/archive.response.dto';
 import { ConfirmDraftDto } from './dto/confirm-draft.dto';
 import { CreateIssuanceDraftDto } from './dto/issue-batch.dto';
 import { CreateRevocationDto } from './dto/revocation.dto';
@@ -55,6 +57,7 @@ import {
 } from './dto/government.response.dto';
 import { OpenDraftService } from './open-draft.service';
 import { RevocationService } from './revocation.service';
+import { RoundArchiveService } from './round-archive.service';
 
 const ISSUANCE_REQUEST_STATUSES = ['READY', 'PUBLISHED', 'WITHDRAWN'] as const;
 
@@ -84,6 +87,7 @@ export class GovernmentController {
     private readonly revocations: RevocationService,
     private readonly changeSets: ChangeSetService,
     private readonly openDrafts: OpenDraftService,
+    private readonly roundArchives: RoundArchiveService,
   ) {}
 
   @Get('me')
@@ -361,30 +365,58 @@ export class GovernmentController {
   @ApiOperation({
     summary: 'List change sets, newest first',
     description:
-      'Summary columns plus transfer/revocation counts — never archiveZip. Download the ' +
-      'round’s archive via GET changesets/:id/archive (D77, D84).',
+      'Summary columns plus issuance/transfer/revocation counts and how many of the round’s ' +
+      'per-office archives exist and were downloaded — never archive bytes (D88).',
   })
   listChangeSets() {
     return this.changeSets.list();
   }
 
-  @Get('changesets/:id/archive')
+  @Get('changesets/:id/archives')
   @ApiOperation({
-    summary: 'Download the round’s bundles as one ZIP, one folder per issued or transferred plot',
+    summary: 'The round’s archives, one per land office (D88)',
+    description:
+      'A branch sees only its own office’s archive; the central office sees all of them. ' +
+      'No zip bytes — download one via GET changesets/:id/archives/:officeCode.',
+  })
+  @ApiOkResponse({ type: [ArchiveSummaryDto] })
+  roundArchivesOf(@Param('id', ParseIntPipe) id: number, @CurrentActor() actor: Actor) {
+    return this.roundArchives.archivesOf(id, actor);
+  }
+
+  @Get('changesets/:id/archives/:officeCode')
+  @ApiOperation({
+    summary: 'Download one office’s bundles of the round as a ZIP, one folder per plot',
     description:
       'Each folder holds receipt.json, secret.json, certificate.pdf and README.txt; ' +
       'manifest.json ties the archive to a root version and tags each plot issued or ' +
-      'transferred (D77, D84). ' +
-      "Available until the change set's archiveExpiresAt. A round with only revocations has " +
-      'no archive.',
+      'transferred (D77, D84). A branch may download only its own office’s archive (403 ' +
+      'OutsideOfficeArea otherwise); the central office may download any. Available until ' +
+      'the archive’s expiresAt, then 410. The first successful download is stamped (D88).',
   })
-  async downloadChangeSetArchive(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    const { zip, filename } = await this.changeSets.archiveFor(id);
+  @ApiForbiddenResponse({ description: 'A branch asked for another office’s archive' })
+  async downloadRoundArchive(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('officeCode') officeCode: string,
+    @CurrentActor() actor: Actor,
+    @Res() res: Response,
+  ) {
+    const { zip, filename } = await this.roundArchives.archiveFor(id, officeCode, actor);
     res.set({
       'Content-Type': 'application/zip',
       'Content-Disposition': `attachment; filename="${filename}"`,
       'Content-Length': String(zip.length),
     });
     res.end(zip);
+  }
+
+  @Get('archives')
+  @ApiOperation({
+    summary: 'Every round’s archives, newest first (D88)',
+    description: 'A branch sees only its own office’s archives; the central office sees all.',
+  })
+  @ApiOkResponse({ type: [ArchiveSummaryDto] })
+  allArchives(@CurrentActor() actor: Actor) {
+    return this.roundArchives.archivesForActor(actor);
   }
 }
