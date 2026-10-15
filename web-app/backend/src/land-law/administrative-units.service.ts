@@ -32,6 +32,13 @@ export interface AddressValidator {
   /** True when the catalog is empty, so ward existence could not be verified. */
   readonly catalogEmpty: boolean;
   readonly catalogSize: number;
+  /** D85: the land office responsible for the address's commune; null when unknown or ambiguous. */
+  officeFor(address: string): LandOfficeRef | null;
+}
+
+export interface LandOfficeRef {
+  id: number;
+  code: string;
 }
 
 const COMMUNE_PREFIX = /^(Phường|Xã|Đặc\s*khu)\s+/i;
@@ -50,9 +57,10 @@ export class AdministrativeUnitsService {
    */
   async createValidator(): Promise<AddressValidator> {
     const units = await this.prisma.administrativeUnit.findMany({
-      select: { name: true },
+      select: { name: true, landOffice: { select: { id: true, code: true } } },
     });
     const names = new Set(units.map((unit) => normaliseUnitName(unit.name)));
+    const offices = officesByName(units);
 
     if (names.size === 0) {
       this.logger.warn(
@@ -65,8 +73,26 @@ export class AdministrativeUnitsService {
       catalogEmpty: names.size === 0,
       catalogSize: names.size,
       check: (address: string) => checkAddress(address, names),
+      officeFor: (address: string) => {
+        const commune = communeNameOf(address);
+        return commune ? (offices.get(normaliseUnitName(commune)) ?? null) : null;
+      },
     };
   }
+}
+
+/** Name → office; a name two offices claim maps to null instead of an arbitrary pick. */
+function officesByName(
+  units: { name: string; landOffice: LandOfficeRef | null }[],
+): Map<string, LandOfficeRef | null> {
+  const result = new Map<string, LandOfficeRef | null>();
+  for (const unit of units) {
+    const name = normaliseUnitName(unit.name);
+    const current = result.get(name);
+    if (current === undefined) result.set(name, unit.landOffice);
+    else if (current?.id !== unit.landOffice?.id) result.set(name, null);
+  }
+  return result;
 }
 
 /**

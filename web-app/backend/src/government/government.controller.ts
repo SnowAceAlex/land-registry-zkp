@@ -133,7 +133,9 @@ export class GovernmentController {
     description:
       'Columns: propertyId, landUseCode, certificateSerial, bookEntryNumber, address, area, ' +
       'issuingAuthority, issueDate (DD/MM/YYYY), expiryDate (DD/MM/YYYY, omit for perpetual ' +
-      'tenure), encumbranceStatus. `useType` and `tenureType` are derived server-side from ' +
+      'tenure), encumbranceStatus, and optionally supersedesPropertyIds (`1001;1002`: the ' +
+      'issued certificates this one replaces — D90; the land office is derived from the ' +
+      'address commune, D85). `useType` and `tenureType` are derived server-side from ' +
       '`landUseCode` (D2) rather than read from the file, so a typo cannot reach a leaf hash. ' +
       'Bad rows are reported individually and the rest still import. ' +
       'Send `?dryRun=true` first to see the per-row verdict without writing anything (D52) — ' +
