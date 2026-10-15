@@ -1,6 +1,6 @@
 // Prisma schema — synced with CODING_ROADMAP.md D19 (leaf schema) + D3 (off-chain
 // metadata) + Phase 5 additions (MerkleRoot, TransferRequest) + Phase 7 UC-flow
-// realignment (D42-D48: IssuanceBatch, ChangeSet, Revocation, PropertyEvent;
+// realignment (D42-D48: ChangeSet, Revocation, PropertyEvent;
 // IssuedBundle dropped — see docs/superpowers/specs/2026-09-07-uc-flow-realignment-design.md).
 //
 // Connection URL lives in prisma.config.ts (Prisma 7 pattern), NOT here.
@@ -154,9 +154,6 @@ model Property {
   /// Lifecycle state. The tree contains exactly the ISSUED rows.
   status PropertyStatus @default(IMPORTED)
 
-  issuanceBatchId Int?
-  issuanceBatch   IssuanceBatch? @relation(fields: [issuanceBatchId], references: [id])
-
   /// Land office whose area this plot lies in (D84); null until assigned
   landOfficeId Int?
   landOffice   LandOffice? @relation(fields: [landOfficeId], references: [id])
@@ -295,40 +292,6 @@ model MerkleNode {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IssuanceBatch — one issuance round, two-phase (D43/D44)
-// ─────────────────────────────────────────────────────────────────────────────
-// A DRAFT holds everything needed to finish the round — including the generated
-// owner secrets — and deliberately touches no Property row. That is what keeps
-// the safety invariant: an abandoned draft can never leave a property holding a
-// commitment whose secret is gone.
-
-model IssuanceBatch {
-  id     Int         @id @default(autoincrement())
-  status DraftStatus @default(DRAFT)
-
-  /// Projected root, decimal string — what the officer is asked to sign
-  newRoot     String
-  /// Filled at confirm time, read from the chain
-  rootVersion Int?
-  txHash      String?
-
-  /// { propertyId: ownerSecret } as decimal strings. Cleared on confirm/discard.
-  draftSecrets Json?
-
-  /// The complete batch archive, built at confirm time
-  archiveZip       Bytes?
-  /// TTL — after this the secrets are unrecoverable and the plot must be re-issued
-  archiveExpiresAt DateTime?
-
-  properties  Property[]
-  createdAt   DateTime   @default(now())
-  publishedAt DateTime?
-
-  @@index([status])
-  @@map("issuance_batches")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // ChangeSet — one publishing round of approved transfers + revocations (D44)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -339,11 +302,6 @@ model ChangeSet {
   newRoot     String
   rootVersion Int?
   txHash      String?
-
-  /// The buyers' bundles, built at confirm time (D77); null for a revocation-only round
-  archiveZip       Bytes?
-  /// TTL — after this the buyers' secrets are unrecoverable
-  archiveExpiresAt DateTime?
 
   transfers   TransferRequest[]
   revocations Revocation[]

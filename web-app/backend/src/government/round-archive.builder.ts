@@ -4,7 +4,7 @@ import type { TreeOverlay } from '@land-registry/blockchain/shared';
 
 import { ChainService } from '../chain/chain.service';
 import { HEAD_OFFICE_CODE } from '../common/actor';
-import { ArchiveService, RoundArchiveEntry } from '../issuance/archive.service';
+import { ArchiveService, ArchiveEntry } from '../issuance/archive.service';
 import { IssuanceService } from '../issuance/issuance.service';
 import { NodeStoreService } from '../tree/node-store.service';
 
@@ -68,7 +68,7 @@ export class RoundArchiveBuilder {
       explorerTxUrlPrefix: this.chain.explorerTxUrlPrefix,
     };
 
-    const byOffice = new Map<number, RoundArchiveEntry[]>();
+    const byOffice = new Map<number, ArchiveEntry[]>();
     for (const owner of owners) {
       const property = {
         ...input.before.get(owner.propertyId)!,

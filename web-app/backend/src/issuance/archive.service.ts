@@ -9,23 +9,8 @@ export interface ArchiveEntry {
   propertyId: string;
   certificateSerial: string;
   leaf: string;
-  /** Set on round archives (D84); absent only on the legacy issuance-batch archive. */
-  kind?: 'issued' | 'transferred';
-  files: ZipEntry[];
-}
-
-/** Legacy issuance-batch archive input; goes with IssuanceBatchService. */
-export interface ArchiveInput {
-  kind: 'issuance' | 'changeset';
-  batchId: number;
-  rootVersion: number;
-  txHash: string | null;
-  publishedAt: Date;
-  entries: ArchiveEntry[];
-}
-
-export interface RoundArchiveEntry extends ArchiveEntry {
   kind: 'issued' | 'transferred';
+  files: ZipEntry[];
 }
 
 /** One office's share of a publishing round (D88). */
@@ -35,7 +20,7 @@ export interface RoundArchiveInput {
   rootVersion: number;
   txHash: string | null;
   publishedAt: Date;
-  entries: RoundArchiveEntry[];
+  entries: ArchiveEntry[];
 }
 
 export const roundArchiveFilename = (roundId: number, officeCode: string): string =>
@@ -50,19 +35,6 @@ export const roundArchiveFilename = (roundId: number, officeCode: string): strin
 @Injectable()
 export class ArchiveService {
   constructor(private readonly zip: ZipService) {}
-
-  async build(input: ArchiveInput): Promise<Buffer> {
-    return this.pack(
-      {
-        kind: input.kind,
-        batchId: input.batchId,
-        rootVersion: input.rootVersion,
-        txHash: input.txHash,
-        publishedAt: input.publishedAt.toISOString(),
-      },
-      input.entries,
-    );
-  }
 
   /** D88: the archive of one branch for one round. */
   async buildRound(input: RoundArchiveInput): Promise<Buffer> {

@@ -35,7 +35,6 @@ describe('property serializers', () => {
     issuedAt: new Date('2026-01-01T00:00:00Z'),
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-02T00:00:00Z'),
-    issuanceBatchId: 3,
   };
 
   it('serializePropertyPublic omits descriptive and internal fields', () => {
@@ -57,7 +56,6 @@ describe('property serializers', () => {
     expect(result).not.toHaveProperty('createdAt');
     expect(result).not.toHaveProperty('updatedAt');
     expect(result).not.toHaveProperty('issuedAt');
-    expect(result).not.toHaveProperty('issuanceBatchId');
   });
 
   it('serializePropertyFull still returns the descriptive fields for the guarded tier', () => {
@@ -77,7 +75,6 @@ describe('property serializers', () => {
     expect(result).not.toHaveProperty('id');
     expect(result).not.toHaveProperty('createdAt');
     expect(result).not.toHaveProperty('updatedAt');
-    expect(result).not.toHaveProperty('issuanceBatchId');
     expect(result.status).toBe('ISSUED');
   });
 });

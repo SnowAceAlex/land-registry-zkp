@@ -2,55 +2,28 @@ import { Module } from '@nestjs/common';
 
 import { ArchiveService } from './archive.service';
 import { ChainModule } from '../chain/chain.module';
-import { DraftLockModule } from '../common/draft-lock.module';
-import { HistoryModule } from '../history/history.module';
-import { IssuanceBatchService } from './issuance-batch.service';
 import { IssuanceRequestService } from './issuance-request.service';
 import { IssuanceService } from './issuance.service';
 import { IssuerService } from './issuer.service';
 import { LineageModule } from '../lineage/lineage.module';
 import { PdfService } from './pdf.service';
-import { RootModule } from '../government/root.module';
-import { TreeModule } from '../tree/tree.module';
 import { ZipService } from './zip.service';
 
 /**
- * IssuanceModule
- * ─────────────────────────────────────────────────────────────────────────────
- * Builds an owner bundle (D31 §3.1 — receipt, secret, PDF, ZIP) and stamps it
- * with the issuer identity block (D30).
- *
- * The one-time claim custody this module used to own (D34's per-owner
- * claim-link service and controller, both now deleted) is gone, superseded by
- * the D42 fallback: the government downloads one archive per issuance batch
- * instead of each owner claiming their own. ArchiveService builds that archive
- * and IssuanceBatchService.confirm() persists it — see archive.service.ts.
- *
- * IssuanceBatchService (D43) is the two-phase draft/confirm/discard flow that
- * replaces issueBatch()'s "publish then write" ordering. It needs TreeModule
- * (project the root), ChainModule (read latestRoot at confirm time),
- * HistoryModule (PropertyEventService — records ISSUED events) and
- * DraftLockModule (at most one open draft, D44), plus RootModule for
- * RootService — imported from its own module rather than via GovernmentModule
- * to avoid a cycle, since GovernmentModule imports IssuanceModule already.
+ * IssuanceModule — builds an owner bundle (D31 §3.1: receipt, secret, PDF, ZIP) stamped with
+ * the issuer identity block (D30), and queues issuance requests (D87). Issuances are published
+ * by the change-set round (D84), which also builds the per-office archives.
  */
 @Module({
-  imports: [ChainModule, TreeModule, HistoryModule, DraftLockModule, RootModule, LineageModule],
+  imports: [ChainModule, LineageModule],
   providers: [
     IssuanceService,
     IssuerService,
     PdfService,
     ZipService,
     ArchiveService,
-    IssuanceBatchService,
     IssuanceRequestService,
   ],
-  exports: [
-    IssuanceService,
-    IssuerService,
-    IssuanceBatchService,
-    IssuanceRequestService,
-    ArchiveService,
-  ],
+  exports: [IssuanceService, IssuerService, IssuanceRequestService, ArchiveService],
 })
 export class IssuanceModule {}

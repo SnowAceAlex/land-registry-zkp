@@ -166,14 +166,10 @@ const api = <T>(route: string, body?: unknown): Promise<T> => call<T>('POST', ro
  */
 async function resetQueue(prisma: PrismaClient): Promise<void> {
   // The route wraps its answer: `{ draft: null }` when nothing is open (D53).
-  const { draft } = await call<{ draft: { kind: string; id: number } | null }>(
-    'GET',
-    '/government/drafts/open',
-  );
+  const { draft } = await call<{ draft: { id: number } | null }>('GET', '/government/drafts/open');
   if (draft) {
-    const route = draft.kind === 'changeset' ? 'changesets' : 'issuance-batches';
-    await call('DELETE', `/government/${route}/${draft.id}`);
-    console.log(`  discarded an open ${draft.kind} draft (#${draft.id})`);
+    await call('DELETE', `/government/changesets/${draft.id}`);
+    console.log(`  discarded an open change-set draft (#${draft.id})`);
   }
 
   const transfers = await prisma.transferRequest.deleteMany({
@@ -182,9 +178,14 @@ async function resetQueue(prisma: PrismaClient): Promise<void> {
   const revocations = await prisma.revocation.deleteMany({
     where: { changeSetId: null, status: 'PENDING' },
   });
-  if (transfers.count > 0 || revocations.count > 0) {
+  // A queued issuance would ride into the next round and skew what is measured (D84).
+  const issuances = await prisma.issuanceRequest.deleteMany({
+    where: { changeSetId: null, status: 'READY' },
+  });
+  if (transfers.count > 0 || revocations.count > 0 || issuances.count > 0) {
     console.log(
-      `  cleared a stale queue: ${transfers.count} transfer(s), ${revocations.count} revocation(s)`,
+      `  cleared a stale queue: ${transfers.count} transfer(s), ${revocations.count} revocation(s), ` +
+        `${issuances.count} issuance request(s)`,
     );
   }
 }
@@ -328,40 +329,39 @@ async function main(): Promise<void> {
     // ── Queue the day's paperwork ────────────────────────────────────────────
     const queueStart = Date.now();
     if (!resumeDraft) {
-
-    // Transfers go straight in as APPROVED (see assumption 2). The new owner
-    // commitment is REAL — the projected root has to be correct or confirm()
-    // rejects the round, which would make the whole measurement meaningless.
-    // Its secret is stored too: since D77 confirm() archives it for the buyer
-    // and refuses a round that has none.
-    const rows: Prisma.Sql[] = [];
-    for (const { propertyId, ownerCommitment } of todayTransfers) {
-      const secret = await nextOwnerSecret(ownerCommitment!);
-      rows.push(Prisma.sql`(
+      // Transfers go straight in as APPROVED (see assumption 2). The new owner
+      // commitment is REAL — the projected root has to be correct or confirm()
+      // rejects the round, which would make the whole measurement meaningless.
+      // Its secret is stored too: since D77 confirm() archives it for the buyer
+      // and refuses a round that has none.
+      const rows: Prisma.Sql[] = [];
+      for (const { propertyId, ownerCommitment } of todayTransfers) {
+        const secret = await nextOwnerSecret(ownerCommitment!);
+        rows.push(Prisma.sql`(
         ${propertyId}, ${await nextOwnerCommitment(ownerCommitment!)}, ${secret.toString()},
         ${'0'}, ${'0'},
         ${'{}'}::jsonb, ${'[]'}::jsonb, ${'APPROVED'}::"TransferStatus",
         ${new Date().toISOString()}::timestamp
       )`);
-    }
-    for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
-      await prisma.$executeRaw(
-        Prisma.sql`INSERT INTO transfer_requests (
+      }
+      for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
+        await prisma.$executeRaw(
+          Prisma.sql`INSERT INTO transfer_requests (
           "propertyId", "newOwnerCommitment", "newOwnerSecret", "oldRoot", "newRoot",
           "proof", "publicSignals", "status", "createdAt"
         ) VALUES ${Prisma.join(rows.slice(i, i + INSERT_CHUNK))}`,
-      );
-    }
+        );
+      }
 
-    // Revocations go through the real endpoint — they are cheap and it keeps
-    // the reason-code and detailHash logic in the measurement.
-    for (const { propertyId } of todayRevocations) {
-      await api('/government/revocations', {
-        propertyId,
-        reasonCode: 2,
-        detailText: `bench replay, day ${day + 1}`,
-      });
-    }
+      // Revocations go through the real endpoint — they are cheap and it keeps
+      // the reason-code and detailHash logic in the measurement.
+      for (const { propertyId } of todayRevocations) {
+        await api('/government/revocations', {
+          propertyId,
+          reasonCode: 2,
+          detailText: `bench replay, day ${day + 1}`,
+        });
+      }
     }
     const queueMs = resumeDraft ? 0 : Date.now() - queueStart;
 

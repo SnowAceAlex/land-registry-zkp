@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
  * Mirrors a published root into `merkle_roots`, and shouts when the chain has
  * moved ahead of the database. It sends no transaction (D43): the root is
  * signed in the officer's browser wallet, and the caller — see
- * IssuanceBatchService.confirm() and ChangeSetService.confirm() — hands the
+ * ChangeSetService.confirm() — hands the
  * resulting {root, version, txHash} to recordRootStatement() below.
  *
  * ⚠️ HISTORY WORTH KEEPING. This class used to rewrite the cached Merkle proof

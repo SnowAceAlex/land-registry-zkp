@@ -655,16 +655,6 @@ describe('ChangeSetService (D44)', () => {
     });
   });
 
-  it('confirm no longer writes the single-archive columns on the change set (D88)', async () => {
-    const { service, changeSetUpdate } = buildConfirmScenario();
-
-    await service.confirm(9, undefined, CENTRAL_ACTOR);
-
-    const data = changeSetUpdate.mock.calls[0][0].data;
-    expect(data).not.toHaveProperty('archiveZip');
-    expect(data).not.toHaveProperty('archiveExpiresAt');
-  });
-
   it('confirm writes one archive row per office, expiring after the TTL (D88)', async () => {
     const { service, archiveCreate, roundArchives } = buildConfirmScenario();
     roundArchives.build.mockResolvedValue([
@@ -733,7 +723,6 @@ describe('ChangeSetService (D44)', () => {
     await service.confirm(4, undefined, CENTRAL_ACTOR);
 
     expect(roundArchives.build).not.toHaveBeenCalled();
-    expect(changeSetUpdate.mock.calls[0][0].data).not.toHaveProperty('archiveZip');
   });
 
   describe('draft discovery (D53) and the revocation cap (D56)', () => {
@@ -1643,7 +1632,6 @@ describe('ChangeSetService — buyer secrets and the archive (D77)', () => {
     expect(row).not.toHaveProperty('_count');
     expect(row).not.toHaveProperty('archives');
     const select = findMany.mock.calls[0][0].select;
-    expect(select).not.toHaveProperty('archiveZip');
     // Only the download stamp of each archive is read, never its bytes.
     expect(select.archives).toEqual({ select: { firstDownloadedAt: true } });
   });

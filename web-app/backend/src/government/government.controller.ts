@@ -39,7 +39,6 @@ import { ChangeSetService } from './changeset.service';
 import { GovernmentService, parsePropertyStatus } from './government.service';
 import { ImportService } from '../import/import.service';
 import { ImportResult } from '../import/dto/import.response.dto';
-import { IssuanceBatchService } from '../issuance/issuance-batch.service';
 import {
   CreateIssuanceRequestsDto,
   IssuanceRequestDto,
@@ -47,7 +46,6 @@ import {
 import { IssuanceRequestService } from '../issuance/issuance-request.service';
 import { ArchiveSummaryDto } from './dto/archive.response.dto';
 import { ConfirmDraftDto } from './dto/confirm-draft.dto';
-import { CreateIssuanceDraftDto } from './dto/issue-batch.dto';
 import { CreateRevocationDto } from './dto/revocation.dto';
 import {
   PropertyListResponseDto,
@@ -82,7 +80,6 @@ export class GovernmentController {
   constructor(
     private readonly government: GovernmentService,
     private readonly importService: ImportService,
-    private readonly issuanceBatches: IssuanceBatchService,
     private readonly issuanceRequests: IssuanceRequestService,
     private readonly revocations: RevocationService,
     private readonly changeSets: ChangeSetService,
@@ -192,7 +189,7 @@ export class GovernmentController {
   @ApiOperation({
     summary: 'The draft currently waiting to be signed, if any (D53)',
     description:
-      'At most one draft exists across issuance batches and change sets (D44). Returns ' +
+      'At most one change-set draft exists (D44). Returns ' +
       '`{ draft: null }` when none is open; otherwise the same shape its create call returned — ' +
       'for a change set that includes the revocationCalldata to sign. This is how a portal ' +
       'resumes after losing the create response: compare `newRoot` with the on-chain ' +
@@ -200,68 +197,6 @@ export class GovernmentController {
   })
   openDraft() {
     return this.openDrafts.current();
-  }
-
-  // Issuance draft — two-phase flow (D43), Metamask signs instead of the backend
-  @Get('issuance-batches')
-  @ApiOperation({
-    summary: 'List issuance rounds, newest first',
-    description:
-      'Summary columns only — never draftSecrets (secret material, D14) or archiveZip ' +
-      '(megabytes of ZIP, D42). Download the archive itself via GET issuance-batches/:id/archive.',
-  })
-  listIssuanceBatches() {
-    return this.issuanceBatches.list();
-  }
-
-  @Post('issuance-batches')
-  @ApiOperation({
-    summary: 'Create an issuance draft (phase 1 of 2)',
-    description:
-      'Generates owner secrets, projects the new Merkle root, and stores everything as a ' +
-      'durable draft. No Property row is modified until confirm. Sign the returned newRoot ' +
-      'with Metamask, then call confirm.',
-  })
-  async createIssuanceDraft(@Body() dto: CreateIssuanceDraftDto) {
-    return this.issuanceBatches.createDraft(dto.propertyIds);
-  }
-
-  @Post('issuance-batches/:id/confirm')
-  @ApiOperation({
-    summary: 'Confirm an issuance draft (phase 2 of 2)',
-    description:
-      'Re-reads latestRoot from the chain and applies the draft only if it matches. The ' +
-      'request body carries no chain evidence on purpose — the optional txHash is a display ' +
-      'label only, never trusted as proof the publish happened.',
-  })
-  async confirmIssuanceDraft(@Param('id', ParseIntPipe) id: number, @Body() dto: ConfirmDraftDto) {
-    return this.issuanceBatches.confirm(id, dto.txHash);
-  }
-
-  @Delete('issuance-batches/:id')
-  @ApiOperation({ summary: 'Discard an unsigned issuance draft' })
-  async discardIssuanceDraft(@Param('id', ParseIntPipe) id: number) {
-    await this.issuanceBatches.discard(id);
-    return { discarded: id };
-  }
-
-  @Get('issuance-batches/:id/archive')
-  @ApiOperation({
-    summary: 'Download the whole batch as one ZIP, one folder per property',
-    description:
-      'Each folder holds receipt.json, secret.json, certificate.pdf and README.txt; a ' +
-      'manifest.json at the root ties the archive to a root version. Available until the ' +
-      "batch's archiveExpiresAt, after which the secrets are unrecoverable and affected " +
-      'plots must be re-issued.',
-  })
-  async downloadArchive(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    const { zip, filename } = await this.issuanceBatches.archiveFor(id);
-    res.set({
-      'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': String(zip.length),
-    });
-    res.end(zip);
   }
 
   @Post('issuance-requests')
