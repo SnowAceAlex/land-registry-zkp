@@ -1,5 +1,6 @@
 import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { hashRecord } from '@land-registry/blockchain/shared';
+import { Prisma } from '@prisma/client';
 
 import {
   ChangeSetService,
@@ -745,6 +746,14 @@ describe('ChangeSetService (D44)', () => {
     );
   });
 
+  it('confirm still succeeds when purging expired archives throws (best effort)', async () => {
+    const { service, archives, transaction } = buildConfirmScenario();
+    archives.purgeExpired.mockRejectedValue(new Error('db hiccup'));
+
+    await expect(service.confirm(9, undefined, CENTRAL_ACTOR)).resolves.toMatchObject({ id: 9 });
+    expect(transaction).toHaveBeenCalled();
+  });
+
   it('confirm reports the chain ahead of the database when the archive build fails', async () => {
     const { service, roundArchives, roots, transaction } = buildConfirmScenario();
     const failure = new Error('zip failed');
@@ -1375,6 +1384,7 @@ describe('ChangeSetService — issuance in the round (D84)', () => {
         expect(prisma.$transaction).toHaveBeenCalledTimes(1);
         expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
           timeout: 120_000,
+          isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
         });
         expect(prisma.$executeRawUnsafe).toHaveBeenCalledWith(
           `SELECT pg_advisory_xact_lock(${ROUND_DRAFT_LOCK_KEY})`,

@@ -236,9 +236,9 @@ export class TransfersService {
       if (error instanceof ProofRejectedError) {
         // RootMismatch means the registry moved on while this waited; the
         // request can never become valid again, so close it rather than leave
-        // it pending forever.
+        // it pending forever. No reason stored: the UI words it itself.
         if (error.reason === 'RootMismatch') {
-          await this.reject(id, actor, error.message);
+          await this.reject(id, actor);
         }
         throw new UnprocessableEntityException({
           reason: error.reason,

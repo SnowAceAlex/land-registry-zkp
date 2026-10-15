@@ -25,6 +25,7 @@ import {
   readerFromTree,
 } from '@land-registry/blockchain/shared';
 
+import { ProofRejectedError } from '../chain/chain.service';
 import { TransfersService } from './transfers.service';
 import { BRANCH_ACTOR, CENTRAL_ACTOR, makeProperty } from '../../test/factories';
 import { toLURRecord } from '../records/record.mapper';
@@ -433,6 +434,22 @@ describe('TransfersService — area scope and office stamps (D83, D86)', () => {
     await service.approve(1, CENTRAL_ACTOR);
 
     expect(update.mock.calls[0][0].data.approvedByOfficeId).toBe(CENTRAL_ACTOR.officeId);
+  });
+
+  it('approve: a RootMismatch closes the request with no stored reason, so the UI words it itself', async () => {
+    const { service, update, chain } = await build();
+    chain.verifyTransferOnChain.mockRejectedValue(
+      new ProofRejectedError('RootMismatch', 'Root is not the latest root'),
+    );
+
+    await expect(service.approve(1, BRANCH_ACTOR)).rejects.toMatchObject({
+      response: { reason: 'RootMismatch' },
+    });
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update.mock.calls[0][0].data).toMatchObject({
+      status: 'REJECTED',
+      rejectReason: null,
+    });
   });
 
   it('reject: another branch gets 403 and the row is untouched', async () => {

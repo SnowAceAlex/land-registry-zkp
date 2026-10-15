@@ -183,7 +183,11 @@ export class ChangeSetService {
         await this.lock.assertNoOpenDraft(tx);
         return this.buildDraft(tx, actor);
       },
-      { timeout: DRAFT_TRANSACTION_TIMEOUT_MS },
+      {
+        timeout: DRAFT_TRANSACTION_TIMEOUT_MS,
+        // The lock argument needs READ COMMITTED: each statement after the wait sees committed drafts.
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      },
     );
   }
 
@@ -461,8 +465,12 @@ export class ChangeSetService {
     transferIds: number[];
     revocationIds: number[];
   }> {
-    // D88: expired archives lose their server copy here, so their secrets do not linger.
-    await this.archives.purgeExpired(new Date());
+    // D88: expired archives lose their server copy here, so their secrets do not linger (best effort).
+    try {
+      await this.archives.purgeExpired(new Date());
+    } catch (error) {
+      this.logger.warn(`purging expired archives failed: ${(error as Error).message}`);
+    }
 
     const draft = await this.prisma.changeSet.findUnique({
       where: { id },
