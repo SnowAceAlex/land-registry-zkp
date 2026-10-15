@@ -29,6 +29,8 @@ import { Response } from 'express';
 import { SkipThrottle } from '@nestjs/throttler';
 
 import { ApiKeyGuard, GOV_API_KEY_HEADER, GOV_API_KEY_SECURITY } from '../common/api-key.guard';
+import { Actor } from '../common/actor';
+import { CurrentActor } from '../common/current-actor.decorator';
 import { parsePageQuery } from '../common/pagination';
 import { ChangeSetService } from './changeset.service';
 import { GovernmentService, parsePropertyStatus } from './government.service';
@@ -42,6 +44,7 @@ import {
   PropertyListResponseDto,
   PropertyDetailDto,
   RegistryStatusResponseDto,
+  MeResponseDto,
 } from './dto/government.response.dto';
 import { OpenDraftService } from './open-draft.service';
 import { RevocationService } from './revocation.service';
@@ -64,6 +67,19 @@ export class GovernmentController {
     private readonly changeSets: ChangeSetService,
     private readonly openDrafts: OpenDraftService,
   ) {}
+
+  @Get('me')
+  @ApiOperation({
+    summary: 'Which office the supplied API key belongs to',
+    description: 'D86: the portal reads `scope` to decide which actions to show.',
+  })
+  @ApiOkResponse({ type: MeResponseDto })
+  me(@CurrentActor() actor: Actor): MeResponseDto {
+    return {
+      office: { code: actor.officeCode, name: actor.officeName, kind: actor.officeKind },
+      scope: actor.scope,
+    };
+  }
 
   @Get('status')
   @ApiOperation({
