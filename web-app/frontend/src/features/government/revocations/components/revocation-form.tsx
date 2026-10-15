@@ -2,7 +2,7 @@
 
 /**
  * Request a revocation (D45). The request only queues: the plot leaves the
- * tree — and the reason reaches the chain — when the next change set publishes.
+ * tree — and the reason reaches the chain — when the next round publishes.
  *
  * What the officer types is deliberately not what the chain stores. The reason
  * is a uint8 code; the free-text detail is hashed (keccak256) and the text
@@ -83,6 +83,7 @@ export function RevocationForm({
       <div>
         <h2 className="font-medium text-ink">{t.revokeTitle}</h2>
         <p className="mt-1 max-w-prose text-sm text-steel">{t.revokeBody}</p>
+        <p className="mt-2 max-w-prose text-sm text-steel">{t.reissueNote}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-[12rem_1fr]">

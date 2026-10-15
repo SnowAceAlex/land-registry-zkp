@@ -4,7 +4,8 @@
  * UC-3 approval queue. Approval is the step that needs a person (D28): a
  * transfer proof shows someone holds the seller's secret, not that they ARE
  * the seller. Approving verifies the proof on chain and moves the request to
- * APPROVED; publishing happens later, batched in a change set (D46).
+ * APPROVED; publishing happens later, batched in a registration round (D46).
+ * The central office can withdraw an APPROVED one before then (D87).
  *
  * The rejection reasons that matter get their own explanation:
  *   - RootMismatch — the registry published a new root after the proof was
@@ -24,12 +25,14 @@ import { buttonStyles } from '@/components/ui/button';
 import { HashText } from '@/components/ui/hash-text';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useConfirmFocus } from '@/lib/use-confirm-focus';
 
 import { apiErrorCode } from '../../api/error-code';
 import { apiFailure } from '../../api/error-message';
-import { govKeys } from '../../api/hooks';
+import { govKeys, useMe } from '../../api/hooks';
 import type { TransferStatus } from '../../api/types';
-import { approveTransfer, listTransfers, rejectTransfer } from '../api';
+import { approveTransfer, listTransfers, rejectTransfer, withdrawTransfer } from '../api';
+import { canWithdrawTransfer } from '../lib/can-withdraw';
 
 const TABS: TransferStatus[] = ['PENDING', 'APPROVED', 'PUBLISHED', 'REJECTED'];
 
@@ -46,6 +49,9 @@ export function TransferQueue({
   const [tab, setTab] = useState<TransferStatus>('PENDING');
   const [working, setWorking] = useState<number | null>(null);
   const [rejecting, setRejecting] = useState<{ id: number; reason: string } | null>(null);
+  const [withdrawing, setWithdrawing] = useState<number | null>(null);
+  const { confirmRef, triggerRef } = useConfirmFocus(withdrawing);
+  const me = useMe();
   const [message, setMessage] = useState<Message | null>(null);
 
   const transfers = useQuery({
@@ -57,6 +63,8 @@ export function TransferQueue({
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['gov', 'transfers'] }),
       queryClient.invalidateQueries({ queryKey: govKeys.pendingChanges }),
+      queryClient.invalidateQueries({ queryKey: govKeys.queueAll }),
+      queryClient.invalidateQueries({ queryKey: govKeys.overview }),
     ]);
   }
 
@@ -86,6 +94,7 @@ export function TransferQueue({
     } finally {
       setWorking(null);
       setRejecting(null);
+      setWithdrawing(null);
       await refresh();
     }
   }
@@ -121,6 +130,7 @@ export function TransferQueue({
               setTab(status);
               setMessage(null);
               setRejecting(null);
+              setWithdrawing(null);
             }}
             className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ui-transition ${
               tab === status
@@ -148,7 +158,7 @@ export function TransferQueue({
         <p className="py-6 text-sm text-steel">{t.queueEmpty}</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-hairline bg-white">
-          <table className="w-full min-w-[46rem] text-left text-sm">
+          <table className="w-full min-w-[54rem] text-left text-sm">
             <thead className="border-b border-hairline text-xs text-steel">
               <tr>
                 <th scope="col" className="px-4 py-2 font-medium">
@@ -156,6 +166,9 @@ export function TransferQueue({
                 </th>
                 <th scope="col" className="px-4 py-2 font-medium">
                   {t.colProperty}
+                </th>
+                <th scope="col" className="px-4 py-2 font-medium">
+                  {t.colOffice}
                 </th>
                 <th scope="col" className="px-4 py-2 font-medium">
                   {t.colBuyer}
@@ -175,7 +188,22 @@ export function TransferQueue({
               {transfers.data.map((request) => (
                 <tr key={request.id} className="align-top">
                   <td className="px-4 py-3 font-mono text-xs">#{request.id}</td>
-                  <td className="px-4 py-3 font-mono text-xs">{request.propertyId}</td>
+                  <td className="px-4 py-3 font-mono text-xs">
+                    {request.propertyId}
+                    {request.held ? (
+                      <span className="ml-2 rounded-full border border-hairline bg-zinc-50 px-2 py-0.5 font-sans text-xs text-steel">
+                        {t.heldBadge}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-3 text-xs">
+                    <span className="font-mono">{request.landOfficeCode ?? t.noOffice}</span>
+                    {request.byFallback ? (
+                      <span className="mt-1 block w-fit rounded-full border border-hairline bg-zinc-50 px-2 py-0.5 text-steel">
+                        {format(t.fallbackBadge, { office: request.officeCode ?? t.noOffice })}
+                      </span>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-3">
                     <HashText value={request.newOwnerCommitment} />
                   </td>
@@ -260,7 +288,61 @@ export function TransferQueue({
                         </div>
                       )
                     ) : request.status === 'APPROVED' ? (
-                      <span className="text-xs text-steel">{t.awaitingPublication}</span>
+                      <div className="flex flex-col gap-2">
+                        <span className="text-xs text-steel">{t.awaitingPublication}</span>
+                        {!canWithdrawTransfer(me.data, request) ? null : withdrawing === request.id ? (
+                          <div className="flex min-w-[16rem] flex-col gap-2">
+                            <p className="text-xs text-ink">
+                              {format(t.withdrawConfirm, { id: request.id })}
+                            </p>
+                            <div className="flex gap-2">
+                              <button
+                                ref={confirmRef}
+                                type="button"
+                                className={`${buttonStyles.primary} px-3 py-1.5 text-xs`}
+                                disabled={working !== null}
+                                onClick={() =>
+                                  run(
+                                    request.id,
+                                    () => withdrawTransfer(request.id),
+                                    format(t.withdrawnTitle, { id: request.id }),
+                                  )
+                                }
+                              >
+                                {working === request.id ? (
+                                  <>
+                                    <LoaderCircle
+                                      className="h-3.5 w-3.5 animate-spin"
+                                      aria-hidden
+                                    />
+                                    {t.withdrawing}
+                                  </>
+                                ) : (
+                                  t.withdrawConfirmButton
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                className={`${buttonStyles.secondary} px-3 py-1.5 text-xs`}
+                                disabled={working !== null}
+                                onClick={() => setWithdrawing(null)}
+                              >
+                                {t.cancel}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            ref={triggerRef(request.id)}
+                            type="button"
+                            className={`${buttonStyles.secondary} w-fit px-3 py-1.5 text-xs`}
+                            disabled={working !== null}
+                            onClick={() => setWithdrawing(request.id)}
+                          >
+                            {t.withdraw}
+                          </button>
+                        )}
+                      </div>
                     ) : request.status === 'PUBLISHED' ? (
                       <span className="text-xs text-steel">
                         {request.changeSetId !== null

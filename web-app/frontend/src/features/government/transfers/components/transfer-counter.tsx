@@ -9,7 +9,7 @@
  *   2. Preview → the registry issues the buyer's secret with both paths (D77)
  *      → witness → prove in a Web Worker → submit, the buyer's secret
  *      included. It is saved with the request and reaches the buyer in the
- *      change set's archive, like an issuance round's secret.
+ *      round's archive, like an issuance round's secret.
  *
  * The seller's secret lives only in this component's state and is dropped as
  * soon as the request is submitted or the officer starts over. The buyer's
