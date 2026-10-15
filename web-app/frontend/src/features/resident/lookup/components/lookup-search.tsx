@@ -14,7 +14,7 @@
  */
 
 import { History, LoaderCircle } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { Dictionary } from '@/i18n/dictionaries';
 // Not from the shared barrel: that re-exports merkleTree.ts, whose top-level
@@ -26,6 +26,7 @@ import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { buttonStyles } from '@/components/ui/button';
 import { ApiError } from '@/lib/api-client';
+import { format } from '@/i18n/format';
 
 import { type RecordPublic, getLineage, getPublicRecord } from '../api';
 import { isRevoked } from '../lib/event-summary';
@@ -74,6 +75,14 @@ export function LookupSearch({
 
   // Only the latest search may write state: a slow answer must not replace a newer one.
   const latest = useRef(0);
+
+  // The clicked id button disappears with the old results; put focus on the new ones.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (state.status === 'found') headingRef.current?.focus();
+  }, [state]);
+
+  const maxId = new Intl.NumberFormat(lang === 'vi' ? 'vi-VN' : 'en-US').format(MAX_PROPERTY_ID);
 
   async function lookUp(propertyId: string) {
     const ticket = ++latest.current;
@@ -159,13 +168,13 @@ export function LookupSearch({
 
         {showInvalid || malformed ? (
           <p id="property-id-error" role="alert" className="text-xs text-red-700">
-            {t.invalidId}
+            {format(t.invalidId, { max: maxId })}
           </p>
         ) : null}
       </form>
 
       {state.status === 'idle' ? (
-        <EmptyState icon={History} title={t.emptyTitle} description={t.emptyBody} />
+        <EmptyState icon={History} title={t.emptyTitle} description={format(t.emptyBody, { max: maxId })} />
       ) : null}
 
       {state.status === 'searching' ? (
@@ -191,16 +200,14 @@ export function LookupSearch({
         <div className="space-y-8">
           {/* Stated up front, not left for the reader to infer from the
               timeline: a revoked plot cannot be proven at all. */}
-          {isRevoked({
-            propertyId: state.record.propertyId,
-            events: state.sections.find((section) => section.isQueried)?.events ?? [],
-          }) || state.record.status === 'REVOKED' ? (
+          {isRevoked(state.sections.find((section) => section.isQueried)?.events ?? []) ||
+          state.record.status === 'REVOKED' ? (
             <Notice tone="danger" title={t.revokedBannerTitle}>
               {t.revokedBannerBody}
             </Notice>
           ) : null}
 
-          <RecordSummary record={state.record} t={t} />
+          <RecordSummary record={state.record} t={t} headingRef={headingRef} />
           <LandTimeline
             sections={state.sections}
             truncated={state.truncated}

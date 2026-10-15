@@ -56,11 +56,6 @@ export interface PropertyEvent {
   occurredAt: string;
 }
 
-export interface PropertyHistory {
-  propertyId: string;
-  events: PropertyEvent[];
-}
-
 /**
  * One certificate in a plot's chain of re-issues (D90). `generation` is
  * negative for ancestors, 0 for the queried certificate, positive for

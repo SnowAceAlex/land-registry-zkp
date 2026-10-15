@@ -29,10 +29,25 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-export function RecordSummary({ record, t }: { record: RecordPublic; t: Strings }) {
+export function RecordSummary({
+  record,
+  t,
+  headingRef,
+}: {
+  record: RecordPublic;
+  t: Strings;
+  /** Where focus lands once a search finishes. */
+  headingRef?: React.Ref<HTMLHeadingElement>;
+}) {
   return (
     <section className="space-y-4">
-      <h2 className="text-sm font-medium tracking-tight text-ink">{t.recordTitle}</h2>
+      <h2
+        ref={headingRef}
+        tabIndex={-1}
+        className="text-sm font-medium tracking-tight text-ink outline-none"
+      >
+        {t.recordTitle}
+      </h2>
 
       <dl className="divide-y divide-hairline rounded-lg border border-hairline bg-surface px-4">
         <Row label={t.fieldStatus}>{t[STATUS_KEYS[record.status]]}</Row>

@@ -8,7 +8,7 @@
 
 import { type RevocationReasonCode, isRevocationReasonCode } from '@/lib/revocation-reason';
 
-import type { PropertyEvent, PropertyEventKind, PropertyHistory } from '../api';
+import type { PropertyEvent, PropertyEventKind } from '../api';
 
 export interface EventSummary {
   kind: PropertyEventKind;
@@ -61,9 +61,9 @@ export function summariseEvent(event: PropertyEvent): EventSummary {
  * plot can be revoked and later issued again. The last event of either kind
  * decides.
  */
-export function isRevoked(history: PropertyHistory): boolean {
-  for (let i = history.events.length - 1; i >= 0; i--) {
-    const kind = history.events[i].kind;
+export function isRevoked(events: PropertyEvent[]): boolean {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const kind = events[i].kind;
     if (kind === 'REVOKED') return true;
     if (kind === 'ISSUED') return false;
   }
