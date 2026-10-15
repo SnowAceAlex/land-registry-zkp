@@ -173,6 +173,11 @@ export function ImportWorkbench({
         />
       </label>
 
+      <div className="rounded-lg border border-hairline bg-white px-4 py-3">
+        <h3 className="text-sm font-medium text-ink">{t.columnHelpTitle}</h3>
+        <p className="mt-1 max-w-prose text-sm text-steel">{t.columnHelpSupersedes}</p>
+      </div>
+
       {state.phase === 'failed' ? (
         <div id="import-csv-error">
           <Notice tone="danger" title={state.failure.title}>

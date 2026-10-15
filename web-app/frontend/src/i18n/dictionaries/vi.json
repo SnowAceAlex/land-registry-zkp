@@ -83,7 +83,21 @@
     "committedTitle": "Đã nhập thành công {count} dòng",
     "committedBody": "Các thửa đất đã sẵn sàng để cấp giấy. Đã bỏ qua {skipped} thửa đã tồn tại.",
     "goToIssuance": "Sang cấp giấy",
-    "importAnother": "Nhập tệp khác"
+    "importAnother": "Nhập tệp khác",
+    "rowCodes": {
+      "InvalidSupersedes": "Giá trị supersedesPropertyIds không hợp lệ. Hãy nhập các propertyId cách nhau bằng dấu ;, ví dụ 1001;1002.",
+      "PredecessorNotFound": "Có sổ mà giấy này thay thế nhưng không có trong hệ thống.",
+      "SelfSupersession": "Một giấy chứng nhận không thể thay thế chính nó.",
+      "PredecessorNeverIssued": "Có sổ mà giấy này thay thế chưa từng được cấp, nên không có gì để thay thế.",
+      "PredecessorAlreadySucceeded": "Có sổ được nêu ở đây đã có giấy kế thừa trong tệp này hoặc trong hệ thống. Đây là điều bình thường khi một giấy được tách thành nhiều giấy."
+    },
+    "byOfficeTitle": "Theo chi nhánh",
+    "byOfficeBody": "Chi nhánh được suy ra từ phường/xã trong địa chỉ của từng dòng.",
+    "columnOffice": "Chi nhánh",
+    "columnCount": "Số dòng",
+    "officeUnassigned": "Chưa phân địa bàn",
+    "columnHelpTitle": "Cột tùy chọn: supersedesPropertyIds",
+    "columnHelpSupersedes": "Các propertyId mà sổ này thay thế, cách nhau bằng dấu ; (ví dụ 1001;1002). Cấp lại, tách thửa, hợp thửa hay kết quả của tòa án đều là một giấy mới với propertyId mới."
   },
   "govIssuance": {
     "title": "Cấp giấy chứng nhận",

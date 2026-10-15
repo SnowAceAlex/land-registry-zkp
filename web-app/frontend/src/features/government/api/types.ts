@@ -182,9 +182,27 @@ export interface ImportResult {
   dryRun: boolean;
   imported: number;
   skipped: number;
-  errors: { row: number; propertyId?: string; message: string }[];
-  warnings: { row: number; propertyId?: string; message: string }[];
+  errors: ImportRowIssue[];
+  warnings: ImportRowIssue[];
   catalogEmpty: boolean;
+  /** Rows written (or, on a dry run, that would be) per derived office (D85); null = no office. */
+  byOffice: { officeCode: string | null; count: number }[];
+}
+
+/** Machine-readable rule behind a supersession row verdict (D90). */
+export type ImportRowCode =
+  | 'InvalidSupersedes'
+  | 'PredecessorNotFound'
+  | 'SelfSupersession'
+  | 'PredecessorNeverIssued'
+  | 'PredecessorAlreadySucceeded';
+
+/** An import row's error or warning; `code` is set only for the supersession rules. */
+export interface ImportRowIssue {
+  row: number;
+  propertyId?: string;
+  message: string;
+  code?: ImportRowCode;
 }
 
 /** One issuance request — IssuanceRequestDto (D87). */
