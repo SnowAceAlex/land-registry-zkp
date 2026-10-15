@@ -2,7 +2,7 @@
 
 > ⚠️ **Trạng thái: chưa chạy thật.** Runbook viết ngày 15/10/2026 cùng lúc với code, **chưa được
 > thực hiện trọn một lượt** — cần một người thao tác ba trình duyệt và Metamask. Phần tự động đã
-> chạy: 398 test Vitest (43 file), 488 test Jest backend (49 suite), `eslint` frontend,
+> chạy: 401 test Vitest (43 file), 503 test Jest backend (49 suite), `eslint` frontend,
 > `next build` và `nest build`; blockchain không đổi (contract và circuit không bị chạm, 183 test).
 > Khi chạy xong, sửa dòng này và ghi số đo thật vào mục 5.
 
@@ -314,8 +314,8 @@ khi thu hồi C được công bố, nên nằm trước chốt sổ). Bước 1
 1. Profile **TT** → **Điều hành**. Mục "Cảnh báo" phải có cảnh báo vàng:
    **"1 giao dịch chuyển nhượng của CN01 đang chờ duyệt; chốt sổ lúc này sẽ khiến chúng không còn hợp lệ."**
    Bảng hàng chờ: `CN01` — Chuyển nhượng `1`, Thu hồi `1`.
-2. Profile **CN01** → **Điều hành** cũng thấy đúng cảnh báo đó (nó mang `officeCode` của CN01). Profile
-   **CN02** → **Điều hành**: **không** thấy cảnh báo này.
+2. *(Cần xác nhận.)* Profile **CN01** → **Điều hành** cũng thấy đúng cảnh báo đó (nó mang `officeCode` của
+   CN01). Profile **CN02** → **Điều hành**: **không** thấy cảnh báo này.
 3. Profile TT → **Chốt sổ**: bảng "Theo nghiệp vụ" chỉ có `Thu hồi = 1` (chuyển nhượng chưa APPROVED nên
    chưa vào đợt). Hiện **"Xem các cảnh báo sau trước khi chốt sổ"**, cảnh báo ở trên, checkbox
    **"Tôi đã xem các cảnh báo"**; nút **Tạo đợt vào sổ** bị khoá cho đến khi tick. **Đừng tạo đợt.**
@@ -434,6 +434,32 @@ khi thu hồi C được công bố, nên nằm trước chốt sổ). Bước 1
 5. **Tra D** (`1004`): `1201` và `1202` đều là mục đời sau.
 6. Nếu `Truncated` được kích hoạt (chuỗi >200 nút) trang phải hiện "Chuỗi giấy chứng nhận bị cắt bớt" — không thể dựng bằng tay, đã có test.
 
+### Bước 9b — Archive hết hạn không khoá Chốt sổ (D88, D89)
+
+*Archive hết hạn mà chưa ai tải không tự hết cảnh báo, nên nó chỉ đòi tick xác nhận; chỉ `ChainAheadOfDatabase`
+chặn hẳn việc tạo đợt.* Dùng archive `CN02` của đợt #4; lệnh SQL giả lập "đã hết hạn và chưa ai tải":
+
+```bash
+docker exec -i land_registry_postgres psql -U postgres -d land_registry -c \
+  "UPDATE change_set_archives SET \"expiresAt\" = now() - interval '1 day', \"firstDownloadedAt\" = NULL, \"firstDownloadedByOfficeId\" = NULL WHERE \"changeSetId\" = 4;"
+docker exec -i land_registry_postgres psql -U postgres -d land_registry -c \
+  "SELECT \"changeSetId\", \"officeId\", zip IS NOT NULL AS has_zip FROM change_set_archives WHERE \"changeSetId\" = 4;"
+```
+
+Lệnh thứ hai phải in `has_zip = t` (bản trên máy chủ chưa bị xoá).
+
+1. Profile **TT** → **Điều hành**: cảnh báo đỏ **"Hồ sơ đợt #4 của CN02 đã hết hạn mà chưa được tải; các giấy chứng
+   nhận đó phải cấp lại."** Trang điều hành không xoá gì: chạy lại lệnh SELECT vẫn `has_zip = t`.
+2. Profile **CN02** → **Thu hồi** `1202`, lý do "Hết hạn sử dụng, không gia hạn" (chỉ để hàng chờ có một mục).
+3. Profile **TT** → **Chốt sổ**: hiện **"Xem các cảnh báo sau trước khi chốt sổ"** (không phải "Chưa thể chốt sổ"),
+   danh sách có cảnh báo archive hết hạn, checkbox **"Tôi đã xem các cảnh báo"**; nút **Tạo đợt vào sổ** chỉ mở sau khi
+   tick. **Đừng tạo đợt.**
+4. Profile **TT** → **Hồ sơ các đợt vào sổ**: dòng `#4 · CN02` có trạng thái **"Đã hết hạn"**, chú thích "Bí mật đã bị
+   xoá; cần cấp lại các thửa này.", nút tải bị khoá. Chạy lại lệnh SELECT → **`has_zip = f`**: việc mở danh sách
+   archive đã xoá bản trên máy chủ (lần chốt sổ kế tiếp cũng làm việc đó).
+5. Dọn: Profile **CN02** → **Thu hồi** → **Rút lại** đề nghị thu hồi 1202 (bước 10 cần lại thửa này). Cảnh báo archive
+   hết hạn vẫn còn mãi — đúng thiết kế, phản hồi của cán bộ là tick xác nhận.
+
 ### Bước 10 (tuỳ chọn) — Tồn đọng thu hồi và `REVOCATION_CAP`
 
 Chỉ làm khi cần kiểm `RevocationBacklog` và cap. Đặt `REVOCATION_CAP=1` trong `web-app/backend/.env`,
@@ -454,13 +480,20 @@ Chỉ làm khi cần kiểm `RevocationBacklog` và cap. Đặt `REVOCATION_CAP=
 | Việc | Kỳ vọng |
 | --- | --- |
 | `curl -s http://localhost:3001/api/records/1101/lineage` (không khoá) | `nodes` có 1003 (`generation:-1`) và 1101 (`0`); key-set của node không có `detailText`, không có secret |
-| `curl -s -H "x-gov-api-key: $HQ" http://localhost:3001/api/government/queue \| grep -c -E "ownerSecret\|newOwnerSecret\|detailText"` | `0` |
+| Lệnh rò secret của hàng chờ (ngay dưới bảng) | `0` |
 | `curl -s -H "x-gov-api-key: $CN01" http://localhost:3001/api/government/operations/offices` | 403 `CentralScopeRequired` |
 | `curl -s -i -X POST -H "x-gov-api-key: $CN01" http://localhost:3001/api/government/changesets` | 403 `CentralScopeRequired` |
 | CN01 `POST /api/government/issuance-requests` | 403 `CentralScopeRequired` |
+| CN01 `POST /api/government/import` (kèm một CSV bất kỳ) | 403 `CentralScopeRequired`, không đọc tệp |
 | `status` của backend (`GET /api/government/status`) | `inSync: true`, `chainId: 31337` |
 | Trạng thái DB: `rootVersion` | 4 (hoặc 5–6 nếu làm bước 10); khớp `Gốc vN` trên thanh trạng thái |
 | `pnpm --filter blockchain run chain:smoke:localhost` | xanh |
+
+Lệnh rò secret của hàng chờ (để ngoài bảng vì dấu `|` trong bảng Markdown phải escape):
+
+```bash
+curl -s -H "x-gov-api-key: $HQ" http://localhost:3001/api/government/queue | grep -c -E "ownerSecret|newOwnerSecret|detailText"
+```
 
 ---
 
@@ -475,6 +508,7 @@ Chỉ làm khi cần kiểm `RevocationBacklog` và cap. Đặt `REVOCATION_CAP=
 | Archive tách theo chi nhánh; chi nhánh chỉ tải phần mình; trung tâm tải được mọi phần; ghi lần tải đầu (D88) | 2 |
 | Chuyển nhượng và thu hồi ngoài địa bàn bị `OutsideOfficeArea` (D86); trung tâm dự phòng ghi nhận | 3, 4, 8 |
 | Cảnh báo `PendingTransfersWouldBreak`; Chốt sổ đòi tick cảnh báo (D89) | 5 |
+| Archive hết hạn chỉ đòi tick, không khoá Chốt sổ; bản trên máy chủ bị xoá khi mở danh sách archive (D88, D89) | 9b |
 | Sổ thay thế chỉ được đề nghị cấp khi sổ cũ đã `REVOKED` thật (D90) | 6 |
 | Lỗi import `supersedesPropertyIds` đúng bốn mã và cảnh báo `PredecessorAlreadySucceeded` | 6, 9 |
 | C không prove được sau thu hồi; người mua A prove được; mọi thứ cùng `rootVersion` | 7 |

@@ -1,7 +1,7 @@
 # Demo đầy đủ trên Sepolia — từ deploy tới kịch bản bảo vệ
 
 Runbook dựng lại toàn bộ hệ thống trên Sepolia sau D82 (xác nhận tình trạng thay sổ ngăn chặn D79–D81), rồi chạy một kịch bản demo
-đi qua cả 6 use case, gồm hai case tấn công cửa sổ chờ change set phải bị từ chối.
+đi qua cả 6 use case, gồm hai case tấn công cửa sổ chờ đợt vào sổ phải bị từ chối.
 
 Mọi lệnh chạy từ **gốc repo** trong **Git Bash**. Dòng nào đặt biến môi trường kiểu `A=1 lệnh` thì
 PowerShell viết `$env:A='1'; lệnh`.
@@ -270,8 +270,8 @@ export CHAIN_NETWORK=sepolia SEPOLIA_RPC_URL=<RPC> GOV_API_KEY=<key>
 
 1. Trang Chuyển nhượng → nạp hồ sơ bên bán `201/` → kiểm tra hồ sơ xanh. **Không** có bước ký ví nào.
 2. Bước 2: **Tạo bằng chứng và nộp hồ sơ** → hàng chờ "Chờ duyệt" → **Phê duyệt** (trong vòng 10 phút kể từ khi tạo
-   proof) → trạng thái APPROVED, chờ change set. Từ lúc nộp, hồ sơ mở chính là khoá.
-3. **Tấn công — bên bán đem sổ đi vay trong lúc chờ change set:**
+   proof) → trạng thái APPROVED, chờ đợt vào sổ. Từ lúc nộp, hồ sơ mở chính là khoá.
+3. **Tấn công — bên bán đem sổ đi vay trong lúc chờ đợt vào sổ:**
    - UC-5 với `201/` → dừng ở "Giấy chứng nhận đang có thủ tục chưa hoàn tất" (ngõ cụt `procedure-open`).
    - Sinh proof bằng CLI (không qua UI):
 
