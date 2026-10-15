@@ -1,0 +1,923 @@
+{
+  "source": "Quyết định UBND TPHCM tổ chức lại VPĐKĐĐ (người dùng cung cấp 14/10/2026); loại đơn vị theo DVHC_TPHCM.csv (NQ 1685/NQ-UBTVQH15)",
+  "province": "TP.HCM",
+  "central": [
+    {
+      "code": "HQ",
+      "name": "Văn phòng Đăng ký đất đai TP.HCM — Trụ sở chính",
+      "kind": "HEAD_OFFICE"
+    },
+    {
+      "code": "CS2",
+      "name": "Văn phòng Đăng ký đất đai TP.HCM — Cơ sở 2",
+      "kind": "SITE"
+    },
+    {
+      "code": "CS3",
+      "name": "Văn phòng Đăng ký đất đai TP.HCM — Cơ sở 3",
+      "kind": "SITE"
+    }
+  ],
+  "branches": [
+    {
+      "code": "CN01",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 1",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Tân Định"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bến Thành"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Cầu Ông Lãnh"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Sài Gòn"
+        }
+      ]
+    },
+    {
+      "code": "CN02",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 2",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Hiệp Bình"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tam Bình"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Thủ Đức"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Linh Xuân"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Long Bình"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tăng Nhơn Phú"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Phước Long"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Long Phước"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Long Trường"
+        },
+        {
+          "type": "PHUONG",
+          "name": "An Khánh"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bình Trưng"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Cát Lái"
+        }
+      ]
+    },
+    {
+      "code": "CN03",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 3",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Bàn Cờ"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Xuân Hòa"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Nhiêu Lộc"
+        }
+      ]
+    },
+    {
+      "code": "CN04",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 4",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Vĩnh Hội"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Khánh Hội"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Xóm Chiếu"
+        }
+      ]
+    },
+    {
+      "code": "CN05",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 5",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Chợ Quán"
+        },
+        {
+          "type": "PHUONG",
+          "name": "An Đông"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Chợ Lớn"
+        }
+      ]
+    },
+    {
+      "code": "CN06",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 6",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Bình Tiên"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bình Tây"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bình Phú"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Phú Lâm"
+        }
+      ]
+    },
+    {
+      "code": "CN07",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 7",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Phú Thuận"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Hưng"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Thuận"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Mỹ"
+        }
+      ]
+    },
+    {
+      "code": "CN08",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 8",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Chánh Hưng"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bình Đông"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Phú Định"
+        }
+      ]
+    },
+    {
+      "code": "CN09",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 9",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Bình Tân"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bình Hưng Hòa"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bình Trị Đông"
+        },
+        {
+          "type": "PHUONG",
+          "name": "An Lạc"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Tạo"
+        }
+      ]
+    },
+    {
+      "code": "CN10",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 10",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Vườn Lài"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Diên Hồng"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Hòa Hưng"
+        }
+      ]
+    },
+    {
+      "code": "CN11",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 11",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Hòa Bình"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Phú Thọ"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bình Thới"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Minh Phụng"
+        }
+      ]
+    },
+    {
+      "code": "CN12",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 12",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Đông Hưng Thuận"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Trung Mỹ Tây"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Thới Hiệp"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Thới An"
+        },
+        {
+          "type": "PHUONG",
+          "name": "An Phú Đông"
+        }
+      ]
+    },
+    {
+      "code": "CN13",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 13",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Đức Nhuận"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Cầu Kiệu"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Phú Nhuận"
+        }
+      ]
+    },
+    {
+      "code": "CN14",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 14",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Gia Định"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Thạnh Mỹ Tây"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bình Lợi Trung"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bình Quới"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bình Thạnh"
+        }
+      ]
+    },
+    {
+      "code": "CN15",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 15",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Hạnh Thông"
+        },
+        {
+          "type": "PHUONG",
+          "name": "An Nhơn"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Gò Vấp"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Thông Tây Hội"
+        },
+        {
+          "type": "PHUONG",
+          "name": "An Hội Đông"
+        },
+        {
+          "type": "PHUONG",
+          "name": "An Hội Tây"
+        }
+      ]
+    },
+    {
+      "code": "CN16",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 16",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Tân Sơn"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Bình"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Hòa"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Sơn Hòa"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Sơn Nhất"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bảy Hiền"
+        }
+      ]
+    },
+    {
+      "code": "CN17",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 17",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Tây Thạnh"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Sơn Nhì"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Phú Thọ Hòa"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Phú Thạnh"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Phú"
+        }
+      ]
+    },
+    {
+      "code": "CN18",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 18",
+      "units": [
+        {
+          "type": "XA",
+          "name": "Vĩnh Lộc"
+        },
+        {
+          "type": "XA",
+          "name": "Tân Vĩnh Lộc"
+        },
+        {
+          "type": "XA",
+          "name": "Bình Lợi"
+        },
+        {
+          "type": "XA",
+          "name": "Tân Nhựt"
+        },
+        {
+          "type": "XA",
+          "name": "Bình Chánh"
+        },
+        {
+          "type": "XA",
+          "name": "Hưng Long"
+        },
+        {
+          "type": "XA",
+          "name": "Bình Hưng"
+        }
+      ]
+    },
+    {
+      "code": "CN19",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 19",
+      "units": [
+        {
+          "type": "XA",
+          "name": "An Nhơn Tây"
+        },
+        {
+          "type": "XA",
+          "name": "Thái Mỹ"
+        },
+        {
+          "type": "XA",
+          "name": "Nhuận Đức"
+        },
+        {
+          "type": "XA",
+          "name": "Tân An Hội"
+        },
+        {
+          "type": "XA",
+          "name": "Củ Chi"
+        },
+        {
+          "type": "XA",
+          "name": "Phú Hòa Đông"
+        },
+        {
+          "type": "XA",
+          "name": "Bình Mỹ"
+        }
+      ]
+    },
+    {
+      "code": "CN20",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 20",
+      "units": [
+        {
+          "type": "XA",
+          "name": "Cần Giờ"
+        },
+        {
+          "type": "XA",
+          "name": "An Thới Đông"
+        },
+        {
+          "type": "XA",
+          "name": "Bình Khánh"
+        },
+        {
+          "type": "XA",
+          "name": "Thạnh An"
+        }
+      ]
+    },
+    {
+      "code": "CN21",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 21",
+      "units": [
+        {
+          "type": "XA",
+          "name": "Hóc Môn"
+        },
+        {
+          "type": "XA",
+          "name": "Bà Điểm"
+        },
+        {
+          "type": "XA",
+          "name": "Xuân Thới Sơn"
+        },
+        {
+          "type": "XA",
+          "name": "Đông Thạnh"
+        }
+      ]
+    },
+    {
+      "code": "CN22",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 22",
+      "units": [
+        {
+          "type": "XA",
+          "name": "Nhà Bè"
+        },
+        {
+          "type": "XA",
+          "name": "Hiệp Phước"
+        }
+      ]
+    },
+    {
+      "code": "CN23",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 23",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Thủ Dầu Một"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Chánh Hiệp"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bình Dương"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Phú Lợi"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Phú An"
+        }
+      ]
+    },
+    {
+      "code": "CN24",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 24",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Dĩ An"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Đông Hòa"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Đông Hiệp"
+        }
+      ]
+    },
+    {
+      "code": "CN25",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 25",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Thuận An"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Thuận Giao"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bình Hòa"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Lái Thiêu"
+        },
+        {
+          "type": "PHUONG",
+          "name": "An Phú"
+        }
+      ]
+    },
+    {
+      "code": "CN26",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 26",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Tân Uyên"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Vĩnh Tân"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Hiệp"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Khánh"
+        }
+      ]
+    },
+    {
+      "code": "CN27",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 27",
+      "units": [
+        {
+          "type": "XA",
+          "name": "Phú Giáo"
+        },
+        {
+          "type": "XA",
+          "name": "Phước Thành"
+        },
+        {
+          "type": "XA",
+          "name": "Phước Hòa"
+        },
+        {
+          "type": "XA",
+          "name": "An Long"
+        }
+      ]
+    },
+    {
+      "code": "CN28",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 28",
+      "units": [
+        {
+          "type": "XA",
+          "name": "Bắc Tân Uyên"
+        },
+        {
+          "type": "XA",
+          "name": "Thường Tân"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Bình Cơ"
+        }
+      ]
+    },
+    {
+      "code": "CN29",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 29",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Bến Cát"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tây Nam"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Chánh Phú Hòa"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Thới Hòa"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Hòa Lợi"
+        }
+      ]
+    },
+    {
+      "code": "CN30",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 30",
+      "units": [
+        {
+          "type": "XA",
+          "name": "Dầu Tiếng"
+        },
+        {
+          "type": "XA",
+          "name": "Long Hòa"
+        },
+        {
+          "type": "XA",
+          "name": "Minh Thạnh"
+        },
+        {
+          "type": "XA",
+          "name": "Thanh An"
+        }
+      ]
+    },
+    {
+      "code": "CN31",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 31",
+      "units": [
+        {
+          "type": "XA",
+          "name": "Bàu Bàng"
+        },
+        {
+          "type": "XA",
+          "name": "Trừ Văn Thố"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Long Nguyên"
+        }
+      ]
+    },
+    {
+      "code": "CN32",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 32",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Bà Rịa"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Long Hương"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tam Long"
+        }
+      ]
+    },
+    {
+      "code": "CN33",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 33",
+      "units": [
+        {
+          "type": "XA",
+          "name": "Đất Đỏ"
+        },
+        {
+          "type": "XA",
+          "name": "Long Hải"
+        },
+        {
+          "type": "XA",
+          "name": "Long Điền"
+        },
+        {
+          "type": "XA",
+          "name": "Phước Hải"
+        }
+      ]
+    },
+    {
+      "code": "CN34",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 34",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Phú Mỹ"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Thành"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Phước"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tân Hải"
+        },
+        {
+          "type": "XA",
+          "name": "Châu Pha"
+        }
+      ]
+    },
+    {
+      "code": "CN35",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 35",
+      "units": [
+        {
+          "type": "XA",
+          "name": "Hồ Tràm"
+        },
+        {
+          "type": "XA",
+          "name": "Xuyên Mộc"
+        },
+        {
+          "type": "XA",
+          "name": "Hòa Hội"
+        },
+        {
+          "type": "XA",
+          "name": "Bàu Lâm"
+        },
+        {
+          "type": "XA",
+          "name": "Hòa Hiệp"
+        },
+        {
+          "type": "XA",
+          "name": "Bình Châu"
+        }
+      ]
+    },
+    {
+      "code": "CN36",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 36",
+      "units": [
+        {
+          "type": "XA",
+          "name": "Ngãi Giao"
+        },
+        {
+          "type": "XA",
+          "name": "Bình Giã"
+        },
+        {
+          "type": "XA",
+          "name": "Kim Long"
+        },
+        {
+          "type": "XA",
+          "name": "Châu Đức"
+        },
+        {
+          "type": "XA",
+          "name": "Xuân Sơn"
+        },
+        {
+          "type": "XA",
+          "name": "Nghĩa Thành"
+        }
+      ]
+    },
+    {
+      "code": "CN37",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 37",
+      "units": [
+        {
+          "type": "PHUONG",
+          "name": "Vũng Tàu"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Tam Thắng"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Rạch Dừa"
+        },
+        {
+          "type": "PHUONG",
+          "name": "Phước Thắng"
+        },
+        {
+          "type": "XA",
+          "name": "Long Sơn"
+        }
+      ]
+    },
+    {
+      "code": "CN38",
+      "name": "Chi nhánh Văn phòng Đăng ký đất đai số 38",
+      "units": [
+        {
+          "type": "DAC_KHU",
+          "name": "Côn Đảo"
+        }
+      ]
+    }
+  ]
+}

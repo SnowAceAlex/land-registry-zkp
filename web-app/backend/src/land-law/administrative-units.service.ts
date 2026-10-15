@@ -52,7 +52,7 @@ export class AdministrativeUnitsService {
     const units = await this.prisma.administrativeUnit.findMany({
       select: { name: true },
     });
-    const names = new Set(units.map((unit) => normalise(unit.name)));
+    const names = new Set(units.map((unit) => normaliseUnitName(unit.name)));
 
     if (names.size === 0) {
       this.logger.warn(
@@ -124,7 +124,7 @@ export function checkAddress(address: string, catalog: Set<string>): AddressChec
   // An empty catalog cannot be checked against. That is reported ONCE per
   // import through AddressValidator.catalogEmpty (D52) — repeating it on every
   // row buried each real warning under hundreds of identical ones.
-  if (catalog.size > 0 && !catalog.has(normalise(communeName))) {
+  if (catalog.size > 0 && !catalog.has(normaliseUnitName(communeName))) {
     errors.push(
       `'${segments[communeIndex]}' is not in the administrative catalog — check the name ` +
         `against the units in force since 01/7/2025`,
@@ -134,8 +134,18 @@ export function checkAddress(address: string, catalog: Set<string>): AddressChec
   return { errors, warnings };
 }
 
-function normalise(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, ' ');
+export function normaliseUnitName(name: string): string {
+  return name.normalize('NFC').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/** The single commune segment of an address without its prefix, or null. */
+export function communeNameOf(address: string): string | null {
+  const communes = address
+    .split(',')
+    .map((segment) => segment.trim())
+    .filter((segment) => COMMUNE_PREFIX.test(segment));
+  if (communes.length !== 1) return null;
+  return communes[0].replace(COMMUNE_PREFIX, '').trim();
 }
 
 /**
