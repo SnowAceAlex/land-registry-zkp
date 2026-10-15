@@ -23,7 +23,7 @@ export interface QueueFilter {
 
 type Row = QueueRow & { changeSetId: number | null };
 
-const OPEN_STATUSES: Record<QueueKind, string[]> = {
+export const OPEN_STATUSES: Record<QueueKind, string[]> = {
   issuance: ['READY'],
   transfer: ['PENDING', 'APPROVED'],
   revocation: ['PENDING'],

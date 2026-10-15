@@ -31,6 +31,8 @@ import {
   QueueListResponseDto,
   QueueQueryDto,
 } from './dto/queue.dto';
+import { OfficeRowDto, OverviewDto } from './dto/operations.dto';
+import { OperationsService } from './operations.service';
 import { QueueService } from './queue.service';
 
 @ApiTags('Operations')
@@ -40,7 +42,34 @@ import { QueueService } from './queue.service';
 @Controller('government')
 @UseGuards(ApiKeyGuard)
 export class OperationsController {
-  constructor(private readonly queue: QueueService) {}
+  constructor(
+    private readonly queue: QueueService,
+    private readonly operations: OperationsService,
+  ) {}
+
+  @Get('operations/overview')
+  @ApiOperation({
+    summary: 'Registry state, queue totals and coded alerts (D89)',
+    description:
+      'A branch gets its own area only: its queue totals and the alerts naming its office, ' +
+      'plus ChainAheadOfDatabase. Answers 503 when the chain root cannot be read.',
+  })
+  @ApiOkResponse({ type: OverviewDto })
+  overview(@CurrentActor() actor: Actor) {
+    return this.operations.overview(actor);
+  }
+
+  @Get('operations/offices')
+  @CentralOnly()
+  @ApiOperation({
+    summary: 'The queue by office: one row per office plus the unassigned plots (D89)',
+    description: 'Counts follow the plot area, not the office that filed the item.',
+  })
+  @ApiOkResponse({ type: [OfficeRowDto] })
+  @ApiForbiddenResponse({ description: 'CentralScopeRequired' })
+  offices() {
+    return this.operations.offices();
+  }
 
   @Get('queue')
   @ApiOperation({

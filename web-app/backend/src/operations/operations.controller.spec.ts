@@ -20,4 +20,9 @@ describe('OperationsController guards (D86/D87)', () => {
     expect(guardsOf('withdraw')).not.toContain(CentralOnlyGuard);
     expect(guardsOf('list')).not.toContain(CentralOnlyGuard);
   });
+
+  it('opens the overview to both scopes and the office table to central only', () => {
+    expect(guardsOf('overview')).not.toContain(CentralOnlyGuard);
+    expect(guardsOf('offices')).toContain(CentralOnlyGuard);
+  });
 });

@@ -19,5 +19,6 @@ import { TreeModule } from '../tree/tree.module';
   imports: [TreeModule, ChainModule],
   controllers: [ProofController],
   providers: [ProofService, AttestationService],
+  exports: [AttestationService],
 })
 export class ProofModule {}
