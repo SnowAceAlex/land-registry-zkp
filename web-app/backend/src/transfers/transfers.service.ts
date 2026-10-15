@@ -19,6 +19,9 @@ import {
 } from '@land-registry/blockchain/shared';
 
 import { ChainService, ProofRejectedError } from '../chain/chain.service';
+import { Actor } from '../common/actor';
+import { assertCanActOn } from '../common/office-scope';
+import { officeCodes } from '../common/office-codes';
 import { blockchainDir } from '../common/paths';
 import { IssuanceService } from '../issuance/issuance.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -74,8 +77,8 @@ export class TransfersService {
    * tree twice per call. It is now ~2·TREE_DEPTH key lookups: the old path read
    * from the node table, the new one from an overlay of the single changed leaf.
    */
-  async preview(dto: TransferPreviewDto): Promise<TransferPreviewResult> {
-    const property = await this.requireTransferableProperty(dto.propertyId);
+  async preview(dto: TransferPreviewDto, actor: Actor): Promise<TransferPreviewResult> {
+    const property = await this.requireTransferableProperty(dto.propertyId, actor);
 
     // D77 — the buyer's secret is issued here, by the same generator and to the
     // same 248-bit bound as an issuance round's (D14). Nothing is stored: the
@@ -113,8 +116,8 @@ export class TransfersService {
    * Validated eagerly so a broken submission is rejected while the submitter is
    * still watching, rather than surfacing later at an officer's desk.
    */
-  async submit(dto: SubmitTransferDto): Promise<TransferRequestDto> {
-    const property = await this.requireTransferableProperty(dto.propertyId);
+  async submit(dto: SubmitTransferDto, actor: Actor): Promise<TransferRequestDto> {
+    const property = await this.requireTransferableProperty(dto.propertyId, actor);
     const proof = dto.proof as unknown as Groth16Proof;
     const publicSignals = dto.publicSignals as PublicSignals;
 
@@ -170,18 +173,28 @@ export class TransfersService {
         newRoot: publicSignals[NEW_ROOT],
         proof: dto.proof as object,
         publicSignals: dto.publicSignals as object,
-        officeId: 0, // TODO(phase-10 task 5): actor.officeId
+        // D86: stamp who filed it and which office owns the plot's area.
+        officeId: actor.officeId,
+        landOfficeId: property.landOfficeId,
       },
     });
-    return toTransferRequestDto(created);
+    return toTransferRequestDto(created, await officeCodes(this.prisma));
   }
 
-  async list(status?: TransferStatus): Promise<TransferRequestDto[]> {
-    const rows = await this.prisma.transferRequest.findMany({
-      where: status ? { status } : undefined,
-      orderBy: { createdAt: 'desc' },
-    });
-    return rows.map(toTransferRequestDto);
+  async list(status: TransferStatus | undefined, actor: Actor): Promise<TransferRequestDto[]> {
+    // D86: a branch sees only its own area; a central office sees everything.
+    const where = {
+      ...(status ? { status } : {}),
+      ...(actor.scope === 'BRANCH' ? { landOfficeId: actor.officeId } : {}),
+    };
+    const [rows, offices] = await Promise.all([
+      this.prisma.transferRequest.findMany({
+        where: Object.keys(where).length > 0 ? where : undefined,
+        orderBy: { createdAt: 'desc' },
+      }),
+      officeCodes(this.prisma),
+    ]);
+    return rows.map((row) => toTransferRequestDto(row, offices));
   }
 
   /**
@@ -201,8 +214,8 @@ export class TransfersService {
    * The proof is still verified here rather than only at publish time: a
    * proof that does not verify must never sit in the approved queue.
    */
-  async approve(id: number): Promise<TransferApprovalResponseDto> {
-    const request = await this.requirePendingRequest(id);
+  async approve(id: number, actor: Actor): Promise<TransferApprovalResponseDto> {
+    const request = await this.requirePendingRequest(id, actor);
     const proof = request.proof as unknown as Groth16Proof;
     const publicSignals = request.publicSignals as PublicSignals;
 
@@ -225,7 +238,7 @@ export class TransfersService {
         // request can never become valid again, so close it rather than leave
         // it pending forever.
         if (error.reason === 'RootMismatch') {
-          await this.reject(id, error.message);
+          await this.reject(id, actor, error.message);
         }
         throw new UnprocessableEntityException({
           reason: error.reason,
@@ -238,7 +251,11 @@ export class TransfersService {
 
     const updated = await this.prisma.transferRequest.update({
       where: { id },
-      data: { status: TransferStatus.APPROVED, decidedAt: new Date() },
+      data: {
+        status: TransferStatus.APPROVED,
+        decidedAt: new Date(),
+        approvedByOfficeId: actor.officeId,
+      },
     });
 
     this.logger.log(
@@ -253,8 +270,8 @@ export class TransfersService {
     };
   }
 
-  async reject(id: number, reason?: string): Promise<TransferRequestDto> {
-    const request = await this.requirePendingRequest(id);
+  async reject(id: number, actor: Actor, reason?: string): Promise<TransferRequestDto> {
+    const request = await this.requirePendingRequest(id, actor);
     const updated = await this.prisma.transferRequest.update({
       where: { id: request.id },
       data: {
@@ -266,7 +283,7 @@ export class TransfersService {
         decidedAt: new Date(),
       },
     });
-    return toTransferRequestDto(updated);
+    return toTransferRequestDto(updated, await officeCodes(this.prisma));
   }
 
   /**
@@ -323,11 +340,13 @@ export class TransfersService {
     }
   }
 
-  private async requireTransferableProperty(propertyId: string): Promise<Property> {
+  private async requireTransferableProperty(propertyId: string, actor: Actor): Promise<Property> {
     const property = await this.prisma.property.findUnique({ where: { propertyId } });
     if (!property) {
       throw new NotFoundException(`Unknown propertyId ${propertyId}`);
     }
+    // D86: scope first, so the state checks below do not reveal another branch's plot.
+    assertCanActOn(actor, property);
     // Mirrors ProofService.requireIssuedProperty: a revoked plot keeps its
     // ownerCommitment (only leaf/merkleProof/rootVersion are cleared, D45), so
     // the ownerCommitment check below alone would let it through and fail
@@ -367,11 +386,19 @@ export class TransfersService {
     return property;
   }
 
-  private async requirePendingRequest(id: number) {
+  private async requirePendingRequest(id: number, actor: Actor) {
     const request = await this.prisma.transferRequest.findUnique({ where: { id } });
     if (!request) {
       throw new NotFoundException(`Unknown transfer request #${id}`);
     }
+    const property = await this.prisma.property.findUnique({
+      where: { propertyId: request.propertyId },
+    });
+    if (!property) {
+      throw new NotFoundException(`Unknown propertyId ${request.propertyId}`);
+    }
+    // D86: scope before the status check, so another branch learns nothing about the request.
+    assertCanActOn(actor, property);
     if (request.status !== TransferStatus.PENDING) {
       throw new ConflictException(
         `Transfer request #${id} was already ${request.status.toLowerCase()}`,

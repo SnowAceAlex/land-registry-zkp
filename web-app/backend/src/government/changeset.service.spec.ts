@@ -30,6 +30,7 @@ describe('ChangeSetService (D44)', () => {
   const prisma = {
     transferRequest: { findMany: transferFindMany, update: jest.fn() },
     revocation: { findMany: revocationFindMany, update: jest.fn() },
+    landOffice: { findMany: jest.fn().mockResolvedValue([{ id: 9, code: 'CN01' }]) },
     changeSet: {
       findUnique: changeSetFindUnique,
       create: changeSetCreate,
@@ -86,6 +87,9 @@ describe('ChangeSetService (D44)', () => {
         changeSetId: null,
         createdAt: new Date(),
         decidedAt: null,
+        officeId: 9,
+        landOfficeId: 9,
+        heldAt: null,
       },
     ]);
     const service = new ChangeSetService(
@@ -103,6 +107,7 @@ describe('ChangeSetService (D44)', () => {
 
     expect(transfers).toHaveLength(1);
     expect(transfers[0]).not.toHaveProperty('newOwnerSecret');
+    expect(transfers[0].officeCode).toBe('CN01');
   });
 
   it('refuses to draft when there is nothing pending', async () => {

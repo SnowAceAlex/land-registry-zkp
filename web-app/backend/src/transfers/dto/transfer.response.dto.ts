@@ -46,6 +46,22 @@ export class TransferRequestDto {
 
   @ApiPropertyOptional({ nullable: true, format: 'date-time' })
   decidedAt!: Date | null;
+
+  /** Code of the office that filed the request (D86). */
+  @ApiProperty({ nullable: true, type: String, example: 'CN01' })
+  officeCode!: string | null;
+
+  /** Code of the office that manages the plot's area; null while the plot is unassigned. */
+  @ApiProperty({ nullable: true, type: String, example: 'CN01' })
+  landOfficeCode!: string | null;
+
+  /** True when a different office than the plot's own filed it (the central fallback). */
+  @ApiProperty({ example: false })
+  byFallback!: boolean;
+
+  /** True while an officer holds it out of the next change set. */
+  @ApiProperty({ example: false })
+  held!: boolean;
 }
 
 export class TransferApprovalResponseDto {

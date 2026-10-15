@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NodeStoreService } from '../tree/node-store.service';
 import { toLURRecord } from '../records/record.mapper';
 import { TransferRequestDto } from '../transfers/dto/transfer.response.dto';
+import { officeCodes } from '../common/office-codes';
 import { toTransferRequestDto } from '../transfers/transfer-request.serializer';
 import { RootService } from './root.service';
 
@@ -136,9 +137,12 @@ export class ChangeSetService {
     revocations: Revocation[];
     revocationCap: number;
   }> {
-    const { transfers, revocations } = await this.queue();
+    const [{ transfers, revocations }, offices] = await Promise.all([
+      this.queue(),
+      officeCodes(this.prisma),
+    ]);
     return {
-      transfers: transfers.map(toTransferRequestDto),
+      transfers: transfers.map((row) => toTransferRequestDto(row, offices)),
       revocations,
       revocationCap: MAX_REVOCATIONS_PER_CHANGESET,
     };

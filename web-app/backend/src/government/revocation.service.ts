@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { keccak256, toUtf8Bytes } from 'ethers';
 
+import { Actor } from '../common/actor';
+import { assertCanActOn } from '../common/office-scope';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRevocationDto } from './dto/revocation.dto';
 
@@ -33,7 +35,7 @@ export const REASON_CODES: Record<number, string> = {
 export class RevocationService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async request(dto: CreateRevocationDto) {
+  async request(dto: CreateRevocationDto, actor: Actor) {
     if (!REASON_CODES[dto.reasonCode]) {
       throw new BadRequestException(
         `reasonCode must be one of ${Object.keys(REASON_CODES).join(', ')}`,
@@ -44,6 +46,8 @@ export class RevocationService {
       where: { propertyId: dto.propertyId },
     });
     if (!property) throw new NotFoundException(`Unknown propertyId ${dto.propertyId}`);
+    // D86: scope before the state checks, so another branch learns nothing about the plot.
+    assertCanActOn(actor, property);
     if (property.status !== 'ISSUED') {
       throw new ConflictException(
         `Property ${dto.propertyId} is ${property.status}; only an ISSUED certificate can be revoked`,
@@ -77,16 +81,21 @@ export class RevocationService {
         detailText: dto.detailText,
         detailHash: keccak256(toUtf8Bytes(dto.detailText)),
         status: 'PENDING',
-        officeId: 0, // TODO(phase-10 task 5): actor.officeId
+        officeId: actor.officeId,
+        landOfficeId: property.landOfficeId,
       },
     });
 
     return { id: created.id, propertyId: created.propertyId, detailHash: created.detailHash };
   }
 
-  async pending() {
+  async pending(actor: Actor) {
     return this.prisma.revocation.findMany({
-      where: { status: 'PENDING' },
+      // D86: a branch sees only its own area.
+      where: {
+        status: 'PENDING',
+        ...(actor.scope === 'BRANCH' ? { landOfficeId: actor.officeId } : {}),
+      },
       orderBy: { createdAt: 'asc' },
     });
   }

@@ -249,8 +249,8 @@ export class GovernmentController {
       'The plot already has a pending revocation, or an open transfer (one procedure per plot, ' +
       'D80). Once recorded, the owner gets no status attestation until it closes (D82)',
   })
-  async requestRevocation(@Body() dto: CreateRevocationDto) {
-    return this.revocations.request(dto);
+  async requestRevocation(@Body() dto: CreateRevocationDto, @CurrentActor() actor: Actor) {
+    return this.revocations.request(dto, actor);
   }
 
   @Get('pending-changes')
