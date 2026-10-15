@@ -31,8 +31,8 @@ src/
 │   └── [lang]/
 │       ├── layout.tsx               <html lang>, fonts, metadata
 │       ├── page.tsx                 → features/landing
-│       ├── government/              layout mounts wallet + API-key gate + nav
-│       │   └── import | issuance | transfers | revocations | changes /page.tsx
+│       ├── government/              layout mounts wallet + API-key gate + nav; `/` redirects to operations
+│       │   └── operations | import | issuance | transfers | revocations | changes | archives /page.tsx
 │       └── resident/                layout mounts nav, no wallet
 │           └── lookup | proof | verify /page.tsx
 ├── features/
@@ -41,16 +41,18 @@ src/
 │   │   ├── auth/                    portal infra: GOV_API_KEY gate + session storage
 │   │   ├── api/                     portal infra: key-aware client, response types, shared queries, error codes
 │   │   ├── publishing/              portal infra: nextDraftStep + DraftPanel (sign → mine → confirm, D43/D53)
-│   │   ├── shell/                   portal infra: nav + registry status bar (chain, root, open draft, wallet)
+│   │   ├── shell/                   portal infra: nav built by the office's scope (D86), CentralOnly wrapper, status bar (chain, root, open draft, office, wallet)
 │   │   ├── wallet/                  portal infra: wagmi config, RootRegistry ABI/codec, chain reads + publish
-│   │   ├── import/                  UC-2   dry run → import (D52)
-│   │   ├── issuance/                UC-1   pick → draft → sign → confirm → archive
-│   │   ├── transfers/               UC-3   transfer counter (client-side proof) + approval queue
-│   │   ├── revocations/             UC-4   revocation requests + the pending list
-│   │   └── changes/                 UC-4   change sets (publish transfers + revocations, buyers' archive)
+│   │   ├── operations/              D89    landing page: registry state, coded alerts, queue per office, recent rounds (tables only)
+│   │   ├── import/                  UC-2   dry run → import (D52), report by branch, supersession row codes (D85, D90)
+│   │   ├── issuance/                UC-1   pick → "Đề nghị cấp" → READY list with withdraw; central office only (D87)
+│   │   ├── transfers/               UC-3   transfer counter (client-side proof) + approval queue, area-scoped, withdraw (D86, D87)
+│   │   ├── revocations/             UC-4   revocation requests + the pending list, area-scoped, withdraw
+│   │   ├── changes/                 UC-4   "Chốt sổ": one round for issuance + transfers + revocations (D84), alert gate, queue with hold / release
+│   │   └── archives/                D88    one archive per branch per round; a branch downloads its own, the central office any
 │   └── resident/                    logged-out, no wallet, no provider (D61)
 │       ├── shell/                   portal infra: nav, /public/config cache + hook, error wording
-│       ├── lookup/                  D48    public property history
+│       ├── lookup/                  D48/D90 public land history across re-issued certificates (lineage timeline)
 │       ├── proof/                   UC-5   client-side proof generation
 │       └── verify/                  UC-6   four ordered checks + D30 issuer chain + revocation
 ├── components/ui/                   design-system primitives (button, empty-state, page-header, notice, skeleton, hash-text)
@@ -71,6 +73,12 @@ features/<portal>/<feature>/
 ├── lib/            pure helpers owned by this feature (tests sit beside them: *.test.ts)
 └── api.ts          this feature's backend calls, built on lib/api-client.ts
 ```
+
+The government nav depends on the signed-in office's scope (`shell/nav-items.ts`, D86): a branch
+sees Operations, Transfers, Revocations and Archives; the central office (HQ, CS2, CS3) also sees
+Import, Issuance and Close the register ("Chốt sổ"). Central-only pages render a notice instead of
+their forms for a branch, and the backend answers 403 `CentralScopeRequired` regardless. The wallet
+is needed only on the Chốt sổ page, where a round is signed.
 
 Government use cases call the backend through `features/government/api/gov-client.ts` (it adds
 the portal key and returns to the gate on a 401); resident features call `apiFetch` directly,
