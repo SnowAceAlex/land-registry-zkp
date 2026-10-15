@@ -7,7 +7,7 @@
  */
 
 import { govGet, govPost } from '../api/gov-client';
-import type { IssuanceRequest, PropertyList } from '../api/types';
+import type { IssuanceRequest, PropertyList, QueueItem } from '../api/types';
 
 export const ISSUANCE_PAGE_SIZE = 50;
 
@@ -21,4 +21,16 @@ export function listImportedProperties(skip: number): Promise<PropertyList> {
 /** POST /government/issuance-requests — central only; 409 PredecessorNotRevoked (D90). */
 export function requestIssuance(propertyIds: string[]): Promise<IssuanceRequest[]> {
   return govPost<IssuanceRequest[]>('/government/issuance-requests', { propertyIds });
+}
+
+/** GET /government/issuance-requests?status= — requests of one state, oldest first. */
+export function listIssuanceRequests(
+  status: 'READY' | 'PUBLISHED' | 'WITHDRAWN',
+): Promise<IssuanceRequest[]> {
+  return govGet<IssuanceRequest[]>(`/government/issuance-requests?status=${status}`);
+}
+
+/** POST /government/queue/issuance/:id/withdraw — discards the owner secret; the plot is IMPORTED again. */
+export function withdrawIssuance(id: number): Promise<QueueItem> {
+  return govPost<QueueItem>(`/government/queue/issuance/${id}/withdraw`);
 }

@@ -2,10 +2,12 @@
  * features/government/issuance/components/issuance-view.tsx - UC-1, issue a batch.
  *
  * Since D84/D87 this page only QUEUES plots for issuance:
- *  1. GET /api/government/properties?status=IMPORTED for the selectable rows.
+ *  1. GET /api/government/properties?status=IMPORTED for the selectable rows
+ *     (plots with a READY request are shown as queued).
  *  2. POST /api/government/issuance-requests — the backend generates each owner
- *     secret now and keeps it on the request; the plot stays IMPORTED.
- *  3. The next round (a change set, signed on the publishing page with Metamask,
+ *     secret now and keeps it on the request; the plot stays IMPORTED until the round.
+ *  3. A queued request can be withdrawn; the secret is discarded.
+ *  4. The next round (a change set, signed on the Changes page with Metamask,
  *     D43) puts the queued plots, approved transfers and revocations under one
  *     root; its per-office archives carry the bundles (D88).
  */
