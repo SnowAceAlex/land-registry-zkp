@@ -77,6 +77,7 @@ export class RevocationService {
         detailText: dto.detailText,
         detailHash: keccak256(toUtf8Bytes(dto.detailText)),
         status: 'PENDING',
+        officeId: 0, // TODO(phase-10 task 5): actor.officeId
       },
     });
 

@@ -170,6 +170,7 @@ export class TransfersService {
         newRoot: publicSignals[NEW_ROOT],
         proof: dto.proof as object,
         publicSignals: dto.publicSignals as object,
+        officeId: 0, // TODO(phase-10 task 5): actor.officeId
       },
     });
     return toTransferRequestDto(created);

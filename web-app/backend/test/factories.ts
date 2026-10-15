@@ -36,6 +36,7 @@ export function makeProperty(overrides: Partial<Property> = {}): Property {
     // carries a non-null ownerCommitment by default, above) — D45.
     status: 'ISSUED',
     issuanceBatchId: null,
+    landOfficeId: null,
     createdAt: new Date('2026-01-15T00:00:00.000Z'),
     updatedAt: new Date('2026-01-15T00:00:00.000Z'),
     ...overrides,
