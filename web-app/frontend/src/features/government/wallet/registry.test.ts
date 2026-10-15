@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ChangeSetDraftDetail, IssuanceDraftDetail } from '../api/types';
+import type { ChangeSetDraftDetail } from '../api/types';
 import {
   bytes32ToDecimal,
   publishCallFor,
@@ -12,19 +12,12 @@ import {
 /** A real BN254-sized root, well past Number.MAX_SAFE_INTEGER. */
 const ROOT = '5677530015593700534173836181788122415198283309363871298832210090950018556857';
 
-const issuanceDraft: IssuanceDraftDetail = {
-  kind: 'issuance',
-  id: 7,
-  newRoot: ROOT,
-  createdAt: '2026-09-14T02:00:00.000Z',
-  propertyIds: ['1001'],
-};
-
 const changeSetDraft = (revocations: number): ChangeSetDraftDetail => ({
   kind: 'changeset',
   id: 9,
   newRoot: ROOT,
   createdAt: '2026-09-14T03:00:00.000Z',
+  issuanceRequestIds: [],
   transferIds: [1],
   revocationIds: Array.from({ length: revocations }, (_, i) => i + 1),
   revocationCalldata: {
@@ -54,15 +47,11 @@ describe('root codec', () => {
 });
 
 describe('publishCallFor (D54)', () => {
-  it('publishes an issuance round with publishRoot', () => {
-    expect(publishCallFor(issuanceDraft)).toEqual({
+  it('keeps a round without revocations on plain publishRoot', () => {
+    expect(publishCallFor(changeSetDraft(0))).toEqual({
       functionName: 'publishRoot',
       args: [rootToBytes32(ROOT)],
     });
-  });
-
-  it('keeps a change set without revocations on plain publishRoot', () => {
-    expect(publishCallFor(changeSetDraft(0)).functionName).toBe('publishRoot');
   });
 
   it('carries the revocation calldata when the round revokes anything (D45)', () => {

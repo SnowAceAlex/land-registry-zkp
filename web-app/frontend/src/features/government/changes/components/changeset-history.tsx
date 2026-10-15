@@ -1,29 +1,20 @@
 'use client';
 
 /**
- * Every change set, newest first, with the buyers' archive (D77).
- *
- * Same shape as the issuance history (D42): the archive is the only surviving
- * copy of the buyers' secrets and is deleted after 7 days, so its expiry is
- * shown next to the button rather than discovered as a 410. A round that only
- * revoked has nothing to download.
+ * Every change set, newest first. Archives are per office now (D88); the
+ * download moves to the archives page, so this table only counts them.
  */
 
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import type { Dictionary } from '@/i18n/dictionaries';
-import { format } from '@/i18n/format';
-import { buttonStyles } from '@/components/ui/button';
 import { HashText } from '@/components/ui/hash-text';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { apiErrorCode } from '../../api/error-code';
-import { type Failure, apiFailure } from '../../api/error-message';
+import { apiFailure } from '../../api/error-message';
 import { govKeys } from '../../api/hooks';
-import type { ChangeSetSummary } from '../../api/types';
-import { downloadChangeSetArchive, listChangeSets } from '../api';
+import { listChangeSets } from '../api';
 
 export function ChangeSetHistory({
   t,
@@ -33,33 +24,9 @@ export function ChangeSetHistory({
   errors: Dictionary['govErrors'];
 }) {
   const changeSets = useQuery({ queryKey: govKeys.changeSets, queryFn: listChangeSets });
-  const [downloading, setDownloading] = useState<number | null>(null);
-  const [failure, setFailure] = useState<Failure | null>(null);
-
-  async function download(changeSet: ChangeSetSummary) {
-    setDownloading(changeSet.id);
-    setFailure(null);
-    try {
-      await downloadChangeSetArchive(changeSet.id);
-    } catch (error) {
-      setFailure(
-        apiErrorCode(error) === 'gone' ? { title: t.archiveGoneTitle } : apiFailure(error, errors),
-      );
-      await changeSets.refetch();
-    } finally {
-      setDownloading(null);
-    }
-  }
-
   return (
     <section className="space-y-4">
       <h2 className="font-medium text-ink">{t.historyTitle}</h2>
-
-      {failure ? (
-        <Notice tone="danger" title={failure.title}>
-          {failure.detail}
-        </Notice>
-      ) : null}
 
       {changeSets.isPending ? (
         <Skeleton className="h-24 w-full" />
@@ -84,9 +51,6 @@ export function ChangeSetHistory({
             </thead>
             <tbody className="divide-y divide-whisper">
               {changeSets.data.map((changeSet) => {
-                const expired =
-                  changeSet.archiveExpiresAt !== null &&
-                  new Date(changeSet.archiveExpiresAt) < new Date();
                 return (
                   <tr key={changeSet.id} className="align-middle">
                     <td className="px-4 py-2 font-mono text-xs">#{changeSet.id}</td>
@@ -103,29 +67,9 @@ export function ChangeSetHistory({
                       {changeSet.publishedAt ? new Date(changeSet.publishedAt).toLocaleString() : '—'}
                     </td>
                     <td className="px-4 py-2">
-                      {changeSet.status !== 'PUBLISHED' || changeSet.transferCount === 0 ? (
-                        '—'
-                      ) : expired ? (
-                        <span className="text-xs text-steel">{t.archiveExpired}</span>
-                      ) : (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            className={`${buttonStyles.secondary} px-3 py-1.5 text-xs`}
-                            disabled={downloading !== null}
-                            onClick={() => download(changeSet)}
-                          >
-                            {downloading === changeSet.id ? t.downloading : t.download}
-                          </button>
-                          {changeSet.archiveExpiresAt ? (
-                            <span className="text-xs text-steel">
-                              {format(t.archiveUntil, {
-                                date: new Date(changeSet.archiveExpiresAt).toLocaleDateString(),
-                              })}
-                            </span>
-                          ) : null}
-                        </div>
-                      )}
+                      {changeSet.archiveCount === 0
+                        ? '—'
+                        : `${changeSet.archivesDownloaded}/${changeSet.archiveCount}`}
                     </td>
                   </tr>
                 );

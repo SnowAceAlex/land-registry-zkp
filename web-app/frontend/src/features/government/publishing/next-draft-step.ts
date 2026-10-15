@@ -16,12 +16,11 @@
  *     signing only.
  */
 
-import type { DraftKind, OpenDraft } from '../api/types';
+import type { OpenDraft } from '../api/types';
 
 export type DraftStep =
   | 'loading'
   | 'create'
-  | 'blockedByOtherDraft'
   | 'confirm'
   | 'connect'
   | 'wrongChain'
@@ -29,8 +28,6 @@ export type DraftStep =
   | 'sign';
 
 export interface DraftStepInput {
-  /** Which kind of draft this screen publishes. */
-  currentKind: DraftKind;
   /** `undefined` while loading; `null` when no draft is open. */
   openDraft: OpenDraft | null | undefined;
   /** Decimal latestRoot read from the chain; `undefined` while loading. */
@@ -47,7 +44,6 @@ export function nextDraftStep(input: DraftStepInput): DraftStep {
   const { openDraft } = input;
   if (openDraft === undefined) return 'loading';
   if (openDraft === null) return 'create';
-  if (openDraft.kind !== input.currentKind) return 'blockedByOtherDraft';
 
   if (input.onChainLatestRoot === undefined) return 'loading';
   if (input.onChainLatestRoot === openDraft.newRoot) return 'confirm';

@@ -18,28 +18,27 @@ describe('draft-tx-store (D53)', () => {
   it('recalls the hash signed for the same draft', () => {
     const storage = memoryStorage();
 
-    rememberDraftTx(storage, 'issuance', 7, HASH);
+    rememberDraftTx(storage, 7, HASH);
 
-    expect(recallDraftTx(storage, 'issuance', 7)).toBe(HASH);
-    expect(recallDraftTx(storage, 'changeset', 7)).toBeNull();
-    expect(recallDraftTx(storage, 'issuance', 8)).toBeNull();
+    expect(recallDraftTx(storage, 7)).toBe(HASH);
+    expect(recallDraftTx(storage, 8)).toBeNull();
   });
 
   it('forgets it once the draft is confirmed or discarded', () => {
     const storage = memoryStorage();
-    rememberDraftTx(storage, 'changeset', 9, HASH);
+    rememberDraftTx(storage, 9, HASH);
 
-    forgetDraftTx(storage, 'changeset', 9);
+    forgetDraftTx(storage, 9);
 
-    expect(recallDraftTx(storage, 'changeset', 9)).toBeNull();
+    expect(recallDraftTx(storage, 9)).toBeNull();
   });
 
   it('ignores a stored value that is not a transaction hash', () => {
     // confirm() would reject a malformed label with a 400; a missing label is fine.
     const storage = memoryStorage();
-    storage.setItem('land-registry.draft-tx.issuance.7', 'not-a-hash');
+    storage.setItem('land-registry.draft-tx.changeset.7', 'not-a-hash');
 
-    expect(recallDraftTx(storage, 'issuance', 7)).toBeNull();
+    expect(recallDraftTx(storage, 7)).toBeNull();
   });
 
   it('never throws when storage is unavailable (private mode)', () => {
@@ -55,8 +54,8 @@ describe('draft-tx-store (D53)', () => {
       },
     };
 
-    expect(() => rememberDraftTx(broken, 'issuance', 7, HASH)).not.toThrow();
-    expect(recallDraftTx(broken, 'issuance', 7)).toBeNull();
-    expect(() => forgetDraftTx(broken, 'issuance', 7)).not.toThrow();
+    expect(() => rememberDraftTx(broken, 7, HASH)).not.toThrow();
+    expect(recallDraftTx(broken, 7)).toBeNull();
+    expect(() => forgetDraftTx(broken, 7)).not.toThrow();
   });
 });

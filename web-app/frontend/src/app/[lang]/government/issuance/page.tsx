@@ -11,6 +11,6 @@ export default async function Page({ params }: PageProps<'/[lang]'>) {
   const dict = await getDictionary(lang);
 
   return (
-    <IssuanceView lang={lang} t={dict.govIssuance} draftT={dict.govDraft} errors={dict.govErrors} />
+    <IssuanceView lang={lang} t={dict.govIssuance} errors={dict.govErrors} />
   );
 }

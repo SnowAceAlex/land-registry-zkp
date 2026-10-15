@@ -9,7 +9,7 @@
  * through usePendingChanges() in the portal's api/hooks.
  */
 
-import { govDelete, govDownload, govGet, govPost } from '../api/gov-client';
+import { govDelete, govGet, govPost } from '../api/gov-client';
 import type { ChangeSetDraftDetail, ChangeSetSummary, DraftConfirmation } from '../api/types';
 
 export function createChangeSetDraft(): Promise<ChangeSetDraftDetail> {
@@ -28,9 +28,4 @@ export function discardChangeSetDraft(id: number): Promise<{ discarded: number }
 /** Every change set, newest first — summary columns only (D77). */
 export function listChangeSets(): Promise<ChangeSetSummary[]> {
   return govGet<ChangeSetSummary[]>('/government/changesets');
-}
-
-/** The buyers' bundles of one round, one folder per transferred plot (D77). */
-export function downloadChangeSetArchive(id: number): Promise<string> {
-  return govDownload(`/government/changesets/${id}/archive`);
 }

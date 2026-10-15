@@ -38,6 +38,20 @@ describe('apiFailure', () => {
     },
   );
 
+  it.each([
+    [403, undefined, 'forbidden'],
+    [403, 'OutsideOfficeArea', 'outsideOfficeArea'],
+    [403, 'CentralScopeRequired', 'centralScopeRequired'],
+    [409, 'PredecessorNotRevoked', 'predecessorNotRevoked'],
+    [409, 'ItemInOpenDraft', 'itemInOpenDraft'],
+  ] as const)('words %i %s in both languages (D86, D87, D90)', (status, reason, key) => {
+    for (const dict of [en.govErrors, viDict.govErrors]) {
+      const failure = apiFailure(new ApiError(status, BACKEND_PROSE, reason), dict);
+      expect(failure.title).toBe(dict[key]);
+      expect(failure.title).not.toBe(dict.unknown);
+    }
+  });
+
   it('says the same thing in Vietnamese, with nothing English left in it', () => {
     const failure = apiFailure(new ApiError(410, BACKEND_PROSE), viDict.govErrors);
     expect(failure.title).toBe(viDict.govErrors.gone);

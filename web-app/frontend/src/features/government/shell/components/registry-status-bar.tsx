@@ -29,9 +29,7 @@ export function RegistryStatusBar({ lang, t }: { lang: Locale; t: Dictionary['go
   const pathname = usePathname();
 
   const draft = openDraft.data;
-  const draftHref = draft
-    ? `/${lang}/government/${draft.kind === 'issuance' ? 'issuance' : 'changes'}`
-    : null;
+  const draftHref = draft ? `/${lang}/government/changes` : null;
   const onDraftPage = draftHref !== null && pathname.startsWith(draftHref);
 
   return (
@@ -74,9 +72,7 @@ export function RegistryStatusBar({ lang, t }: { lang: Locale; t: Dictionary['go
       {draft && draftHref && !onDraftPage ? (
         <Notice
           tone="info"
-          title={format(draft.kind === 'issuance' ? t.draftOpenIssuance : t.draftOpenChangeset, {
-            id: draft.id,
-          })}
+          title={format(t.draftOpenChangeset, { id: draft.id })}
           action={
             <Link href={draftHref} className="text-sm font-medium text-authority underline underline-offset-4">
               {t.openDraft}

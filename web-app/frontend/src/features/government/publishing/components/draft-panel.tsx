@@ -84,11 +84,10 @@ export function DraftPanel({
   const [phase, setPhase] = useState<Phase>('idle');
   const [failure, setFailure] = useState<Failure | null>(null);
   const [txHash, setTxHash] = useState<string | null>(() =>
-    typeof window === 'undefined' ? null : recallDraftTx(session, draft.kind, draft.id),
+    typeof window === 'undefined' ? null : recallDraftTx(session, draft.id),
   );
 
   const step = nextDraftStep({
-    currentKind: draft.kind,
     openDraft: draft,
     onChainLatestRoot: chain.latestRoot,
     walletConnected: chain.isConnected,
@@ -102,7 +101,7 @@ export function DraftPanel({
     setFailure(null);
     try {
       const confirmation = await onConfirm(draft.id, hash);
-      forgetDraftTx(session, draft.kind, draft.id);
+      forgetDraftTx(session, draft.id);
       onSettled({ kind: 'confirmed', confirmation });
     } catch (error) {
       setFailure(apiFailure(error, errors));
@@ -129,7 +128,7 @@ export function DraftPanel({
       return;
     }
 
-    rememberDraftTx(session, draft.kind, draft.id, hash);
+    rememberDraftTx(session, draft.id, hash);
     setTxHash(hash);
     setPhase('mining');
     try {
@@ -150,7 +149,7 @@ export function DraftPanel({
     setFailure(null);
     try {
       await onDiscard(draft.id);
-      forgetDraftTx(session, draft.kind, draft.id);
+      forgetDraftTx(session, draft.id);
       onSettled({ kind: 'discarded' });
     } catch (error) {
       setFailure(apiFailure(error, errors));
@@ -160,9 +159,7 @@ export function DraftPanel({
   }
 
   const busy = phase !== 'idle';
-  const title = format(draft.kind === 'issuance' ? t.titleIssuance : t.titleChangeset, {
-    id: draft.id,
-  });
+  const title = format(t.titleChangeset, { id: draft.id });
 
   return (
     <section
@@ -255,7 +252,7 @@ export function DraftPanel({
         ) : step === 'sign' ? (
           <StepRow text={t.stepSign}>
             <button type="button" className={buttonStyles.primary} onClick={sign}>
-              {draft.kind === 'issuance' ? t.signIssuance : t.signChangeset}
+              {t.signChangeset}
             </button>
           </StepRow>
         ) : null}

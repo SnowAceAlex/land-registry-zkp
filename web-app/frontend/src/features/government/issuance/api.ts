@@ -1,18 +1,13 @@
 /**
- * features/government/issuance/api.ts - UC-1 backend calls (D43).
+ * features/government/issuance/api.ts - UC-1 backend calls.
  *
- * Draft → (wallet signs, in DraftPanel) → confirm. The draft generates the
- * owner secrets and stores them durably without touching any Property row;
- * confirm re-reads latestRoot from the chain before writing anything.
+ * Issuance is a queued request now (D87): the backend generates the owner
+ * secrets and keeps them on the request, and the plot reaches the register in
+ * the next round (D84), which the publishing page signs.
  */
 
-import { govDelete, govDownload, govGet, govPost } from '../api/gov-client';
-import type {
-  DraftConfirmation,
-  IssuanceBatchSummary,
-  IssuanceDraftDetail,
-  PropertyList,
-} from '../api/types';
+import { govGet, govPost } from '../api/gov-client';
+import type { IssuanceRequest, PropertyList } from '../api/types';
 
 export const ISSUANCE_PAGE_SIZE = 50;
 
@@ -23,27 +18,7 @@ export function listImportedProperties(skip: number): Promise<PropertyList> {
   );
 }
 
-export function listIssuanceBatches(): Promise<IssuanceBatchSummary[]> {
-  return govGet<IssuanceBatchSummary[]>('/government/issuance-batches');
-}
-
-export function createIssuanceDraft(propertyIds: string[]): Promise<IssuanceDraftDetail> {
-  return govPost<IssuanceDraftDetail>('/government/issuance-batches', { propertyIds });
-}
-
-/** `txHash` is a label for history rows only — confirm decides from the chain. */
-export function confirmIssuanceDraft(id: number, txHash?: string): Promise<DraftConfirmation> {
-  return govPost<DraftConfirmation>(
-    `/government/issuance-batches/${id}/confirm`,
-    txHash ? { txHash } : {},
-  );
-}
-
-export function discardIssuanceDraft(id: number): Promise<{ discarded: number }> {
-  return govDelete<{ discarded: number }>(`/government/issuance-batches/${id}`);
-}
-
-/** One ZIP for the round, a folder per plot (D42). 410 once the 7-day TTL passed. */
-export function downloadIssuanceArchive(id: number): Promise<string> {
-  return govDownload(`/government/issuance-batches/${id}/archive`);
+/** POST /government/issuance-requests — central only; 409 PredecessorNotRevoked (D90). */
+export function requestIssuance(propertyIds: string[]): Promise<IssuanceRequest[]> {
+  return govPost<IssuanceRequest[]>('/government/issuance-requests', { propertyIds });
 }
