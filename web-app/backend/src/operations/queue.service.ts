@@ -42,6 +42,8 @@ const QUEUE_SELECT = {
   createdAt: true,
 } as const;
 
+const CLEAR_HOLD = { heldAt: null, heldReason: null };
+
 const WITHDRAWN_TRANSFER_REASON = 'Withdrawn by the central office';
 
 function parseKind(raw: string): QueueKind {
@@ -96,13 +98,13 @@ export class QueueService {
   async hold(rawKind: string, id: number, reason: string, _actor: Actor): Promise<QueueItem> {
     const kind = parseKind(rawKind);
     await this.loadOpen(kind, id);
-    return this.update(kind, id, { heldAt: new Date(), heldReason: reason });
+    return this.guardedUpdate(kind, id, { heldAt: new Date(), heldReason: reason });
   }
 
   async release(rawKind: string, id: number, _actor: Actor): Promise<QueueItem> {
     const kind = parseKind(rawKind);
     await this.loadOpen(kind, id);
-    return this.update(kind, id, { heldAt: null, heldReason: null });
+    return this.guardedUpdate(kind, id, { heldAt: null, heldReason: null });
   }
 
   async withdraw(rawKind: string, id: number, actor: Actor): Promise<QueueItem> {
@@ -125,16 +127,17 @@ export class QueueService {
     }
 
     const data = {
-      issuance: { status: 'WITHDRAWN', ownerSecret: null },
+      issuance: { status: 'WITHDRAWN', ownerSecret: null, ...CLEAR_HOLD },
       transfer: {
+        ...CLEAR_HOLD,
         status: 'REJECTED',
         newOwnerSecret: null,
         rejectReason: WITHDRAWN_TRANSFER_REASON,
         decidedAt: new Date(),
       },
-      revocation: { status: 'REJECTED' },
+      revocation: { status: 'REJECTED', ...CLEAR_HOLD },
     }[kind];
-    return this.update(kind, id, data);
+    return this.guardedUpdate(kind, id, data);
   }
 
   private resolveOfficeFilter(
@@ -200,8 +203,18 @@ export class QueueService {
     return row;
   }
 
-  private async update(kind: QueueKind, id: number, data: object): Promise<QueueItem> {
-    const row = (await this.table(kind).update({ where: { id }, data })) as Row;
+  // A round may connect the item between our read and this write; the guard makes that lose.
+  private async guardedUpdate(kind: QueueKind, id: number, data: object): Promise<QueueItem> {
+    const table = this.table(kind);
+    const { count } = (await table.updateMany({
+      where: { id, status: { in: OPEN_STATUSES[kind] }, changeSetId: null },
+      data,
+    })) as { count: number };
+    if (count === 0) {
+      await this.loadOpen(kind, id);
+      throw new ConflictException(`The ${kind} item ${id} changed while it was being updated`);
+    }
+    const row = await this.load(kind, id);
     return toQueueItem(kind, row, await officeCodes(this.prisma), new Date());
   }
 
@@ -216,7 +229,7 @@ export class QueueService {
       findMany(args: object): Promise<unknown>;
       count(args: object): Promise<unknown>;
       findUnique(args: object): Promise<unknown>;
-      update(args: object): Promise<unknown>;
+      updateMany(args: object): Promise<unknown>;
     };
   }
 }

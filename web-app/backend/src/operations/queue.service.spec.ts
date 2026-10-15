@@ -24,11 +24,7 @@ function build() {
     findMany: jest.fn().mockResolvedValue([]),
     count: jest.fn().mockResolvedValue(0),
     findUnique: jest.fn(),
-    update: jest
-      .fn()
-      .mockImplementation(({ where, data }) =>
-        Promise.resolve({ ...baseRow, id: where.id, status: 'READY', ...data }),
-      ),
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
   });
   const prisma = {
     issuanceRequest: model(),
@@ -147,18 +143,25 @@ describe('QueueService hold / release (D87)', () => {
     ['revocation', 'revocation', 'PENDING'],
   ] as const)('holds and releases a %s', async (kind, table, status) => {
     const { prisma, service } = build();
-    prisma[table].findUnique.mockResolvedValue({ ...baseRow, id: 5, status });
+    const openRow = { ...baseRow, id: 5, status };
+    const heldRow = { ...openRow, heldAt: now, heldReason: 'wait for court' };
+    const guard = { in: kind === 'transfer' ? ['PENDING', 'APPROVED'] : [status] };
+    prisma[table].findUnique
+      .mockResolvedValueOnce(openRow)
+      .mockResolvedValueOnce(heldRow)
+      .mockResolvedValueOnce(heldRow)
+      .mockResolvedValueOnce(openRow);
 
     const held = await service.hold(kind, 5, 'wait for court', CENTRAL_ACTOR);
-    expect(prisma[table].update).toHaveBeenCalledWith({
-      where: { id: 5 },
+    expect(prisma[table].updateMany).toHaveBeenCalledWith({
+      where: { id: 5, status: guard, changeSetId: null },
       data: { heldAt: now, heldReason: 'wait for court' },
     });
     expect(held.held).toBe(true);
 
     const released = await service.release(kind, 5, CENTRAL_ACTOR);
-    expect(prisma[table].update).toHaveBeenLastCalledWith({
-      where: { id: 5 },
+    expect(prisma[table].updateMany).toHaveBeenLastCalledWith({
+      where: { id: 5, status: guard, changeSetId: null },
       data: { heldAt: null, heldReason: null },
     });
     expect(released.held).toBe(false);
@@ -177,7 +180,7 @@ describe('QueueService hold / release (D87)', () => {
     await expect(service.hold('issuance', 1, 'x', CENTRAL_ACTOR)).rejects.toBeInstanceOf(
       ConflictException,
     );
-    expect(prisma.issuanceRequest.update).not.toHaveBeenCalled();
+    expect(prisma.issuanceRequest.updateMany).not.toHaveBeenCalled();
   });
 
   it('refuses every action on an item already in an open draft', async () => {
@@ -197,7 +200,7 @@ describe('QueueService hold / release (D87)', () => {
         response: { reason: 'ItemInOpenDraft', details: { kind: 'revocation', id: 3 } },
       });
     }
-    expect(prisma.revocation.update).not.toHaveBeenCalled();
+    expect(prisma.revocation.updateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -206,9 +209,9 @@ describe('QueueService.withdraw (D87)', () => {
     const { prisma, service } = build();
     prisma.issuanceRequest.findUnique.mockResolvedValue({ ...baseRow, id: 1, status: 'READY' });
     await service.withdraw('issuance', 1, CENTRAL_ACTOR);
-    expect(prisma.issuanceRequest.update).toHaveBeenCalledWith({
-      where: { id: 1 },
-      data: { status: 'WITHDRAWN', ownerSecret: null },
+    expect(prisma.issuanceRequest.updateMany).toHaveBeenCalledWith({
+      where: { id: 1, status: { in: ['READY'] }, changeSetId: null },
+      data: { status: 'WITHDRAWN', ownerSecret: null, heldAt: null, heldReason: null },
     });
   });
 
@@ -216,13 +219,15 @@ describe('QueueService.withdraw (D87)', () => {
     const { prisma, service } = build();
     prisma.transferRequest.findUnique.mockResolvedValue({ ...baseRow, id: 2, status: 'APPROVED' });
     await service.withdraw('transfer', 2, CENTRAL_ACTOR);
-    expect(prisma.transferRequest.update).toHaveBeenCalledWith({
-      where: { id: 2 },
+    expect(prisma.transferRequest.updateMany).toHaveBeenCalledWith({
+      where: { id: 2, status: { in: ['PENDING', 'APPROVED'] }, changeSetId: null },
       data: {
         status: 'REJECTED',
         newOwnerSecret: null,
         rejectReason: 'Withdrawn by the central office',
         decidedAt: now,
+        heldAt: null,
+        heldReason: null,
       },
     });
   });
@@ -233,16 +238,16 @@ describe('QueueService.withdraw (D87)', () => {
     await expect(service.withdraw('transfer', 2, CENTRAL_ACTOR)).rejects.toBeInstanceOf(
       ConflictException,
     );
-    expect(prisma.transferRequest.update).not.toHaveBeenCalled();
+    expect(prisma.transferRequest.updateMany).not.toHaveBeenCalled();
   });
 
   it('withdraws a revocation as REJECTED', async () => {
     const { prisma, service } = build();
     prisma.revocation.findUnique.mockResolvedValue({ ...baseRow, id: 3, status: 'PENDING' });
     await service.withdraw('revocation', 3, CENTRAL_ACTOR);
-    expect(prisma.revocation.update).toHaveBeenCalledWith({
-      where: { id: 3 },
-      data: { status: 'REJECTED' },
+    expect(prisma.revocation.updateMany).toHaveBeenCalledWith({
+      where: { id: 3, status: { in: ['PENDING'] }, changeSetId: null },
+      data: { status: 'REJECTED', heldAt: null, heldReason: null },
     });
   });
 
@@ -272,6 +277,45 @@ describe('QueueService.withdraw (D87)', () => {
     ]) {
       await expect(act()).rejects.toMatchObject({ response: { reason: 'CentralScopeRequired' } });
     }
-    expect(prisma.issuanceRequest.update).not.toHaveBeenCalled();
+    expect(prisma.issuanceRequest.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('QueueService — a draft takes the item between read and write', () => {
+  it.each([
+    ['hold', 'revocation', 'revocation'],
+    ['release', 'issuance', 'issuanceRequest'],
+    ['withdraw', 'transfer', 'transferRequest'],
+  ] as const)(
+    '%s answers 409 ItemInOpenDraft when the guarded update matches nothing',
+    async (op, kind, table) => {
+      const { prisma, service } = build();
+      const status = kind === 'issuance' ? 'READY' : kind === 'transfer' ? 'APPROVED' : 'PENDING';
+      prisma[table].findUnique
+        .mockResolvedValueOnce({ ...baseRow, id: 8, status })
+        .mockResolvedValueOnce({ ...baseRow, id: 8, status, changeSetId: 21 });
+      prisma[table].updateMany.mockResolvedValue({ count: 0 });
+
+      const call =
+        op === 'hold'
+          ? service.hold(kind, 8, 'x', CENTRAL_ACTOR)
+          : op === 'release'
+            ? service.release(kind, 8, CENTRAL_ACTOR)
+            : service.withdraw(kind, 8, CENTRAL_ACTOR);
+      await expect(call).rejects.toMatchObject({
+        response: { reason: 'ItemInOpenDraft', details: { kind, id: 8 } },
+      });
+    },
+  );
+
+  it('answers a plain 409 when the item was closed meanwhile', async () => {
+    const { prisma, service } = build();
+    prisma.revocation.findUnique
+      .mockResolvedValueOnce({ ...baseRow, id: 8, status: 'PENDING' })
+      .mockResolvedValueOnce({ ...baseRow, id: 8, status: 'PUBLISHED' });
+    prisma.revocation.updateMany.mockResolvedValue({ count: 0 });
+    await expect(service.withdraw('revocation', 8, CENTRAL_ACTOR)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
   });
 });

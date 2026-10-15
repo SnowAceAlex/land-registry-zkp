@@ -64,6 +64,7 @@ export class OperationsController {
     description: '`kind` is issuance, transfer or revocation. The item stays an open procedure.',
   })
   @ApiOkResponse({ type: QueueItemDto })
+  @ApiForbiddenResponse({ description: 'CentralScopeRequired' })
   @ApiConflictResponse({ description: 'Not open, or ItemInOpenDraft' })
   hold(
     @Param('kind') kind: string,
@@ -79,6 +80,7 @@ export class OperationsController {
   @CentralOnly()
   @ApiOperation({ summary: 'Put a held item back into the next round (D87)' })
   @ApiOkResponse({ type: QueueItemDto })
+  @ApiForbiddenResponse({ description: 'CentralScopeRequired' })
   @ApiConflictResponse({ description: 'Not open, or ItemInOpenDraft' })
   release(
     @Param('kind') kind: string,
