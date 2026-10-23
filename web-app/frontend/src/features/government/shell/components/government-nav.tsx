@@ -64,8 +64,9 @@ export function GovernmentNav({
 
   return (
     <>
-      {/* Desktop: fixed-width rail */}
-      <aside className="hidden w-62.5 shrink-0 flex-col border-r border-whisper bg-white md:flex">
+      {/* Desktop: fixed-width rail, one viewport tall and sticky, so the locale switcher and sign-out
+          stay on screen however long the page is. */}
+      <aside className="hidden w-62.5 shrink-0 flex-col border-r border-whisper bg-white md:sticky md:top-0 md:flex md:h-dvh md:self-start">
         <div className="border-b border-whisper p-6">
           <Link href={`/${lang}`} className="flex items-center gap-3 rounded-lg">
             <span className="rounded-lg border border-hairline bg-zinc-50 p-2">
@@ -78,7 +79,7 @@ export function GovernmentNav({
           </Link>
         </div>
 
-        <nav aria-label={t.ariaLabel} className="flex-1 space-y-1 p-4">
+        <nav aria-label={t.ariaLabel} className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
           <h2 className="mb-2 px-3 text-xs font-medium tracking-wider text-steel uppercase">
             {t.operations}
           </h2>
