@@ -43,8 +43,9 @@ dotenv.config({ path: path.join(REPO_ROOT, '.env') });
 
 const DEFAULT_ORG_NAME = 'So Tai nguyen va Moi truong TP.HCM';
 const ROOT_NAME = 'Demo Government Root CA';
+// Decree 68/2024/NĐ-CP: a CA certificate lasts at most 20 years, a new subscriber's 5.
 const ROOT_VALIDITY_DAYS = 7300;
-const ISSUER_VALIDITY_DAYS = 3650;
+const ISSUER_VALIDITY_DAYS = 1825;
 
 function openssl(args: string[]): void {
   execFileSync('openssl', args, { stdio: ['ignore', 'ignore', 'inherit'] });
