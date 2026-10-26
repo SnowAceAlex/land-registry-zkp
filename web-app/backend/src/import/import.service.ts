@@ -5,7 +5,13 @@ import { MAX_PROPERTY_ID, TenureType, toUnixTimestamp } from '@land-registry/blo
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ImportRow } from './csv-row';
-import { ImportResult, ImportRowError, ImportRowWarning } from './dto/import.response.dto';
+import {
+  ImportOfficeCount,
+  ImportResult,
+  ImportRowCode,
+  ImportRowError,
+  ImportRowWarning,
+} from './dto/import.response.dto';
 import {
   LandUserType,
   TenureContext,
@@ -20,6 +26,7 @@ import {
   AdministrativeUnitsService,
   assertIssuingAuthority,
 } from '../land-law/administrative-units.service';
+import { LineageService } from '../lineage/lineage.service';
 import { encumbranceStatusName, tenureTypeName, useTypeName } from '../records/record.mapper';
 
 /**
@@ -38,11 +45,29 @@ const TERM_TOLERANCE_DAYS = 366;
 
 const CERTIFICATE_SERIAL_PATTERN = /^[A-ZĐ]{2}\s?\d{6}$/i;
 
+/** A row failing a named rule; `code` lets the portal tell the rules apart (D90). */
+class RowRuleError extends Error {
+  constructor(
+    readonly code: ImportRowCode,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+interface ParsedRow {
+  lineNumber: number;
+  input: Prisma.PropertyCreateManyInput;
+  officeCode: string | null;
+  supersedes: string[];
+}
+
 @Injectable()
 export class ImportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly administrativeUnits: AdministrativeUnitsService,
+    private readonly lineage: LineageService,
   ) {}
 
   /**
@@ -72,17 +97,17 @@ export class ImportService {
 
     const errors: ImportRowError[] = [];
     const warnings: ImportRowWarning[] = [];
-    const creates: Prisma.PropertyCreateManyInput[] = [];
+    const rows: ParsedRow[] = [];
     const seen = new Set<string>();
 
     const addresses = await this.administrativeUnits.createValidator();
 
     parsed.data.forEach((row, index) => {
       // +2: one for the header line, one for 1-based line numbers, so the
-      // number in the error matches what the operator s  ees in their editor.
+      // number in the error matches what the operator sees in their editor.
       const lineNumber = index + 2;
       try {
-        const { input, rowWarnings } = this.toCreateInput(row, addresses);
+        const { input, rowWarnings, supersedes } = this.toCreateInput(row, addresses);
         if (seen.has(input.propertyId)) {
           errors.push({
             row: lineNumber,
@@ -92,7 +117,9 @@ export class ImportService {
           return;
         }
         seen.add(input.propertyId);
-        creates.push(input);
+        const office = addresses.officeFor(input.address);
+        input.landOfficeId = office?.id ?? null;
+        rows.push({ lineNumber, input, officeCode: office?.code ?? null, supersedes });
         for (const message of rowWarnings) {
           warnings.push({ row: lineNumber, propertyId: input.propertyId, message });
         }
@@ -101,44 +128,130 @@ export class ImportService {
           row: lineNumber,
           propertyId: row.propertyId,
           message: (error as Error).message,
+          ...(error instanceof RowRuleError && { code: error.code }),
         });
       }
     });
 
+    const accepted = await this.checkSupersession(rows, errors, warnings);
+    errors.sort((a, b) => a.row - b.row);
+    warnings.sort((a, b) => a.row - b.row);
+
     const catalogEmpty = addresses.catalogEmpty;
 
+    // Same arithmetic skipDuplicates applies below, so a dry run predicts the
+    // commit rather than approximating it, and only new rows get lineage edges.
+    const existing = new Set(
+      (
+        await this.prisma.property.findMany({
+          where: { propertyId: { in: accepted.map((entry) => entry.input.propertyId) } },
+          select: { propertyId: true },
+        })
+      ).map((property) => property.propertyId),
+    );
+    const fresh = accepted.filter((entry) => !existing.has(entry.input.propertyId));
+    const byOffice = countByOffice(fresh);
+
     if (dryRun) {
-      // Same arithmetic skipDuplicates applies below, so the preview predicts
-      // the commit rather than approximating it.
-      const existing = await this.prisma.property.findMany({
-        where: { propertyId: { in: creates.map((input) => input.propertyId) } },
-        select: { propertyId: true },
-      });
       return {
         dryRun,
-        imported: creates.length - existing.length,
-        skipped: existing.length,
+        imported: fresh.length,
+        skipped: existing.size,
         errors,
         warnings,
         catalogEmpty,
+        byOffice,
       };
     }
 
-    // skipDuplicates keeps a re-run of the same file from failing wholesale on
-    // records already in the registry.
-    const { count } = await this.prisma.property.createMany({
-      data: creates,
-      skipDuplicates: true,
-    });
+    // skipDuplicates keeps a row that appeared since the check above from
+    // failing the whole write. D90: plots and their supersession edges commit
+    // together or not at all.
+    const edges = fresh.flatMap((entry) =>
+      entry.supersedes.map((predecessor) => ({
+        predecessorPropertyId: predecessor,
+        successorPropertyId: entry.input.propertyId,
+      })),
+    );
+    const [{ count }] = await this.prisma.$transaction([
+      this.prisma.property.createMany({
+        data: fresh.map((entry) => entry.input),
+        skipDuplicates: true,
+      }),
+      this.lineage.edgesStatement(edges),
+    ]);
 
     return {
       dryRun,
       imported: count,
-      skipped: creates.length - count,
+      skipped: accepted.length - count,
       errors,
       warnings,
       catalogEmpty,
+      byOffice,
     };
+  }
+
+  /** D90: drops rows whose predecessors fail the lineage rules; returns the rest. */
+  private async checkSupersession(
+    rows: ParsedRow[],
+    errors: ImportRowError[],
+    warnings: ImportRowWarning[],
+  ): Promise<ParsedRow[]> {
+    const referenced = [...new Set(rows.flatMap((entry) => entry.supersedes))];
+    if (referenced.length === 0) return rows;
+
+    const found = new Map(
+      (
+        await this.prisma.property.findMany({
+          where: { propertyId: { in: referenced } },
+          select: { propertyId: true, status: true },
+        })
+      ).map((property) => [property.propertyId, property.status]),
+    );
+    const successors = await this.lineage.successorsOf(referenced);
+
+    return rows.filter((entry) => {
+      const propertyId = entry.input.propertyId;
+      const failures: { code: ImportRowCode; message: string; predecessorPropertyId: string }[] = [];
+      for (const predecessor of entry.supersedes) {
+        const status = found.get(predecessor);
+        if (status === undefined) {
+          failures.push({
+            code: 'PredecessorNotFound',
+            predecessorPropertyId: predecessor,
+            message: `supersedesPropertyIds: plot ${predecessor} is not in the registry`,
+          });
+        } else if (status === 'IMPORTED') {
+          failures.push({
+            code: 'PredecessorNeverIssued',
+            predecessorPropertyId: predecessor,
+            message: `supersedesPropertyIds: plot ${predecessor} was never issued, so there is no certificate to replace`,
+          });
+        }
+      }
+      if (failures.length > 0) {
+        for (const failure of failures) {
+          errors.push({ row: entry.lineNumber, propertyId, ...failure });
+        }
+        return false;
+      }
+
+      for (const predecessor of entry.supersedes) {
+        // The edge this same row wrote on an earlier run is not news.
+        const others = (successors.get(predecessor) ?? []).filter((id) => id !== propertyId);
+        if (others.length > 0) {
+          warnings.push({
+            row: entry.lineNumber,
+            propertyId,
+            code: 'PredecessorAlreadySucceeded',
+            predecessorPropertyId: predecessor,
+            message: `plot ${predecessor} already has a successor (${others.join(', ')}); this row is recorded as another`,
+          });
+        }
+      }
+      return true;
+    });
   }
 
   private toCreateInput(
@@ -147,6 +260,7 @@ export class ImportService {
   ): {
     input: Prisma.PropertyCreateManyInput;
     rowWarnings: string[];
+    supersedes: string[];
   } {
     const rowWarnings: string[] = [];
 
@@ -230,6 +344,7 @@ export class ImportService {
         issueDate,
       },
       rowWarnings,
+      supersedes: parseSupersedes(row.supersedesPropertyIds, propertyId),
     };
   }
 
@@ -320,6 +435,42 @@ export class ImportService {
       }
     }
   }
+}
+
+/** Splits the `1001;1002` column; every id must be a valid tree slot other than the row's own. */
+function parseSupersedes(value: string | undefined, ownId: string): string[] {
+  const ids = [
+    ...new Set(
+      (value ?? '')
+        .split(';')
+        .map((part) => part.trim())
+        .filter(Boolean),
+    ),
+  ];
+  for (const id of ids) {
+    if (!/^\d+$/.test(id) || BigInt(id) > MAX_PROPERTY_ID) {
+      throw new RowRuleError(
+        'InvalidSupersedes',
+        `supersedesPropertyIds: '${id}' is not a valid propertyId (0 to ${MAX_PROPERTY_ID})`,
+      );
+    }
+  }
+  if (ids.includes(ownId)) {
+    throw new RowRuleError('SelfSupersession', `plot ${ownId} cannot supersede itself`);
+  }
+  return ids;
+}
+
+/** Rows per office code, ordered by code with the unresolved (null) group last. */
+function countByOffice(rows: ParsedRow[]): ImportOfficeCount[] {
+  const counts = new Map<string | null, number>();
+  for (const { officeCode } of rows) counts.set(officeCode, (counts.get(officeCode) ?? 0) + 1);
+  const named = [...counts]
+    .filter(([officeCode]) => officeCode !== null)
+    .map(([officeCode, count]) => ({ officeCode, count }))
+    .sort((a, b) => (a.officeCode! < b.officeCode! ? -1 : 1));
+  const unresolved = counts.get(null);
+  return unresolved === undefined ? named : [...named, { officeCode: null, count: unresolved }];
 }
 
 function requireField(row: ImportRow, field: keyof ImportRow): string {

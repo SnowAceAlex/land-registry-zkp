@@ -1,6 +1,6 @@
 // Prisma schema — synced with CODING_ROADMAP.md D19 (leaf schema) + D3 (off-chain
 // metadata) + Phase 5 additions (MerkleRoot, TransferRequest) + Phase 7 UC-flow
-// realignment (D42-D48: IssuanceBatch, ChangeSet, Revocation, PropertyEvent;
+// realignment (D42-D48: ChangeSet, Revocation, PropertyEvent;
 // IssuedBundle dropped — see docs/superpowers/specs/2026-09-07-uc-flow-realignment-design.md).
 //
 // Connection URL lives in prisma.config.ts (Prisma 7 pattern), NOT here.
@@ -73,7 +73,7 @@ enum PropertyStatus {
   REVOKED
 }
 
-/// Shared lifecycle of both draft types (D43).
+/// Lifecycle of a ChangeSet draft (D43): DRAFT → PUBLISHED or DISCARDED.
 enum DraftStatus {
   DRAFT
   PUBLISHED
@@ -154,8 +154,9 @@ model Property {
   /// Lifecycle state. The tree contains exactly the ISSUED rows.
   status PropertyStatus @default(IMPORTED)
 
-  issuanceBatchId Int?
-  issuanceBatch   IssuanceBatch? @relation(fields: [issuanceBatchId], references: [id])
+  /// Land office whose area this plot lies in (D85); null until assigned
+  landOfficeId Int?
+  landOffice   LandOffice? @relation(fields: [landOfficeId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -164,6 +165,7 @@ model Property {
   /// it. Without this index that filter is a sequential scan over the whole
   /// cadastre.
   @@index([status])
+  @@index([landOfficeId, status])
   @@map("properties")
 }
 
@@ -196,9 +198,56 @@ model AdministrativeUnit {
   code      String?
   createdAt DateTime               @default(now())
 
+  /// Land office responsible for this commune (D85)
+  landOfficeId Int?
+  landOffice   LandOffice? @relation(fields: [landOfficeId], references: [id])
+
   @@unique([name, province])
   @@index([province])
+  @@index([landOfficeId])
   @@map("administrative_units")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LandOffice — the offices that operate the registry (D85)
+// ─────────────────────────────────────────────────────────────────────────────
+// The office-stamp columns on the procedure tables (officeId, approvedByOfficeId,
+// createdByOfficeId, confirmedByOfficeId, firstDownloadedByOfficeId and landOfficeId
+// on TransferRequest/Revocation/IssuanceRequest) are plain Int audit stamps with
+// no Prisma relation: each relation would need its own named back-relation here.
+
+enum LandOfficeKind {
+  HEAD_OFFICE
+  SITE
+  BRANCH
+}
+
+model LandOffice {
+  id          Int                  @id @default(autoincrement())
+  /// HQ | CS2 | CS3 | CN01…CN38
+  code        String               @unique
+  name        String
+  kind        LandOfficeKind
+  units       AdministrativeUnit[]
+  properties  Property[]
+  credentials OfficeCredential[]
+  archives    ChangeSetArchive[]
+  createdAt   DateTime             @default(now())
+
+  @@map("land_offices")
+}
+
+model OfficeCredential {
+  id        Int        @id @default(autoincrement())
+  officeId  Int
+  office    LandOffice @relation(fields: [officeId], references: [id])
+  /// sha256(key), hex
+  keyHash   String     @unique
+  createdAt DateTime   @default(now())
+  revokedAt DateTime?
+
+  @@index([officeId])
+  @@map("office_credentials")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -243,41 +292,7 @@ model MerkleNode {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IssuanceBatch — one issuance round, two-phase (D43/D44)
-// ─────────────────────────────────────────────────────────────────────────────
-// A DRAFT holds everything needed to finish the round — including the generated
-// owner secrets — and deliberately touches no Property row. That is what keeps
-// the safety invariant: an abandoned draft can never leave a property holding a
-// commitment whose secret is gone.
-
-model IssuanceBatch {
-  id     Int         @id @default(autoincrement())
-  status DraftStatus @default(DRAFT)
-
-  /// Projected root, decimal string — what the officer is asked to sign
-  newRoot     String
-  /// Filled at confirm time, read from the chain
-  rootVersion Int?
-  txHash      String?
-
-  /// { propertyId: ownerSecret } as decimal strings. Cleared on confirm/discard.
-  draftSecrets Json?
-
-  /// The complete batch archive, built at confirm time
-  archiveZip       Bytes?
-  /// TTL — after this the secrets are unrecoverable and the plot must be re-issued
-  archiveExpiresAt DateTime?
-
-  properties  Property[]
-  createdAt   DateTime   @default(now())
-  publishedAt DateTime?
-
-  @@index([status])
-  @@map("issuance_batches")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ChangeSet — one publishing round of approved transfers + revocations (D44)
+// ChangeSet — one registration round: issuances + transfers + revocations (D84)
 // ─────────────────────────────────────────────────────────────────────────────
 
 model ChangeSet {
@@ -288,19 +303,80 @@ model ChangeSet {
   rootVersion Int?
   txHash      String?
 
-  /// The buyers' bundles, built at confirm time (D77); null for a revocation-only round
-  archiveZip       Bytes?
-  /// TTL — after this the buyers' secrets are unrecoverable
-  archiveExpiresAt DateTime?
-
   transfers   TransferRequest[]
   revocations Revocation[]
+  issuances   IssuanceRequest[]
+  archives    ChangeSetArchive[]
+
+  /// Offices that drafted / confirmed the round (plain stamps, no relation)
+  createdByOfficeId   Int?
+  confirmedByOfficeId Int?
 
   createdAt   DateTime  @default(now())
   publishedAt DateTime?
 
   @@index([status])
   @@map("change_sets")
+}
+
+/// One archive per (change set, office): each office downloads only its own plots' bundles (D88).
+model ChangeSetArchive {
+  id                        Int        @id @default(autoincrement())
+  changeSetId               Int
+  changeSet                 ChangeSet  @relation(fields: [changeSetId], references: [id])
+  officeId                  Int
+  office                    LandOffice @relation(fields: [officeId], references: [id])
+  /// null once expired and purged
+  zip                       Bytes?
+  propertyCount             Int
+  expiresAt                 DateTime
+  firstDownloadedAt         DateTime?
+  firstDownloadedByOfficeId Int?
+
+  @@unique([changeSetId, officeId])
+  @@index([officeId])
+  @@map("change_set_archives")
+}
+
+enum IssuanceRequestStatus {
+  READY
+  PUBLISHED
+  WITHDRAWN
+}
+
+/// A pending issuance: the owner secret is held until the change set archive is written (D87).
+model IssuanceRequest {
+  id              Int                   @id @default(autoincrement())
+  propertyId      String
+  ownerSecret     String?
+  ownerCommitment String
+  status          IssuanceRequestStatus @default(READY)
+  /// office that acted (always central for issuance)
+  officeId        Int
+  /// copy of Property.landOfficeId at creation
+  landOfficeId    Int?
+  heldAt          DateTime?
+  heldReason      String?
+  changeSetId     Int?
+  changeSet       ChangeSet?            @relation(fields: [changeSetId], references: [id])
+  createdAt       DateTime              @default(now())
+  publishedAt     DateTime?
+
+  @@index([status])
+  @@index([propertyId])
+  @@index([landOfficeId, status])
+  @@map("issuance_requests")
+}
+
+/// successor replaces predecessor (D90). Written at import only.
+model PropertyLineage {
+  predecessorPropertyId String
+  successorPropertyId   String
+  createdAt             DateTime @default(now())
+
+  @@id([predecessorPropertyId, successorPropertyId])
+  @@index([successorPropertyId])
+  @@map("property_lineage")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -322,11 +398,19 @@ model Revocation {
   changeSetId Int?
   changeSet   ChangeSet?       @relation(fields: [changeSetId], references: [id])
 
+  /// Office that filed it / office owning the plot's area (plain stamps, no relation)
+  officeId     Int
+  landOfficeId Int?
+  /// Set while an officer holds it out of the next change set
+  heldAt       DateTime?
+  heldReason   String?
+
   createdAt   DateTime  @default(now())
   publishedAt DateTime?
 
   @@index([status])
   @@index([propertyId])
+  @@index([landOfficeId, status])
   @@map("revocations")
 }
 
@@ -390,5 +474,15 @@ model TransferRequest {
   changeSetId Int?
   changeSet   ChangeSet? @relation(fields: [changeSetId], references: [id])
 
+  /// Office that filed it / office that approved it / office owning the plot's
+  /// area (plain stamps, no relation)
+  officeId           Int
+  approvedByOfficeId Int?
+  landOfficeId       Int?
+  /// Set while an officer holds it out of the next change set
+  heldAt             DateTime?
+  heldReason         String?
+
+  @@index([landOfficeId, status])
   @@map("transfer_requests")
 }

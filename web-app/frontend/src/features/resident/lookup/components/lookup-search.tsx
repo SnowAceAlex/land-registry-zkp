@@ -6,13 +6,15 @@
  * Split out so `lookup-view.tsx` stays a Server Component (its TODO asked for
  * exactly this). No wallet and no key: both routes are public (D39/D48/D50).
  *
- * The record and the history are fetched together. Either alone is misleading —
- * a history with no current status does not say whether the plot is revoked
- * *now*, and a status with no history does not say how it got there.
+ * The record and the lineage are fetched together. Either alone is misleading —
+ * a history with no current status does not say whether the certificate is
+ * revoked *now*, and a status with no history does not say how it got there.
+ * The lineage spans every certificate of the land (D90), so a re-issued
+ * certificate does not look clean.
  */
 
 import { History, LoaderCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { Dictionary } from '@/i18n/dictionaries';
 // Not from the shared barrel: that re-exports merkleTree.ts, whose top-level
@@ -24,10 +26,12 @@ import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { buttonStyles } from '@/components/ui/button';
 import { ApiError } from '@/lib/api-client';
+import { format } from '@/i18n/format';
 
-import { type PropertyHistory, type RecordPublic, getPropertyHistory, getPublicRecord } from '../api';
+import { type RecordPublic, getLineage, getPublicRecord } from '../api';
 import { isRevoked } from '../lib/event-summary';
-import { PropertyTimeline } from './property-timeline';
+import { type LandTimelineSection, buildLandTimeline } from '../lib/land-timeline';
+import { LandTimeline } from './land-timeline';
 import { RecordSummary } from './record-summary';
 import { residentFailure } from '../../shell/resident-error';
 
@@ -36,7 +40,12 @@ type Strings = Dictionary['residentLookup'];
 type State =
   | { status: 'idle' }
   | { status: 'searching' }
-  | { status: 'found'; record: RecordPublic; history: PropertyHistory }
+  | {
+      status: 'found';
+      record: RecordPublic;
+      sections: LandTimelineSection[];
+      truncated: boolean;
+    }
   | { status: 'not-found' }
   | { status: 'failed'; title: string; detail?: string };
 
@@ -64,24 +73,32 @@ export function LookupSearch({
 
   const malformed = value.trim() !== '' && invalidId(value);
 
-  async function search(event: React.FormEvent) {
-    event.preventDefault();
-    const propertyId = value.trim();
+  // Only the latest search may write state: a slow answer must not replace a newer one.
+  const latest = useRef(0);
 
-    if (propertyId === '' || invalidId(propertyId)) {
-      setShowInvalid(true);
-      return;
-    }
+  // The clicked id button disappears with the old results; put focus on the new ones.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (state.status === 'found') headingRef.current?.focus();
+  }, [state]);
+
+  const maxId = new Intl.NumberFormat(lang === 'vi' ? 'vi-VN' : 'en-US').format(MAX_PROPERTY_ID);
+
+  async function lookUp(propertyId: string) {
+    const ticket = ++latest.current;
     setShowInvalid(false);
     setState({ status: 'searching' });
 
     try {
-      const [record, history] = await Promise.all([
+      const [record, lineage] = await Promise.all([
         getPublicRecord(propertyId),
-        getPropertyHistory(propertyId),
+        getLineage(propertyId),
       ]);
-      setState({ status: 'found', record, history });
+      if (ticket !== latest.current) return;
+      const { sections, truncated } = buildLandTimeline(lineage);
+      setState({ status: 'found', record, sections, truncated });
     } catch (error) {
+      if (ticket !== latest.current) return;
       // 404 is an answer, not a failure: the plot does not exist.
       if (error instanceof ApiError && error.status === 404) {
         setState({ status: 'not-found' });
@@ -89,6 +106,23 @@ export function LookupSearch({
       }
       setState({ status: 'failed', ...residentFailure(error, errors) });
     }
+  }
+
+  function search(event: React.FormEvent) {
+    event.preventDefault();
+    const propertyId = value.trim();
+
+    if (propertyId === '' || invalidId(propertyId)) {
+      setShowInvalid(true);
+      return;
+    }
+    void lookUp(propertyId);
+  }
+
+  // A certificate id clicked in the timeline: same search, input kept in step.
+  function select(propertyId: string) {
+    setValue(propertyId);
+    void lookUp(propertyId);
   }
 
   return (
@@ -134,13 +168,13 @@ export function LookupSearch({
 
         {showInvalid || malformed ? (
           <p id="property-id-error" role="alert" className="text-xs text-red-700">
-            {t.invalidId}
+            {format(t.invalidId, { max: maxId })}
           </p>
         ) : null}
       </form>
 
       {state.status === 'idle' ? (
-        <EmptyState icon={History} title={t.emptyTitle} description={t.emptyBody} />
+        <EmptyState icon={History} title={t.emptyTitle} description={format(t.emptyBody, { max: maxId })} />
       ) : null}
 
       {state.status === 'searching' ? (
@@ -166,18 +200,21 @@ export function LookupSearch({
         <div className="space-y-8">
           {/* Stated up front, not left for the reader to infer from the
               timeline: a revoked plot cannot be proven at all. */}
-          {isRevoked(state.history) || state.record.status === 'REVOKED' ? (
+          {isRevoked(state.sections.find((section) => section.isQueried)?.events ?? []) ||
+          state.record.status === 'REVOKED' ? (
             <Notice tone="danger" title={t.revokedBannerTitle}>
               {t.revokedBannerBody}
             </Notice>
           ) : null}
 
-          <RecordSummary record={state.record} t={t} />
-          <PropertyTimeline
-            events={state.history.events}
+          <RecordSummary record={state.record} t={t} headingRef={headingRef} />
+          <LandTimeline
+            sections={state.sections}
+            truncated={state.truncated}
             lang={lang}
             t={t}
             revocation={revocation}
+            onSelect={select}
           />
         </div>
       ) : null}

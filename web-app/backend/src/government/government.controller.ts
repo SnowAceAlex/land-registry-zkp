@@ -13,11 +13,13 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { IssuanceRequestStatus } from '@prisma/client';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBody,
   ApiConflictResponse,
   ApiConsumes,
+  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
@@ -29,22 +31,41 @@ import { Response } from 'express';
 import { SkipThrottle } from '@nestjs/throttler';
 
 import { ApiKeyGuard, GOV_API_KEY_HEADER, GOV_API_KEY_SECURITY } from '../common/api-key.guard';
+import { Actor } from '../common/actor';
+import { CentralOnly } from '../common/central-only.guard';
+import { CurrentActor } from '../common/current-actor.decorator';
 import { parsePageQuery } from '../common/pagination';
 import { ChangeSetService } from './changeset.service';
 import { GovernmentService, parsePropertyStatus } from './government.service';
 import { ImportService } from '../import/import.service';
 import { ImportResult } from '../import/dto/import.response.dto';
-import { IssuanceBatchService } from '../issuance/issuance-batch.service';
+import {
+  CreateIssuanceRequestsDto,
+  IssuanceRequestDto,
+} from '../issuance/dto/issuance-request.dto';
+import { IssuanceRequestService } from '../issuance/issuance-request.service';
+import { ArchiveSummaryDto } from './dto/archive.response.dto';
 import { ConfirmDraftDto } from './dto/confirm-draft.dto';
-import { CreateIssuanceDraftDto } from './dto/issue-batch.dto';
 import { CreateRevocationDto } from './dto/revocation.dto';
 import {
   PropertyListResponseDto,
   PropertyDetailDto,
   RegistryStatusResponseDto,
+  MeResponseDto,
 } from './dto/government.response.dto';
 import { OpenDraftService } from './open-draft.service';
 import { RevocationService } from './revocation.service';
+import { RoundArchiveService } from './round-archive.service';
+
+const ISSUANCE_REQUEST_STATUSES = ['READY', 'PUBLISHED', 'WITHDRAWN'] as const;
+
+function parseIssuanceRequestStatus(raw?: string): IssuanceRequestStatus | undefined {
+  if (raw === undefined || raw === '') return undefined;
+  if (!(ISSUANCE_REQUEST_STATUSES as readonly string[]).includes(raw)) {
+    throw new BadRequestException(`status must be one of ${ISSUANCE_REQUEST_STATUSES.join(', ')}`);
+  }
+  return raw as IssuanceRequestStatus;
+}
 
 @ApiTags('Government')
 @ApiSecurity(GOV_API_KEY_SECURITY)
@@ -59,11 +80,25 @@ export class GovernmentController {
   constructor(
     private readonly government: GovernmentService,
     private readonly importService: ImportService,
-    private readonly issuanceBatches: IssuanceBatchService,
+    private readonly issuanceRequests: IssuanceRequestService,
     private readonly revocations: RevocationService,
     private readonly changeSets: ChangeSetService,
     private readonly openDrafts: OpenDraftService,
+    private readonly roundArchives: RoundArchiveService,
   ) {}
+
+  @Get('me')
+  @ApiOperation({
+    summary: 'Which office the supplied API key belongs to',
+    description: 'D86: the portal reads `scope` to decide which actions to show.',
+  })
+  @ApiOkResponse({ type: MeResponseDto })
+  me(@CurrentActor() actor: Actor): MeResponseDto {
+    return {
+      office: { code: actor.officeCode, name: actor.officeName, kind: actor.officeKind },
+      scope: actor.scope,
+    };
+  }
 
   @Get('status')
   @ApiOperation({
@@ -111,13 +146,16 @@ export class GovernmentController {
 
   //CSV Import
   @Post('import')
+  @CentralOnly()
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({
-    summary: 'Bulk import land records from CSV',
+    summary: 'Bulk import land records from CSV (central office only)',
     description:
       'Columns: propertyId, landUseCode, certificateSerial, bookEntryNumber, address, area, ' +
       'issuingAuthority, issueDate (DD/MM/YYYY), expiryDate (DD/MM/YYYY, omit for perpetual ' +
-      'tenure), encumbranceStatus. `useType` and `tenureType` are derived server-side from ' +
+      'tenure), encumbranceStatus, and optionally supersedesPropertyIds (`1001;1002`: the ' +
+      'issued certificates this one replaces — D90; the land office is derived from the ' +
+      'address commune, D85). `useType` and `tenureType` are derived server-side from ' +
       '`landUseCode` (D2) rather than read from the file, so a typo cannot reach a leaf hash. ' +
       'Bad rows are reported individually and the rest still import. ' +
       'Send `?dryRun=true` first to see the per-row verdict without writing anything (D52) — ' +
@@ -152,7 +190,7 @@ export class GovernmentController {
   @ApiOperation({
     summary: 'The draft currently waiting to be signed, if any (D53)',
     description:
-      'At most one draft exists across issuance batches and change sets (D44). Returns ' +
+      'At most one change-set draft exists (D44). Returns ' +
       '`{ draft: null }` when none is open; otherwise the same shape its create call returned — ' +
       'for a change set that includes the revocationCalldata to sign. This is how a portal ' +
       'resumes after losing the create response: compare `newRoot` with the on-chain ' +
@@ -162,66 +200,31 @@ export class GovernmentController {
     return this.openDrafts.current();
   }
 
-  // Issuance draft — two-phase flow (D43), Metamask signs instead of the backend
-  @Get('issuance-batches')
+  @Post('issuance-requests')
+  @CentralOnly()
   @ApiOperation({
-    summary: 'List issuance rounds, newest first',
+    summary: 'Queue plots for issuance (central office only)',
     description:
-      'Summary columns only — never draftSecrets (secret material, D14) or archiveZip ' +
-      '(megabytes of ZIP, D42). Download the archive itself via GET issuance-batches/:id/archive.',
+      'D87: generates each owner secret now and keeps it on the request; the plot stays ' +
+      'IMPORTED until a change set confirms.',
   })
-  listIssuanceBatches() {
-    return this.issuanceBatches.list();
+  @ApiOkResponse({ type: [IssuanceRequestDto] })
+  @ApiConflictResponse({
+    description:
+      'A plot is not IMPORTED, is already queued, or supersedes a certificate that is not ' +
+      'REVOKED yet (reason PredecessorNotRevoked, D90)',
+  })
+  requestIssuance(@Body() dto: CreateIssuanceRequestsDto, @CurrentActor() actor: Actor) {
+    return this.issuanceRequests.request(dto.propertyIds, actor);
   }
 
-  @Post('issuance-batches')
-  @ApiOperation({
-    summary: 'Create an issuance draft (phase 1 of 2)',
-    description:
-      'Generates owner secrets, projects the new Merkle root, and stores everything as a ' +
-      'durable draft. No Property row is modified until confirm. Sign the returned newRoot ' +
-      'with Metamask, then call confirm.',
-  })
-  async createIssuanceDraft(@Body() dto: CreateIssuanceDraftDto) {
-    return this.issuanceBatches.createDraft(dto.propertyIds);
-  }
-
-  @Post('issuance-batches/:id/confirm')
-  @ApiOperation({
-    summary: 'Confirm an issuance draft (phase 2 of 2)',
-    description:
-      'Re-reads latestRoot from the chain and applies the draft only if it matches. The ' +
-      'request body carries no chain evidence on purpose — the optional txHash is a display ' +
-      'label only, never trusted as proof the publish happened.',
-  })
-  async confirmIssuanceDraft(@Param('id', ParseIntPipe) id: number, @Body() dto: ConfirmDraftDto) {
-    return this.issuanceBatches.confirm(id, dto.txHash);
-  }
-
-  @Delete('issuance-batches/:id')
-  @ApiOperation({ summary: 'Discard an unsigned issuance draft' })
-  async discardIssuanceDraft(@Param('id', ParseIntPipe) id: number) {
-    await this.issuanceBatches.discard(id);
-    return { discarded: id };
-  }
-
-  @Get('issuance-batches/:id/archive')
-  @ApiOperation({
-    summary: 'Download the whole batch as one ZIP, one folder per property',
-    description:
-      'Each folder holds receipt.json, secret.json, certificate.pdf and README.txt; a ' +
-      'manifest.json at the root ties the archive to a root version. Available until the ' +
-      "batch's archiveExpiresAt, after which the secrets are unrecoverable and affected " +
-      'plots must be re-issued.',
-  })
-  async downloadArchive(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    const { zip, filename } = await this.issuanceBatches.archiveFor(id);
-    res.set({
-      'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': String(zip.length),
-    });
-    res.end(zip);
+  @Get('issuance-requests')
+  @CentralOnly()
+  @ApiOperation({ summary: 'List issuance requests (central office only)' })
+  @ApiQuery({ name: 'status', required: false, enum: ['READY', 'PUBLISHED', 'WITHDRAWN'] })
+  @ApiOkResponse({ type: [IssuanceRequestDto] })
+  listIssuanceRequests(@CurrentActor() actor: Actor, @Query('status') status?: string) {
+    return this.issuanceRequests.list(parseIssuanceRequestStatus(status), actor);
   }
 
   @Post('revocations')
@@ -231,52 +234,64 @@ export class GovernmentController {
       'The plot already has a pending revocation, or an open transfer (one procedure per plot, ' +
       'D80). Once recorded, the owner gets no status attestation until it closes (D82)',
   })
-  async requestRevocation(@Body() dto: CreateRevocationDto) {
-    return this.revocations.request(dto);
+  async requestRevocation(@Body() dto: CreateRevocationDto, @CurrentActor() actor: Actor) {
+    return this.revocations.request(dto, actor);
   }
 
   @Get('pending-changes')
   @ApiOperation({
-    summary: 'Approved transfers and pending revocations waiting for the next change set',
+    summary:
+      'Issuance requests, approved transfers and pending revocations waiting for the next round',
+    description:
+      'Held items and items already in a draft are left out. A branch sees only its own area (D86).',
   })
-  pendingChanges() {
-    return this.changeSets.pending();
+  pendingChanges(@CurrentActor() actor: Actor) {
+    return this.changeSets.pending(actor);
   }
 
-  // Change-set draft — batches approved transfers + pending revocations into
-  // one root, two-phase flow (D44/D46), Metamask signs instead of the backend
+  // The publishing round (D84) — issuances, transfers and revocations under one root,
+  // two-phase flow (D43/D46), Metamask signs instead of the backend
   @Post('changesets')
+  @CentralOnly()
   @ApiOperation({
-    summary: 'Create a change-set draft (phase 1 of 2)',
+    summary: 'Create a change-set draft (phase 1 of 2, central office only)',
     description:
-      'Gathers every approved transfer and pending revocation, projects the single root that ' +
-      'applying all of them produces, and stores it as a durable draft. No Property, ' +
-      'TransferRequest or Revocation row is modified until confirm. Sign the returned newRoot ' +
-      '(and, when the round includes any revocations, the revocationCalldata for ' +
+      'Gathers every READY issuance request, approved transfer and pending revocation that is ' +
+      'not held, projects the single root that applying all of them produces, and stores it as ' +
+      'a durable draft. No Property or request row is modified until confirm. Sign the returned ' +
+      'newRoot (and, when the round includes any revocations, the revocationCalldata for ' +
       'publishRootWithRevocations) with Metamask, then call confirm.',
   })
   @ApiConflictResponse({
     description:
-      'Another draft is already open (D44), or the queue holds conflicting procedures for one plot',
+      'Another draft is already open (D44), the queue holds conflicting procedures for one plot, ' +
+      'or an issuance supersedes a certificate that is not REVOKED yet (reason ' +
+      'PredecessorNotRevoked, D90)',
   })
-  async createChangeSetDraft() {
-    return this.changeSets.createDraft();
+  async createChangeSetDraft(@CurrentActor() actor: Actor) {
+    return this.changeSets.createDraft(actor);
   }
 
   @Post('changesets/:id/confirm')
+  @CentralOnly()
   @ApiOperation({
-    summary: 'Confirm a change-set draft (phase 2 of 2)',
+    summary: 'Confirm a change-set draft (phase 2 of 2, central office only)',
     description:
       'Re-reads latestRoot from the chain and applies the draft only if it matches. The ' +
       'request body carries no chain evidence on purpose — the optional txHash is a display ' +
       'label only, never trusted as proof the publish happened.',
   })
-  async confirmChangeSetDraft(@Param('id', ParseIntPipe) id: number, @Body() dto: ConfirmDraftDto) {
-    return this.changeSets.confirm(id, dto.txHash);
+  async confirmChangeSetDraft(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ConfirmDraftDto,
+    @CurrentActor() actor: Actor,
+  ) {
+    return this.changeSets.confirm(id, dto.txHash, actor);
   }
 
   @Delete('changesets/:id')
-  @ApiOperation({ summary: 'Discard an unsigned change-set draft' })
+  @CentralOnly()
+  @ApiOperation({ summary: 'Discard an unsigned change-set draft (central office only)' })
   async discardChangeSetDraft(@Param('id', ParseIntPipe) id: number) {
     await this.changeSets.discard(id);
     return { discarded: id };
@@ -286,29 +301,58 @@ export class GovernmentController {
   @ApiOperation({
     summary: 'List change sets, newest first',
     description:
-      'Summary columns plus transfer/revocation counts — never archiveZip. Download the ' +
-      'buyers’ archive via GET changesets/:id/archive (D77).',
+      'Summary columns plus issuance/transfer/revocation counts and how many of the round’s ' +
+      'per-office archives exist and were downloaded — never archive bytes (D88).',
   })
   listChangeSets() {
     return this.changeSets.list();
   }
 
-  @Get('changesets/:id/archive')
+  @Get('changesets/:id/archives')
   @ApiOperation({
-    summary: 'Download the buyers’ bundles as one ZIP, one folder per transferred plot (D77)',
+    summary: 'The round’s archives, one per land office (D88)',
     description:
-      'Each folder holds receipt.json, secret.json, certificate.pdf and README.txt — the same ' +
-      'four files as an issuance folder; manifest.json ties the archive to a root version. ' +
-      "Available until the change set's archiveExpiresAt. A round with only revocations has " +
-      'no archive.',
+      'A branch sees only its own office’s archive; the central office sees all of them. ' +
+      'No zip bytes — download one via GET changesets/:id/archives/:officeCode.',
   })
-  async downloadChangeSetArchive(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    const { zip, filename } = await this.changeSets.archiveFor(id);
+  @ApiOkResponse({ type: [ArchiveSummaryDto] })
+  roundArchivesOf(@Param('id', ParseIntPipe) id: number, @CurrentActor() actor: Actor) {
+    return this.roundArchives.archivesOf(id, actor);
+  }
+
+  @Get('changesets/:id/archives/:officeCode')
+  @ApiOperation({
+    summary: 'Download one office’s bundles of the round as a ZIP, one folder per plot',
+    description:
+      'Each folder holds receipt.json, secret.json, certificate.pdf and README.txt; ' +
+      'manifest.json ties the archive to a root version and tags each plot issued or ' +
+      'transferred (D77, D84). A branch may download only its own office’s archive (403 ' +
+      'OutsideOfficeArea otherwise); the central office may download any. Available until ' +
+      'the archive’s expiresAt, then 410. The first successful download is stamped (D88).',
+  })
+  @ApiForbiddenResponse({ description: 'A branch asked for another office’s archive' })
+  async downloadRoundArchive(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('officeCode') officeCode: string,
+    @CurrentActor() actor: Actor,
+    @Res() res: Response,
+  ) {
+    const { zip, filename } = await this.roundArchives.archiveFor(id, officeCode, actor);
     res.set({
       'Content-Type': 'application/zip',
       'Content-Disposition': `attachment; filename="${filename}"`,
       'Content-Length': String(zip.length),
     });
     res.end(zip);
+  }
+
+  @Get('archives')
+  @ApiOperation({
+    summary: 'Every round’s archives, newest first (D88)',
+    description: 'A branch sees only its own office’s archives; the central office sees all.',
+  })
+  @ApiOkResponse({ type: [ArchiveSummaryDto] })
+  allArchives(@CurrentActor() actor: Actor) {
+    return this.roundArchives.archivesForActor(actor);
   }
 }

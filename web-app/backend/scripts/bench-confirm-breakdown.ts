@@ -92,14 +92,15 @@ async function main(): Promise<void> {
       propertyId: property.propertyId,
       certificateSerial: property.certificateSerial,
       leaf: leaves.get(property.propertyId)!.toString(),
+      kind: 'transferred',
       files: built.files,
     });
   }
 
   const zipStart = process.hrtime.bigint();
-  const zip = await archive.build({
-    kind: 'changeset',
-    batchId: 0,
+  const zip = await archive.buildRound({
+    roundId: 0,
+    officeCode: 'BENCH',
     rootVersion: 1,
     txHash: null,
     publishedAt: new Date(),

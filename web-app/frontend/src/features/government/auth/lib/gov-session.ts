@@ -44,7 +44,7 @@ export function clearGovKey(): void {
 }
 
 /**
- * Ask the backend whether a key is real. `GET /api/government/status` is behind
+ * Ask the backend whether a key is real. `GET /api/government/me` is behind
  * ApiKeyGuard, so a 200 proves the key, and a 401 disproves it. Anything else
  * is a transport problem and must not be reported to the officer as "wrong
  * key" - that sends them hunting for a credential that was fine all along.
@@ -54,7 +54,7 @@ export async function validateGovKey(
 ): Promise<{ ok: true } | { ok: false; reason: 'rejected' | 'unreachable'; detail?: string }> {
   let res: Response;
   try {
-    res = await fetch(`${BACKEND_URL}/api/government/status`, {
+    res = await fetch(`${BACKEND_URL}/api/government/me`, {
       headers: { [GOV_API_KEY_HEADER]: key },
       cache: 'no-store',
     });

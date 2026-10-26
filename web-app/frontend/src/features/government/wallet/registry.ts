@@ -29,8 +29,8 @@ export type PublishCall =
 
 /**
  * The transaction a draft is published with — same rule as transferSmoke.ts:
- * an issuance round is always `publishRoot`; a change set uses
- * `publishRootWithRevocations` only when it revokes something, since that is
+ * a round uses
+ * `publishRootWithRevocations` only when it revokes something, else plain `publishRoot`, since that is
  * the function that also writes the public `revocations` mapping (D45).
  *
  * Signing `publishRoot` for a round that has revocations would still let
@@ -39,7 +39,7 @@ export type PublishCall =
  */
 export function publishCallFor(draft: OpenDraft): PublishCall {
   const newRoot = rootToBytes32(draft.newRoot);
-  if (draft.kind === 'changeset' && draft.revocationIds.length > 0) {
+  if (draft.revocationIds.length > 0) {
     const { propertyIds, reasonCodes, detailHashes } = draft.revocationCalldata;
     return {
       functionName: 'publishRootWithRevocations',

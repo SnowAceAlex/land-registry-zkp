@@ -13,14 +13,32 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { govGet } from './gov-client';
-import type { OpenDraft, PendingChanges, RegistryStatus, TransferRequest } from './types';
+import type {
+  ArchiveSummary,
+  ChangeSetSummary,
+  Me,
+  OfficeRow,
+  OpenDraft,
+  Overview,
+  PendingChanges,
+  QueueFilter,
+  QueueList,
+  RegistryStatus,
+  TransferRequest,
+} from './types';
 
 export const govKeys = {
   status: ['gov', 'status'] as const,
   openDraft: ['gov', 'drafts', 'open'] as const,
   transfers: (status: string) => ['gov', 'transfers', status] as const,
   properties: (status: string, skip: number) => ['gov', 'properties', status, skip] as const,
-  issuanceBatches: ['gov', 'issuance-batches'] as const,
+  me: ['gov', 'me'] as const,
+  overview: ['gov', 'operations', 'overview'] as const,
+  offices: ['gov', 'operations', 'offices'] as const,
+  queueAll: ['gov', 'queue'] as const,
+  queue: (filter: QueueFilter) => ['gov', 'queue', filter] as const,
+  archives: ['gov', 'archives'] as const,
+  issuanceRequests: (status: string) => ['gov', 'issuance-requests', status] as const,
   pendingChanges: ['gov', 'pending-changes'] as const,
   changeSets: ['gov', 'changesets'] as const,
 };
@@ -65,4 +83,64 @@ export function usePendingChanges() {
     queryKey: govKeys.pendingChanges,
     queryFn: () => govGet<PendingChanges>('/government/pending-changes'),
   });
+}
+
+/** GET /government/me — the office behind the key and its scope (D86). */
+export function useMe() {
+  return useQuery({
+    queryKey: govKeys.me,
+    queryFn: () => govGet<Me>('/government/me'),
+    staleTime: Infinity,
+  });
+}
+
+/** GET /government/operations/overview — registry state, queue totals and coded alerts (D89). */
+export function useOverview() {
+  return useQuery({
+    queryKey: govKeys.overview,
+    queryFn: () => govGet<Overview>('/government/operations/overview'),
+    refetchInterval: 30_000,
+  });
+}
+
+/** GET /government/operations/offices — central only, so a branch passes `false`. */
+export function useOfficeRows(enabled: boolean) {
+  return useQuery({
+    queryKey: govKeys.offices,
+    queryFn: () => govGet<OfficeRow[]>('/government/operations/offices'),
+    enabled,
+  });
+}
+
+/** GET /government/queue — open items of the three procedures, oldest first (D87). */
+export function useQueue(filter: QueueFilter) {
+  return useQuery({
+    queryKey: govKeys.queue(filter),
+    queryFn: () => govGet<QueueList>(`/government/queue${queryString(filter)}`),
+  });
+}
+
+/** GET /government/changesets — every round, newest first, summary columns only (D77). */
+export function useChangeSets() {
+  return useQuery({
+    queryKey: govKeys.changeSets,
+    queryFn: () => govGet<ChangeSetSummary[]>('/government/changesets'),
+  });
+}
+
+/** GET /government/archives — every round's archives this office may see (D88). */
+export function useArchives() {
+  return useQuery({
+    queryKey: govKeys.archives,
+    queryFn: () => govGet<ArchiveSummary[]>('/government/archives'),
+  });
+}
+
+function queryString(filter: QueueFilter): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filter)) {
+    if (value !== undefined) params.set(key, String(value));
+  }
+  const text = params.toString();
+  return text ? `?${text}` : '';
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { PropertyEvent, PropertyEventKind, PropertyHistory } from '../api';
+import type { PropertyEvent, PropertyEventKind } from '../api';
 import { isRevoked, summariseEvent } from './event-summary';
 
 function event(kind: PropertyEventKind, overrides: Partial<PropertyEvent> = {}): PropertyEvent {
@@ -18,10 +18,7 @@ function event(kind: PropertyEventKind, overrides: Partial<PropertyEvent> = {}):
   };
 }
 
-const history = (kinds: PropertyEventKind[]): PropertyHistory => ({
-  propertyId: '1001',
-  events: kinds.map((kind) => event(kind)),
-});
+const history = (kinds: PropertyEventKind[]): PropertyEvent[] => kinds.map((kind) => event(kind));
 
 describe('summariseEvent (D48)', () => {
   it('sees an owner change on a transfer', () => {

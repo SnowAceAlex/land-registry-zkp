@@ -38,6 +38,12 @@ const API_TITLES: Record<ApiErrorCode, keyof ErrorStrings> = {
   'attestation-expired': 'attestationExpired',
   'invalid-attestation': 'invalidAttestation',
   'procedure-open': 'procedureOpen',
+  'outside-office-area': 'outsideOfficeArea',
+  'central-scope-required': 'centralScopeRequired',
+  'predecessor-not-revoked': 'predecessorNotRevoked',
+  'item-in-open-draft': 'itemInOpenDraft',
+  'queue-changed': 'queueChanged',
+  forbidden: 'forbidden',
   unreachable: 'unreachable',
   unknown: 'unknown',
 };

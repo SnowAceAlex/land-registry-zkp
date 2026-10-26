@@ -12,7 +12,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
  * `status` mirrors the on-chain `revocations` mapping, `rootVersion` is a
  * cache-freshness counter. The descriptive certificate fields (address, area,
  * certificate serial, …) and internal columns (id, createdAt, updatedAt,
- * issuedAt, issuanceBatchId) are deliberately absent — see
+ * issuedAt) are deliberately absent — see
  * `GET /api/government/properties/:propertyId` for the guarded full record.
  */
 export class RecordPublicDto {

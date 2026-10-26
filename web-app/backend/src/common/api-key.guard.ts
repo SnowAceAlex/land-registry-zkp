@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
-import { Request } from 'express';
-import { timingSafeEqual } from 'crypto';
+import { PrismaService } from '../prisma/prisma.service';
+import { ActorRequest } from './actor';
+import { resolveActor } from './actor-resolver';
 
 export const GOV_API_KEY_HEADER = 'x-gov-api-key';
 
@@ -17,9 +18,10 @@ export const GOV_API_KEY_SECURITY = 'gov-api-key';
 /**
  * ApiKeyGuard
  * ─────────────────────────────────────────────────────────────────────────────
- * Guards the state-authority endpoints with a static API key (D14 — the
- * authority is mocked for the PoC; a real deployment would use the officer's
- * institutional identity, noted in Limitations).
+ * Guards the state-authority endpoints with an API key (D14 — the authority is
+ * mocked for the PoC; a real deployment would use the officer's institutional
+ * identity, noted in Limitations). Since D86 the key resolves to an office
+ * actor: the env GOV_API_KEY is HQ, any other key is a per-office credential.
  *
  * This is what separates "anyone can compute a projected root" (public, no
  * judgement involved) from "someone approves a transfer and publishes it"
@@ -31,27 +33,18 @@ export const GOV_API_KEY_SECURITY = 'gov-api-key';
  */
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
-    const expected = process.env.GOV_API_KEY;
-    if (!expected) {
-      throw new UnauthorizedException(
-        'GOV_API_KEY is not configured on the server — government endpoints are disabled',
-      );
-    }
+  constructor(private readonly prisma: PrismaService) {}
 
-    const request = context.switchToHttp().getRequest<Request>();
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<ActorRequest>();
     const provided = request.header(GOV_API_KEY_HEADER);
-    if (!provided || !safeEqual(provided, expected)) {
+    const actor = provided
+      ? await resolveActor(this.prisma, provided, process.env.GOV_API_KEY)
+      : null;
+    if (!actor) {
       throw new UnauthorizedException(`Missing or invalid ${GOV_API_KEY_HEADER} header`);
     }
+    request.actor = actor;
     return true;
   }
-}
-
-/** Constant-time compare so a wrong key cannot be discovered byte by byte. */
-function safeEqual(a: string, b: string): boolean {
-  const left = Buffer.from(a);
-  const right = Buffer.from(b);
-  if (left.length !== right.length) return false;
-  return timingSafeEqual(left, right);
 }

@@ -1,5 +1,6 @@
 import { TransferRequest } from '@prisma/client';
 
+import { isFallback } from '../common/office-scope';
 import { TransferRequestDto } from './dto/transfer.response.dto';
 
 /**
@@ -10,7 +11,10 @@ import { TransferRequestDto } from './dto/transfer.response.dto';
  * lists the queue. Same lesson as D50: the shape is what leaks. Every field is
  * named here, and a new column stays private until someone adds it on purpose.
  */
-export function toTransferRequestDto(row: TransferRequest): TransferRequestDto {
+export function toTransferRequestDto(
+  row: TransferRequest,
+  offices: Map<number, string>,
+): TransferRequestDto {
   return {
     id: row.id,
     propertyId: row.propertyId,
@@ -23,5 +27,9 @@ export function toTransferRequestDto(row: TransferRequest): TransferRequestDto {
     changeSetId: row.changeSetId,
     createdAt: row.createdAt,
     decidedAt: row.decidedAt,
+    officeCode: offices.get(row.officeId) ?? null,
+    landOfficeCode: row.landOfficeId === null ? null : (offices.get(row.landOfficeId) ?? null),
+    byFallback: isFallback(row.officeId, row.landOfficeId),
+    held: row.heldAt !== null,
   };
 }

@@ -116,7 +116,7 @@ describe('RootRegistry — revocations (D45)', () => {
 
   /**
    * The cap the backend actually applies (D56, re-measured at D73). MUST match
-   * `MAX_REVOCATIONS_PER_CHANGESET` in
+   * `DEFAULT_REVOCATION_CAP` in
    * `web-app/backend/src/government/changeset.service.ts` — the two packages
    * cannot import each other, so this is a double-entry ledger:
    * `changeset.service.spec.ts` pins the value on the backend side, this test

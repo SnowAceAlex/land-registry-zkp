@@ -52,6 +52,8 @@ export interface ImportRow {
   encumbranceStatus?: string;
   /** true raises the project-lease cap from 50 to 70 years (Điều 172 khoản 1 điểm c) */
   isLongTermInvestmentProject?: string;
+  /** "1001;1002" — certificates this one replaces (D83/D90); each must be an issued plot */
+  supersedesPropertyIds?: string;
 }
 
 export const IMPORT_COLUMNS: (keyof ImportRow)[] = [
@@ -71,4 +73,5 @@ export const IMPORT_COLUMNS: (keyof ImportRow)[] = [
   'expiryDate',
   'encumbranceStatus',
   'isLongTermInvestmentProject',
+  'supersedesPropertyIds',
 ];

@@ -4,7 +4,7 @@
  * Every route here is officer-only (D47). The seller's secret never appears in
  * any request below. The buyer's does, by design (D77): the registry issues it
  * in the preview, exactly like an issuance round's secret, and it comes back
- * with the proof so the change set's archive can deliver it to the buyer.
+ * with the proof so the round's archive can deliver it to the buyer.
  */
 
 import type { Groth16Proof, PublicSignals } from '@land-registry/blockchain/shared';
@@ -12,6 +12,7 @@ import type { Groth16Proof, PublicSignals } from '@land-registry/blockchain/shar
 import { govGet, govPost } from '../api/gov-client';
 import type {
   PropertyDetail,
+  QueueItem,
   TransferPreview,
   TransferRequest,
   TransferStatus,
@@ -49,4 +50,9 @@ export function approveTransfer(id: number): Promise<{ id: number; status: Trans
 
 export function rejectTransfer(id: number, reason?: string): Promise<TransferRequest> {
   return govPost<TransferRequest>(`/transfers/${id}/reject`, reason ? { reason } : {});
+}
+
+/** POST /government/queue/transfer/:id/withdraw — central only, APPROVED only; unlocks the plot and discards the buyer's secret. */
+export function withdrawTransfer(id: number): Promise<QueueItem> {
+  return govPost<QueueItem>(`/government/queue/transfer/${id}/withdraw`);
 }

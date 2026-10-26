@@ -7,6 +7,7 @@ import { HistoryModule } from './history/history.module';
 import { ImportModule } from './import/import.module';
 import { IssuanceModule } from './issuance/issuance.module';
 import { LandLawModule } from './land-law/land-law.module';
+import { OperationsModule } from './operations/operations.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProofModule } from './proof/proof.module';
 import { PublicConfigModule } from './public-config/public-config.module';
@@ -75,6 +76,7 @@ const THROTTLE_LIMIT = Number(process.env.THROTTLE_LIMIT ?? 60);
     ProofModule,
     HistoryModule,
     PublicConfigModule,
+    OperationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

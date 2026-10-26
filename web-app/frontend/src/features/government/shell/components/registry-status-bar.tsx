@@ -6,7 +6,7 @@
  * The facts every operation depends on, visible on every government page:
  * which chain the registry is on (D54), the published root version, whether
  * the database agrees with the chain, and whether a draft is already waiting
- * (D44 — at most one, so it blocks the next publish wherever it was started).
+ * (D44 — at most one, so it blocks the next round).
  * The wallet button lives here too: signing is a portal-wide concern, not a
  * per-page one.
  */
@@ -21,37 +21,42 @@ import { format } from '@/i18n/format';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { useOpenDraft, useRegistryStatus } from '../../api/hooks';
+import { useMe, useOpenDraft, useRegistryStatus } from '../../api/hooks';
 
 export function RegistryStatusBar({ lang, t }: { lang: Locale; t: Dictionary['govShell'] }) {
   const status = useRegistryStatus();
   const openDraft = useOpenDraft();
+  const me = useMe();
   const pathname = usePathname();
 
-  const draft = openDraft.data;
-  const draftHref = draft
-    ? `/${lang}/government/${draft.kind === 'issuance' ? 'issuance' : 'changes'}`
-    : null;
+  // Only the central office signs rounds, so a branch is never pointed at a draft.
+  const draft = me.data?.scope === 'CENTRAL' ? openDraft.data : null;
+  const draftHref = draft ? `/${lang}/government/changes` : null;
   const onDraftPage = draftHref !== null && pathname.startsWith(draftHref);
 
   return (
     <div className="mb-8 space-y-3">
       <div className="flex flex-col gap-3 border-b border-whisper pb-4 sm:flex-row sm:items-center sm:justify-between">
-        {status.data ? (
+        {status.data || me.data ? (
           <ul
             aria-label={t.network}
             className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-steel"
           >
-            <li className="font-mono">
-              <span className="text-ink">{status.data.network}</span>{' '}
-              {format(t.chain, { chainId: status.data.chainId })}
-            </li>
-            <li className="font-mono">
-              {status.data.onChain.version > 0
-                ? format(t.rootVersion, { version: status.data.onChain.version })
-                : t.noRoot}
-            </li>
-            {status.data.inSync ? <li>{t.inSync}</li> : null}
+            {status.data ? (
+              <>
+                <li className="font-mono">
+                  <span className="text-ink">{status.data.network}</span>{' '}
+                  {format(t.chain, { chainId: status.data.chainId })}
+                </li>
+                <li className="font-mono">
+                  {status.data.onChain.version > 0
+                    ? format(t.rootVersion, { version: status.data.onChain.version })
+                    : t.noRoot}
+                </li>
+                {status.data.inSync ? <li>{t.inSync}</li> : null}
+              </>
+            ) : null}
+            {me.data ? <li>{format(t.office, { name: me.data.office.name })}</li> : null}
           </ul>
         ) : status.isPending ? (
           <Skeleton className="h-4 w-64" />
@@ -74,9 +79,7 @@ export function RegistryStatusBar({ lang, t }: { lang: Locale; t: Dictionary['go
       {draft && draftHref && !onDraftPage ? (
         <Notice
           tone="info"
-          title={format(draft.kind === 'issuance' ? t.draftOpenIssuance : t.draftOpenChangeset, {
-            id: draft.id,
-          })}
+          title={format(t.draftOpenChangeset, { id: draft.id })}
           action={
             <Link href={draftHref} className="text-sm font-medium text-authority underline underline-offset-4">
               {t.openDraft}

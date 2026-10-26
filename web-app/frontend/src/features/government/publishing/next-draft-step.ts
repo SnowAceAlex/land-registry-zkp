@@ -1,13 +1,13 @@
 /**
  * features/government/publishing/next-draft-step.ts
  * ─────────────────────────────────────────────────────────────────────────────
- * The one decision both publishing screens (UC-1 issuance, UC-4 change sets)
- * make on every render: what can the officer do with the draft right now?
+ * The one decision the closing session (D84) makes on every render: what can
+ * the officer do with the round's draft right now?
  *
  * It is a pure function of five facts so the resume path of D43/D53 is
  * testable without a browser, a wallet or a chain:
  *
- *   - the open draft (D44 allows one, across both kinds);
+ *   - the open draft (D44 allows one);
  *   - the chain's latestRoot — equal to the draft's root means the signature
  *     already landed (possibly in a tab that has since been closed), so only
  *     confirm() is left, and confirm needs no wallet: the backend reads the
@@ -16,12 +16,11 @@
  *     signing only.
  */
 
-import type { DraftKind, OpenDraft } from '../api/types';
+import type { OpenDraft } from '../api/types';
 
 export type DraftStep =
   | 'loading'
   | 'create'
-  | 'blockedByOtherDraft'
   | 'confirm'
   | 'connect'
   | 'wrongChain'
@@ -29,8 +28,6 @@ export type DraftStep =
   | 'sign';
 
 export interface DraftStepInput {
-  /** Which kind of draft this screen publishes. */
-  currentKind: DraftKind;
   /** `undefined` while loading; `null` when no draft is open. */
   openDraft: OpenDraft | null | undefined;
   /** Decimal latestRoot read from the chain; `undefined` while loading. */
@@ -47,7 +44,6 @@ export function nextDraftStep(input: DraftStepInput): DraftStep {
   const { openDraft } = input;
   if (openDraft === undefined) return 'loading';
   if (openDraft === null) return 'create';
-  if (openDraft.kind !== input.currentKind) return 'blockedByOtherDraft';
 
   if (input.onChainLatestRoot === undefined) return 'loading';
   if (input.onChainLatestRoot === openDraft.newRoot) return 'confirm';

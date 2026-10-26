@@ -28,6 +28,22 @@ describe('apiErrorCode', () => {
     expect(apiErrorCode(new ApiError(409, 'x', 'ProcedureOpen'))).toBe('procedure-open');
   });
 
+  it('names the office-scope and queue reasons (D86, D87, D90)', () => {
+    expect(apiErrorCode(new ApiError(403, 'x', 'OutsideOfficeArea'))).toBe('outside-office-area');
+    expect(apiErrorCode(new ApiError(403, 'x', 'CentralScopeRequired'))).toBe(
+      'central-scope-required',
+    );
+    expect(apiErrorCode(new ApiError(409, 'x', 'PredecessorNotRevoked'))).toBe(
+      'predecessor-not-revoked',
+    );
+    expect(apiErrorCode(new ApiError(409, 'x', 'ItemInOpenDraft'))).toBe('item-in-open-draft');
+    expect(apiErrorCode(new ApiError(409, 'x', 'QueueChanged'))).toBe('queue-changed');
+  });
+
+  it('calls a 403 without a reason forbidden, not unknown', () => {
+    expect(apiErrorCode(new ApiError(403, 'x'))).toBe('forbidden');
+  });
+
   it('treats a failed fetch as the API being unreachable, not as a wrong request', () => {
     // fetch() rejects with a TypeError when the backend is down or CORS fails.
     expect(apiErrorCode(new TypeError('Failed to fetch'))).toBe('unreachable');

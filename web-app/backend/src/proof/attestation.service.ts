@@ -66,6 +66,11 @@ export class AttestationService implements OnModuleInit {
     this.wallet = new ethers.Wallet(privateKey);
   }
 
+  /** The account that must hold ATTESTER_ROLE; the operations page checks it. */
+  get address(): string {
+    return this.wallet.address;
+  }
+
   /** Sign the plot's current status, or 409 while it has an open procedure. */
   async sign(propertyId: string, now = nowUnixTimestamp()): Promise<AttestationResponseDto> {
     const property = await requireIssuedProperty(this.prisma, propertyId);

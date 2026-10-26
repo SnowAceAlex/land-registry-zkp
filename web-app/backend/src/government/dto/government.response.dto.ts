@@ -158,3 +158,23 @@ export class PropertyDetailDto extends PropertySummaryDto {
   @ApiProperty({ format: 'date-time' })
   issueDate!: Date;
 }
+
+export class MeOfficeDto {
+  @ApiProperty({ example: 'CN01', description: 'HQ | CS2 | CS3 | CN01…CN38' })
+  code!: string;
+
+  @ApiProperty({ example: 'Chi nhánh Văn phòng Đăng ký đất đai khu vực 1' })
+  name!: string;
+
+  @ApiProperty({ example: 'BRANCH', enum: ['HEAD_OFFICE', 'SITE', 'BRANCH'] })
+  kind!: string;
+}
+
+export class MeResponseDto {
+  @ApiProperty({ type: MeOfficeDto })
+  office!: MeOfficeDto;
+
+  /** CENTRAL may act on any plot and on queue-wide actions; BRANCH only on its own area. */
+  @ApiProperty({ example: 'BRANCH', enum: ['CENTRAL', 'BRANCH'] })
+  scope!: string;
+}

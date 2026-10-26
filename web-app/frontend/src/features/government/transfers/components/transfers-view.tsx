@@ -12,7 +12,7 @@
  *     in the thesis rather than gloss: the secret passes through a government
  *     machine even though it never reaches the backend.
  *  3. approve only moves PENDING -> APPROVED. It no longer publishes a root.
- *     The publish happens in UC-4 as part of a ChangeSet (D46).
+ *     The publish happens in UC-4 as part of a registration round (D46).
  *  4. Needs a per-row rejection reason, and an inline error when a submitted
  *     transfer's proof has gone stale against a newer root.
  *  5. The buyer's secret is generated at the counter and must be downloaded

@@ -151,7 +151,7 @@ describe('contracts/LandRegistryVerifier — mock verifiers (Phase 4)', () => {
 
     describe(fn, () => {
       it('returns true when proof, root, and timestamp all pass', async () => {
-        const { verifier, call } = await loadFixture(deployFixture);
+        const { call } = await loadFixture(deployFixture);
         const now = BigInt(await time.latest());
         expect(await call(circuit, signalsFor(circuit, PUBLISHED_ROOT, now))).to.equal(true);
       });

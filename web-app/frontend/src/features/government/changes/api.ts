@@ -1,16 +1,12 @@
-/**
- * features/government/changes/api.ts - UC-4 backend calls (D44–D46, D56 + D73).
- *
- * A change set batches every approved transfer and up to `revocationCap`
- * pending revocations (150 since D73; the backend reports it with the queue)
- * into ONE new root. Same draft → sign → confirm shape as issuance; the draft
- * carries the revocation calldata to sign. Revocations are queued on the
- * Revocations page (features/government/revocations); the queue itself is read
- * through usePendingChanges() in the portal's api/hooks.
- */
+/** Backend calls of the closing session: draft, confirm, discard a round; hold, release an item (D84, D87). */
 
-import { govDelete, govDownload, govGet, govPost } from '../api/gov-client';
-import type { ChangeSetDraftDetail, ChangeSetSummary, DraftConfirmation } from '../api/types';
+import { govDelete, govPost } from '../api/gov-client';
+import type {
+  ChangeSetDraftDetail,
+  DraftConfirmation,
+  QueueItem,
+  QueueKind,
+} from '../api/types';
 
 export function createChangeSetDraft(): Promise<ChangeSetDraftDetail> {
   return govPost<ChangeSetDraftDetail>('/government/changesets');
@@ -25,12 +21,11 @@ export function discardChangeSetDraft(id: number): Promise<{ discarded: number }
   return govDelete<{ discarded: number }>(`/government/changesets/${id}`);
 }
 
-/** Every change set, newest first — summary columns only (D77). */
-export function listChangeSets(): Promise<ChangeSetSummary[]> {
-  return govGet<ChangeSetSummary[]>('/government/changesets');
+/** Keeps an open item out of the next round; it stays an open procedure (D87). */
+export function holdQueueItem(kind: QueueKind, id: number, reason: string): Promise<QueueItem> {
+  return govPost<QueueItem>(`/government/queue/${kind}/${id}/hold`, { reason });
 }
 
-/** The buyers' bundles of one round, one folder per transferred plot (D77). */
-export function downloadChangeSetArchive(id: number): Promise<string> {
-  return govDownload(`/government/changesets/${id}/archive`);
+export function releaseQueueItem(kind: QueueKind, id: number): Promise<QueueItem> {
+  return govPost<QueueItem>(`/government/queue/${kind}/${id}/release`);
 }

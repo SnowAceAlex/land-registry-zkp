@@ -14,9 +14,9 @@
  *     GET /api/government/properties/:propertyId, because publishing
  *     `encumbranceStatus` and `validityPeriod` would make mortgage.circom
  *     pointless. Nothing here reaches for that route.
- *  3. The lifecycle renders as events in `property-timeline.tsx`, each with the
- *     root version it was published under; ids and hashes are font-mono via
- *     `HashText`.
+ *  3. The lifecycle renders in `land-timeline.tsx`: one section per certificate
+ *     of the land (D90), each with its events and the root version they were
+ *     published under; ids and hashes are font-mono via `HashText`.
  *  4. The states (idle / searching / found / not found / API unreachable) live
  *     in `lookup-search.tsx`, a Client Component, so this view stays a Server
  *     Component — as the TODO required.

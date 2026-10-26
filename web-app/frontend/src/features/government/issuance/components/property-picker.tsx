@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * Choose the IMPORTED properties that go into one issuance round.
+ * Choose the IMPORTED properties to queue for issuance.
  *
  * The list is filtered server-side (`?status=IMPORTED`) so paging counts only
- * issuable plots; the selection survives paging, because a round is chosen
- * from the whole backlog, not one screen of it.
+ * issuable plots; the selection survives paging. Plots with a READY request
+ * stay IMPORTED until their round, so they show as queued and cannot be picked.
  */
 
 import { useState } from 'react';
@@ -22,7 +22,8 @@ import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { govKeys } from '../../api/hooks';
-import { ISSUANCE_PAGE_SIZE, listImportedProperties } from '../api';
+import { ISSUANCE_PAGE_SIZE, listImportedProperties, listIssuanceRequests } from '../api';
+import { queuedPropertyIds, requestablePicks } from '../lib/queued';
 
 export function PropertyPicker({
   lang,
@@ -33,7 +34,7 @@ export function PropertyPicker({
   lang: Locale;
   t: Dictionary['govIssuance'];
   creating: boolean;
-  onCreate: (propertyIds: string[]) => void;
+  onCreate: (propertyIds: string[]) => Promise<boolean>;
 }) {
   const [skip, setSkip] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -43,6 +44,11 @@ export function PropertyPicker({
     queryFn: () => listImportedProperties(skip),
     placeholderData: keepPreviousData,
   });
+  const ready = useQuery({
+    queryKey: govKeys.issuanceRequests('READY'),
+    queryFn: () => listIssuanceRequests('READY'),
+  });
+  const queued = queuedPropertyIds(ready.data);
 
   if (page.isPending) {
     return (
@@ -54,9 +60,7 @@ export function PropertyPicker({
     );
   }
   if (page.error) {
-    return (
-      <Notice tone="danger" title={t.loadError} />
-    );
+    return <Notice tone="danger" title={t.loadError} />;
   }
 
   const { items, total } = page.data;
@@ -75,7 +79,7 @@ export function PropertyPicker({
     );
   }
 
-  const pageIds = items.map((item) => item.propertyId);
+  const pageIds = items.map((item) => item.propertyId).filter((id) => !queued.has(id));
   const allOnPage = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
 
   function toggle(ids: string[], on: boolean) {
@@ -87,6 +91,12 @@ export function PropertyPicker({
       }
       return next;
     });
+  }
+
+  const picks = requestablePicks(selected, queued);
+
+  async function submit() {
+    if (await onCreate(picks)) setSelected(new Set());
   }
 
   return (
@@ -102,7 +112,7 @@ export function PropertyPicker({
                   type="checkbox"
                   aria-label={t.selectAllOnPage}
                   checked={allOnPage}
-                  disabled={creating}
+                  disabled={creating || pageIds.length === 0}
                   onChange={(event) => toggle(pageIds, event.target.checked)}
                   className="h-4 w-4 accent-authority"
                 />
@@ -122,13 +132,20 @@ export function PropertyPicker({
                   <input
                     type="checkbox"
                     aria-label={format(t.selectRow, { id: item.propertyId })}
-                    checked={selected.has(item.propertyId)}
-                    disabled={creating}
+                    checked={selected.has(item.propertyId) && !queued.has(item.propertyId)}
+                    disabled={creating || queued.has(item.propertyId)}
                     onChange={(event) => toggle([item.propertyId], event.target.checked)}
                     className="h-4 w-4 accent-authority"
                   />
                 </td>
-                <td className="px-4 py-2 font-mono text-xs">{item.propertyId}</td>
+                <td className="px-4 py-2 font-mono text-xs">
+                  {item.propertyId}
+                  {queued.has(item.propertyId) ? (
+                    <span className="ml-2 rounded-full border border-hairline bg-zinc-50 px-2 py-0.5 font-sans text-steel">
+                      {t.alreadyQueued}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="px-4 py-2 font-mono text-xs">{item.landUseCode}</td>
                 <td className="max-w-[18rem] truncate px-4 py-2" title={item.address}>
                   {item.address}
@@ -166,20 +183,20 @@ export function PropertyPicker({
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-sm text-steel">{format(t.selectedCount, { count: selected.size })}</span>
+          <span className="text-sm text-steel">{format(t.selectedCount, { count: picks.length })}</span>
           <button
             type="button"
             className={buttonStyles.primary}
-            disabled={selected.size === 0 || creating}
-            onClick={() => onCreate([...selected])}
+            disabled={picks.length === 0 || creating}
+            onClick={() => void submit()}
           >
             {creating ? (
               <>
                 <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
-                {t.creating}
+                {t.requesting}
               </>
             ) : (
-              t.createDraft
+              t.request
             )}
           </button>
         </div>

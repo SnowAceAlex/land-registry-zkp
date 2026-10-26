@@ -258,8 +258,8 @@ async function main(): Promise<void> {
   if (confirm.status >= 400) abort('changeset confirm', confirm);
   console.log(`confirm   root version ${confirm.body.rootVersion}`);
   console.log(
-    `archive   GET /api/government/changesets/${draft.body.id}/archive — the buyer's bundle, ` +
-      `secret.json included (D77)`,
+    `archive   GET /api/government/changesets/${draft.body.id}/archives lists the round's archives; ` +
+      `GET .../archives/<officeCode> downloads the buyer's bundle, secret.json included (D77, D88)`,
   );
 
   // ── The proof is now spent: its oldRoot has stopped being latest ───────────

@@ -9,62 +9,64 @@ export interface ArchiveEntry {
   propertyId: string;
   certificateSerial: string;
   leaf: string;
+  kind: 'issued' | 'transferred';
   files: ZipEntry[];
 }
 
-export interface ArchiveInput {
-  /** Which round produced it: an issuance batch (D42) or a change set's transfers (D77). */
-  kind: 'issuance' | 'changeset';
-  batchId: number;
+/** One office's share of a publishing round (D88). */
+export interface RoundArchiveInput {
+  roundId: number;
+  officeCode: string;
   rootVersion: number;
   txHash: string | null;
   publishedAt: Date;
   entries: ArchiveEntry[];
 }
 
+export const roundArchiveFilename = (roundId: number, officeCode: string): string =>
+  `round-${roundId}-${officeCode}.zip`;
+
 /**
- * ArchiveService — the batch archive of D42.
- *
- * One ZIP for a whole issuance round, one folder per plot, handed to the
- * authority and distributed to owners outside the system. This replaces the
- * per-plot one-time claim link of D34.
- *
- * Since D77 a change set's transfers use it too — one folder per transferred
- * plot, the same four files — so a buyer's bundle and an issued owner's are
- * indistinguishable.
- *
- * The archive contains every owner's secret.json, so the officer holds a copy of
- * all of them until the TTL expires. That is a real privacy cost and it belongs
- * in the thesis Limitations next to D14 — it is not hidden here.
- *
- * ZipService needs no change: archiver treats an entry name as a path, so a "/"
- * in it creates the folder.
+ * Packs bundles into one ZIP, one folder per plot plus a manifest.json. The ZIP holds
+ * every owner's secret.json, so whoever downloads it holds those secrets (D14 limitation).
+ * The TTL limits the server's copy only; a downloaded copy never expires.
+ * A "/" in an entry name makes the folder (archiver).
  */
 @Injectable()
 export class ArchiveService {
   constructor(private readonly zip: ZipService) {}
 
-  async build(input: ArchiveInput): Promise<Buffer> {
+  /** D88: the archive of one branch for one round. */
+  async buildRound(input: RoundArchiveInput): Promise<Buffer> {
+    return this.pack(
+      {
+        kind: 'round',
+        roundId: input.roundId,
+        officeCode: input.officeCode,
+        rootVersion: input.rootVersion,
+        txHash: input.txHash,
+        publishedAt: input.publishedAt.toISOString(),
+      },
+      input.entries,
+    );
+  }
+
+  private pack(header: Record<string, unknown>, entries: ArchiveEntry[]): Promise<Buffer> {
     const manifest = {
-      kind: input.kind,
-      batchId: input.batchId,
-      rootVersion: input.rootVersion,
-      txHash: input.txHash,
-      publishedAt: input.publishedAt.toISOString(),
-      properties: input.entries.map((entry) => ({
+      ...header,
+      properties: entries.map((entry) => ({
         propertyId: entry.propertyId,
         certificateSerial: entry.certificateSerial,
         leaf: entry.leaf,
+        kind: entry.kind,
       })),
     };
-
-    const files = input.entries.flatMap((entry) =>
+    const files = entries.flatMap((entry) =>
       entry.files.map((file) => ({
         name: `${entry.propertyId}/${file.name}`,
         content: file.content,
       })),
     );
-
     return this.zip.create([
       ...files,
       { name: 'manifest.json', content: JSON.stringify(manifest, null, 2) },

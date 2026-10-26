@@ -64,15 +64,8 @@ export function parsePropertyStatus(value: string | undefined): PropertyStatus |
 /**
  * GovernmentService
  * ─────────────────────────────────────────────────────────────────────────────
- * What is left of the state-authority operations after the single-phase
- * on-chain issuance flow (issueBatch()/publishRoot(), both backend-signed)
- * was removed: the status and property-listing views.
- *
- * Issuing land records is now the two-phase draft/confirm flow (D43) —
- * IssuanceBatchService in issuance/, not here — because a Metamask-signed
- * root can no longer be produced by a single backend call. Publishing a root
- * outside of issuance (e.g. to pick up manual DB edits) will similarly move
- * to a signed flow; there is no replacement endpoint for it yet.
+ * The status and property-listing views. Issuance, transfers and revocations
+ * are published by the change-set round (ChangeSetService, D84), not here.
  */
 
 @Injectable()

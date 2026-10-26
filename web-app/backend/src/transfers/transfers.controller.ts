@@ -11,7 +11,9 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 
+import { Actor } from '../common/actor';
 import { ApiKeyGuard, GOV_API_KEY_SECURITY } from '../common/api-key.guard';
+import { CurrentActor } from '../common/current-actor.decorator';
 import { RejectTransferDto, SubmitTransferDto, TransferPreviewDto } from './dto/transfer.dto';
 import {
   TransferApprovalResponseDto,
@@ -55,8 +57,8 @@ export class TransfersController {
       'stored only when the proof is submitted.',
   })
   @ApiOkResponse({ type: TransferPreviewResult })
-  preview(@Body() dto: TransferPreviewDto) {
-    return this.transfers.preview(dto);
+  preview(@Body() dto: TransferPreviewDto, @CurrentActor() actor: Actor) {
+    return this.transfers.preview(dto, actor);
   }
 
   /** Queue a generated transfer proof for approval. */
@@ -83,8 +85,8 @@ export class TransfersController {
       'published in a change set (D46); or the plot has an open revocation (one procedure per ' +
       'plot, D80). From this submit on the seller gets no status attestation (D82)',
   })
-  submit(@Body() dto: SubmitTransferDto) {
-    return this.transfers.submit(dto);
+  submit(@Body() dto: SubmitTransferDto, @CurrentActor() actor: Actor) {
+    return this.transfers.submit(dto, actor);
   }
 
   @Get()
@@ -94,8 +96,8 @@ export class TransfersController {
   @ApiQuery({ name: 'status', required: false, enum: TransferStatus })
   @ApiOkResponse({ type: [TransferRequestDto] })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid x-gov-api-key header' })
-  list(@Query('status') status?: TransferStatus) {
-    return this.transfers.list(status);
+  list(@CurrentActor() actor: Actor, @Query('status') status?: TransferStatus) {
+    return this.transfers.list(status, actor);
   }
 
   /** The human decision: verify on-chain, then record the approval. */
@@ -108,8 +110,8 @@ export class TransfersController {
       'D28 step 4 — the step that needs a person. A transfer proof shows someone holds the old ' +
       "owner's secret; it cannot show they ARE the old owner (ownerCommitment is pseudonymous, " +
       'D8). Verifies on chain, then moves the request from PENDING to APPROVED. Publishing the ' +
-      'new root — and applying it to the registry — happens later, when a change set batches ' +
-      'every approved transfer (and revocation) and an officer signs it (D46).',
+      'new root — and applying it to the registry — happens later, when a round batches ' +
+      'every approved transfer, queued issuance and revocation and the head office signs it (D46, D84).',
   })
   @ApiOkResponse({ type: TransferApprovalResponseDto })
   @ApiUnprocessableEntityResponse({
@@ -121,8 +123,8 @@ export class TransfersController {
     description: 'Request was already approved or rejected',
   })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid x-gov-api-key header' })
-  approve(@Param('id', ParseIntPipe) id: number) {
-    return this.transfers.approve(id);
+  approve(@Param('id', ParseIntPipe) id: number, @CurrentActor() actor: Actor) {
+    return this.transfers.approve(id, actor);
   }
 
   @Post(':id/reject')
@@ -132,7 +134,11 @@ export class TransfersController {
   @ApiOkResponse({ type: TransferRequestDto })
   @ApiConflictResponse({ description: 'Request was already approved or rejected' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid x-gov-api-key header' })
-  reject(@Param('id', ParseIntPipe) id: number, @Body() dto: RejectTransferDto) {
-    return this.transfers.reject(id, dto.reason);
+  reject(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: RejectTransferDto,
+    @CurrentActor() actor: Actor,
+  ) {
+    return this.transfers.reject(id, actor, dto.reason);
   }
 }

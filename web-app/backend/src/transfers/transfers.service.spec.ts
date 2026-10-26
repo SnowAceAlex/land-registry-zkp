@@ -6,7 +6,12 @@ jest.mock('@land-registry/blockchain/shared', () => ({
   assertProofFresh: jest.fn(),
 }));
 
-import { BadRequestException, ConflictException, GoneException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  GoneException,
+} from '@nestjs/common';
 import { Property } from '@prisma/client';
 import {
   BN254_FIELD_MODULUS,
@@ -20,8 +25,9 @@ import {
   readerFromTree,
 } from '@land-registry/blockchain/shared';
 
+import { ProofRejectedError } from '../chain/chain.service';
 import { TransfersService } from './transfers.service';
-import { makeProperty } from '../../test/factories';
+import { BRANCH_ACTOR, CENTRAL_ACTOR, makeProperty } from '../../test/factories';
 import { toLURRecord } from '../records/record.mapper';
 
 describe('TransfersService.requireTransferableProperty (D45/D48)', () => {
@@ -33,8 +39,12 @@ describe('TransfersService.requireTransferableProperty (D45/D48)', () => {
 
     const service = new TransfersService(prisma, {} as never, {} as never, {} as never);
 
-    await expect(service.preview({ propertyId: '1001' })).rejects.toMatchObject({ status: 410 });
-    await expect(service.preview({ propertyId: '1001' })).rejects.toBeInstanceOf(GoneException);
+    await expect(service.preview({ propertyId: '1001' }, CENTRAL_ACTOR)).rejects.toMatchObject({
+      status: 410,
+    });
+    await expect(service.preview({ propertyId: '1001' }, CENTRAL_ACTOR)).rejects.toBeInstanceOf(
+      GoneException,
+    );
   });
 });
 
@@ -80,7 +90,7 @@ describe('TransfersService.preview — both Merkle paths (D28, over the node sto
     const registry = ['1', '2', '10'].map((propertyId) => makeProperty({ propertyId }));
     const { service, tree } = await harness(registry, registry[0]);
 
-    const result = await service.preview({ propertyId: '1' });
+    const result = await service.preview({ propertyId: '1' }, CENTRAL_ACTOR);
 
     // D77 — the registry issues the buyer's secret, like an issuance round's.
     expect(result.newOwnerSecret).toBe('43');
@@ -110,7 +120,7 @@ describe('TransfersService.preview — both Merkle paths (D28, over the node sto
     const registry = ['1', '2', '10'].map((propertyId) => makeProperty({ propertyId }));
     const { service } = await harness(registry, registry[2]);
 
-    const result = await service.preview({ propertyId: '10' });
+    const result = await service.preview({ propertyId: '10' }, CENTRAL_ACTOR);
 
     expect(result.oldSiblings).toHaveLength(TREE_DEPTH);
     expect(result.newSiblings).toHaveLength(TREE_DEPTH);
@@ -122,7 +132,11 @@ describe('TransfersService.preview — both Merkle paths (D28, over the node sto
 });
 
 describe('TransfersService — the buyer secret at submit and reject (D77)', () => {
-  const property = makeProperty({ propertyId: '1001', ownerCommitment: '111' });
+  const property = makeProperty({
+    propertyId: '1001',
+    ownerCommitment: '111',
+    landOfficeId: BRANCH_ACTOR.officeId,
+  });
 
   async function scenario(opts: { pendingRevocation?: { id: number } | null } = {}) {
     const secret = 43n;
@@ -155,6 +169,7 @@ describe('TransfersService — the buyer secret at submit and reject (D77)', () 
     }));
     const prisma = {
       property: { findUnique: jest.fn().mockResolvedValue(property) },
+      landOffice: { findMany: jest.fn().mockResolvedValue([]) },
       transferRequest: {
         findFirst: jest.fn().mockResolvedValue(null),
         findUnique: jest.fn().mockResolvedValue({
@@ -192,25 +207,29 @@ describe('TransfersService — the buyer secret at submit and reject (D77)', () 
 
   it('refuses a secret that does not open the commitment', async () => {
     const { service, create, dto } = await scenario();
-    await expect(service.submit(dto('44'))).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.submit(dto('44'), BRANCH_ACTOR)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
     expect(create).not.toHaveBeenCalled();
   });
 
   it('refuses a secret outside (0, p)', async () => {
     const { service, create, dto } = await scenario();
-    await expect(service.submit(dto('0'))).rejects.toBeInstanceOf(BadRequestException);
-    // p reduces to 0 inside Poseidon — the residue, not the number, would open
-    // the commitment, and the owner's later proofs would use the wrong value.
-    await expect(service.submit(dto(BN254_FIELD_MODULUS.toString()))).rejects.toBeInstanceOf(
+    await expect(service.submit(dto('0'), BRANCH_ACTOR)).rejects.toBeInstanceOf(
       BadRequestException,
     );
+    // p reduces to 0 inside Poseidon — the residue, not the number, would open
+    // the commitment, and the owner's later proofs would use the wrong value.
+    await expect(
+      service.submit(dto(BN254_FIELD_MODULUS.toString()), BRANCH_ACTOR),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(create).not.toHaveBeenCalled();
   });
 
   it('stores the secret in the insert that creates the request, and never returns it', async () => {
     const { service, create, dto, secret } = await scenario();
 
-    const created = await service.submit(dto(secret.toString()));
+    const created = await service.submit(dto(secret.toString()), BRANCH_ACTOR);
 
     expect(create.mock.calls[0][0].data.newOwnerSecret).toBe('43');
     expect(created).not.toHaveProperty('newOwnerSecret');
@@ -219,15 +238,252 @@ describe('TransfersService — the buyer secret at submit and reject (D77)', () 
   it('forgets the secret when the request is rejected', async () => {
     const { service, update } = await scenario();
 
-    await service.reject(1, 'no');
+    await service.reject(1, BRANCH_ACTOR, 'no');
 
     expect(update.mock.calls[0][0].data.newOwnerSecret).toBeNull();
+  });
+
+  it('keeps an officer-typed reason, and writes no English default without one', async () => {
+    const { service, update } = await scenario();
+
+    await service.reject(1, BRANCH_ACTOR, 'Hồ sơ công chứng không hợp lệ');
+    await service.reject(1, BRANCH_ACTOR);
+    await service.reject(1, BRANCH_ACTOR, '   ');
+
+    expect(update.mock.calls.map((call) => call[0].data.rejectReason)).toEqual([
+      'Hồ sơ công chứng không hợp lệ',
+      null,
+      null,
+    ]);
   });
 
   it('refuses a plot with a pending revocation — one open procedure per plot', async () => {
     const { service, create, dto, secret } = await scenario({ pendingRevocation: { id: 9 } });
 
-    await expect(service.submit(dto(secret.toString()))).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.submit(dto(secret.toString()), BRANCH_ACTOR)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
     expect(create).not.toHaveBeenCalled();
+  });
+});
+
+describe('TransfersService — area scope and office stamps (D83, D86)', () => {
+  const OTHER_BRANCH = { ...BRANCH_ACTOR, officeId: 10, officeCode: 'CN02', credentialId: 4 };
+  const ownPlot = makeProperty({
+    propertyId: '1001',
+    ownerCommitment: '111',
+    landOfficeId: BRANCH_ACTOR.officeId,
+  });
+
+  async function build(property: Property | null = ownPlot) {
+    const commitment = (await poseidonHash([43n])).toString();
+    const signals = ['5', '6', '1001', '111', commitment, '1800000000', '0'];
+    const create = jest.fn(async ({ data }) => ({
+      id: 1,
+      ...data,
+      status: 'PENDING',
+      rejectReason: null,
+      txHash: null,
+      changeSetId: null,
+      createdAt: new Date(),
+      decidedAt: null,
+      heldAt: null,
+      heldReason: null,
+      approvedByOfficeId: null,
+    }));
+    const update = jest.fn(async ({ data }) => ({
+      id: 1,
+      propertyId: '1001',
+      newOwnerCommitment: commitment,
+      oldRoot: '5',
+      newRoot: '6',
+      rejectReason: null,
+      txHash: null,
+      changeSetId: null,
+      createdAt: new Date(),
+      officeId: 9,
+      landOfficeId: 9,
+      heldAt: null,
+      heldReason: null,
+      decidedAt: null,
+      ...data,
+    }));
+    const findMany = jest.fn().mockResolvedValue([]);
+    const prisma = {
+      property: { findUnique: jest.fn().mockResolvedValue(property) },
+      landOffice: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 1, code: 'HQ' },
+          { id: 9, code: 'CN01' },
+        ]),
+      },
+      transferRequest: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany,
+        findUnique: jest.fn().mockResolvedValue({
+          id: 1,
+          status: 'PENDING',
+          propertyId: '1001',
+          proof: {},
+          publicSignals: signals,
+        }),
+        create,
+        update,
+      },
+      revocation: { findFirst: jest.fn().mockResolvedValue(null) },
+    };
+    const chain = {
+      getLatestRoot: jest.fn().mockResolvedValue(5n),
+      getRootVersion: jest.fn().mockResolvedValue(1),
+      verifyTransferOnChain: jest.fn().mockResolvedValue(true),
+    };
+    const nodes = { proofFor: jest.fn(), projectRoot: jest.fn(), proofInOverlay: jest.fn() };
+    const issuance = {
+      generateOwnerSecret: jest.fn(() => 43n),
+      commitmentFor: (value: bigint) => poseidonHash([value]),
+    };
+    const service = new TransfersService(
+      prisma as never,
+      nodes as never,
+      chain as never,
+      issuance as never,
+    );
+    const submitDto = {
+      propertyId: '1001',
+      newOwnerCommitment: commitment,
+      newOwnerSecret: '43',
+      proof: {},
+      publicSignals: signals,
+    };
+    return { service, prisma, create, update, findMany, chain, nodes, issuance, submitDto };
+  }
+
+  const outside = { response: { reason: 'OutsideOfficeArea' } };
+
+  it('preview: another branch is refused before any path is computed or secret issued', async () => {
+    const { service, nodes, issuance } = await build();
+
+    await expect(service.preview({ propertyId: '1001' }, OTHER_BRANCH)).rejects.toMatchObject(
+      outside,
+    );
+    expect(nodes.proofFor).not.toHaveBeenCalled();
+    expect(issuance.generateOwnerSecret).not.toHaveBeenCalled();
+  });
+
+  it('preview: the scope check comes before the state checks, so a revoked plot does not leak', async () => {
+    const { service } = await build(makeProperty({ propertyId: '1001', status: 'REVOKED' }));
+
+    await expect(service.preview({ propertyId: '1001' }, BRANCH_ACTOR)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('submit: another branch gets 403 and nothing is verified or written', async () => {
+    const { service, create, chain, submitDto } = await build();
+
+    await expect(service.submit(submitDto, OTHER_BRANCH)).rejects.toMatchObject(outside);
+    expect(chain.getLatestRoot).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('submit: the own branch stamps officeId and landOfficeId on the new row', async () => {
+    const { service, create, submitDto } = await build();
+
+    const dto = await service.submit(submitDto, BRANCH_ACTOR);
+
+    const data = create.mock.calls[0][0].data;
+    expect(data.officeId).toBe(BRANCH_ACTOR.officeId);
+    expect(data.landOfficeId).toBe(BRANCH_ACTOR.officeId);
+    expect(dto.officeCode).toBe('CN01');
+    expect(dto.byFallback).toBe(false);
+  });
+
+  it('submit: a central office may act on any plot and is marked as the fallback', async () => {
+    const { service, create, submitDto } = await build();
+
+    const dto = await service.submit(submitDto, CENTRAL_ACTOR);
+
+    const data = create.mock.calls[0][0].data;
+    expect(data.officeId).toBe(CENTRAL_ACTOR.officeId);
+    expect(data.landOfficeId).toBe(BRANCH_ACTOR.officeId);
+    expect(dto.officeCode).toBe('HQ');
+    expect(dto.landOfficeCode).toBe('CN01');
+    expect(dto.byFallback).toBe(true);
+  });
+
+  it('approve: another branch gets 403 before the proof is looked at', async () => {
+    const { service, update, chain } = await build();
+
+    await expect(service.approve(1, OTHER_BRANCH)).rejects.toMatchObject(outside);
+    expect(chain.verifyTransferOnChain).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('approve: loads the plot by the request’s propertyId and stamps approvedByOfficeId', async () => {
+    const { service, prisma, update } = await build();
+
+    await service.approve(1, BRANCH_ACTOR);
+
+    expect(prisma.property.findUnique).toHaveBeenCalledWith({ where: { propertyId: '1001' } });
+    expect(update.mock.calls[0][0].data.approvedByOfficeId).toBe(BRANCH_ACTOR.officeId);
+  });
+
+  it('approve: a central office stamps its own id', async () => {
+    const { service, update } = await build();
+
+    await service.approve(1, CENTRAL_ACTOR);
+
+    expect(update.mock.calls[0][0].data.approvedByOfficeId).toBe(CENTRAL_ACTOR.officeId);
+  });
+
+  it('approve: a RootMismatch closes the request with no stored reason, so the UI words it itself', async () => {
+    const { service, update, chain } = await build();
+    chain.verifyTransferOnChain.mockRejectedValue(
+      new ProofRejectedError('RootMismatch', 'Root is not the latest root'),
+    );
+
+    await expect(service.approve(1, BRANCH_ACTOR)).rejects.toMatchObject({
+      response: { reason: 'RootMismatch' },
+    });
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update.mock.calls[0][0].data).toMatchObject({
+      status: 'REJECTED',
+      rejectReason: null,
+    });
+  });
+
+  it('reject: another branch gets 403 and the row is untouched', async () => {
+    const { service, update } = await build();
+
+    await expect(service.reject(1, OTHER_BRANCH, 'no')).rejects.toMatchObject(outside);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('reject: the own branch and a central office both pass', async () => {
+    const { service, update } = await build();
+
+    await service.reject(1, BRANCH_ACTOR, 'no');
+    await service.reject(1, CENTRAL_ACTOR, 'no');
+
+    expect(update).toHaveBeenCalledTimes(2);
+  });
+
+  it('list: a branch sees only its own area, a central office sees everything', async () => {
+    const { service, findMany } = await build();
+
+    await service.list(undefined, BRANCH_ACTOR);
+    expect(findMany.mock.calls[0][0].where).toEqual({ landOfficeId: BRANCH_ACTOR.officeId });
+
+    await service.list('PENDING', BRANCH_ACTOR);
+    expect(findMany.mock.calls[1][0].where).toEqual({
+      landOfficeId: BRANCH_ACTOR.officeId,
+      status: 'PENDING',
+    });
+
+    await service.list(undefined, CENTRAL_ACTOR);
+    expect(findMany.mock.calls[2][0].where).toBeUndefined();
+
+    await service.list('APPROVED', CENTRAL_ACTOR);
+    expect(findMany.mock.calls[3][0].where).toEqual({ status: 'APPROVED' });
   });
 });

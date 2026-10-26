@@ -3,6 +3,7 @@ import { MAX_PROPERTY_ID } from '@land-registry/blockchain/shared';
 
 import { ImportService, parseVietnameseDate } from './import.service';
 import { AdministrativeUnitsService } from '../land-law/administrative-units.service';
+import { LineageService } from '../lineage/lineage.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -12,30 +13,62 @@ import { PrismaService } from '../prisma/prisma.service';
 /** Commune-level units the address tests resolve against, standing in for the seeded catalog. */
 const CATALOG = ['Sài Gòn', 'Tân Định', 'Bình Mỹ'];
 
+type Office = { id: number; code: string };
+
 function makeService({
   catalog = CATALOG,
   existing = [],
-}: { catalog?: string[]; existing?: string[] } = {}) {
-  const createMany = jest.fn(async ({ data }: { data: Prisma.PropertyCreateManyInput[] }) => ({
-    // Mirrors skipDuplicates: rows whose propertyId is already registered are not written.
-    count: data.filter((input) => !existing.includes(input.propertyId)).length,
-  }));
-  const findMany = jest.fn(async () => catalog.map((name) => ({ name })));
-  const propertyFindMany = jest.fn(async ({ where }: { where: { propertyId: { in: string[] } } }) =>
-    existing
-      .filter((propertyId) => where.propertyId.in.includes(propertyId))
-      .map((propertyId) => ({ propertyId })),
+  offices = {},
+  statuses = {},
+  edges = [],
+}: {
+  catalog?: string[];
+  existing?: string[];
+  /** commune name → office the catalog assigns it to */
+  offices?: Record<string, Office>;
+  /** propertyId → status of rows already in the registry (default ISSUED) */
+  statuses?: Record<string, string>;
+  /** supersession edges already recorded */
+  edges?: { predecessorPropertyId: string; successorPropertyId: string }[];
+} = {}) {
+  // Rows that exist in the registry: the `existing` ids plus anything given a status.
+  const registered = [...new Set([...existing, ...Object.keys(statuses)])];
+  const createMany = jest.fn((args: { data: Prisma.PropertyCreateManyInput[] }) =>
+    Promise.resolve({
+      // Mirrors skipDuplicates: rows whose propertyId is already registered are not written.
+      count: args.data.filter((input) => !registered.includes(input.propertyId)).length,
+    }),
   );
+  const findMany = jest.fn(async () =>
+    catalog.map((name) => ({ name, landOffice: offices[name] ?? null })),
+  );
+  const propertyFindMany = jest.fn(async ({ where }: { where: { propertyId: { in: string[] } } }) =>
+    registered
+      .filter((propertyId) => where.propertyId.in.includes(propertyId))
+      .map((propertyId) => ({ propertyId, status: statuses[propertyId] ?? 'ISSUED' })),
+  );
+  const lineageFindMany = jest.fn(
+    async ({ where }: { where: { predecessorPropertyId: { in: string[] } } }) =>
+      edges.filter((edge) => where.predecessorPropertyId.in.includes(edge.predecessorPropertyId)),
+  );
+  const lineageCreateMany = jest.fn((args: unknown) => Promise.resolve({ args }));
+  const $transaction = jest.fn((operations: Promise<unknown>[]) => Promise.all(operations));
   const prisma = {
     property: { createMany, findMany: propertyFindMany },
     administrativeUnit: { findMany },
+    propertyLineage: { findMany: lineageFindMany, createMany: lineageCreateMany },
+    $transaction,
   } as unknown as PrismaService;
 
   // Reads the MOST RECENT call: several tests import a rejected file first and
   // a valid one second, and pinning to call 0 would assert against the reject.
   const created = () => createMany.mock.calls[createMany.mock.calls.length - 1][0].data;
-  const service = new ImportService(prisma, new AdministrativeUnitsService(prisma));
-  return { service, createMany, created };
+  const service = new ImportService(
+    prisma,
+    new AdministrativeUnitsService(prisma),
+    new LineageService(prisma),
+  );
+  return { service, createMany, created, lineageCreateMany, $transaction, propertyFindMany };
 }
 
 const COLUMNS = [
@@ -55,6 +88,7 @@ const COLUMNS = [
   'expiryDate',
   'encumbranceStatus',
   'isLongTermInvestmentProject',
+  'supersedesPropertyIds',
 ] as const;
 
 const HEADER = COLUMNS.join(',');
@@ -81,6 +115,7 @@ function row(overrides: Partial<Record<(typeof COLUMNS)[number], string>> = {}):
     expiryDate: '',
     encumbranceStatus: 'FREE',
     isLongTermInvestmentProject: '',
+    supersedesPropertyIds: '',
     ...overrides,
   };
   // Quoted because a comma inside an address or a thousands separator would
@@ -118,6 +153,255 @@ describe('ImportService', () => {
       expect(preview).toMatchObject({ imported: 1, skipped: 1 });
       // The preview is only useful if it predicts the commit exactly.
       expect(written).toMatchObject({ dryRun: false, imported: 1, skipped: 1 });
+    });
+  });
+
+  describe('land office derived from the commune (D85)', () => {
+    const HQ_OFFICE = { id: 1, code: 'HQ' };
+    const CN01 = { id: 4, code: 'CN01' };
+    const TAN_DINH = 'Số 3, Đường X, Phường Tân Định, TP.HCM';
+
+    it('stamps each written row with the office its commune belongs to', async () => {
+      const { service, created } = makeService({
+        offices: { 'Sài Gòn': CN01, 'Tân Định': HQ_OFFICE },
+      });
+
+      await service.importCsv(
+        [
+          HEADER,
+          row({ propertyId: '1' }),
+          row({ propertyId: '2', certificateSerial: 'CT 100002', address: TAN_DINH }),
+        ].join('\n'),
+      );
+
+      expect(created().map((d) => d.landOfficeId)).toEqual([4, 1]);
+    });
+
+    it('leaves landOfficeId null when the unit is unassigned or the catalog is empty', async () => {
+      const unassigned = makeService();
+      await unassigned.service.importCsv([HEADER, row()].join('\n'));
+      expect(unassigned.created()[0].landOfficeId).toBeNull();
+
+      const empty = makeService({ catalog: [] });
+      await empty.service.importCsv([HEADER, row()].join('\n'));
+      expect(empty.created()[0].landOfficeId).toBeNull();
+    });
+
+    it('counts written rows per office, null last', async () => {
+      const { service } = makeService({ offices: { 'Sài Gòn': CN01, 'Tân Định': HQ_OFFICE } });
+
+      const result = await service.importCsv(
+        [
+          HEADER,
+          row({ propertyId: '1' }),
+          row({ propertyId: '2', certificateSerial: 'CT 100002', address: TAN_DINH }),
+          row({ propertyId: '3', certificateSerial: 'CT 100003' }),
+          row({ propertyId: '4', certificateSerial: 'CT 100004', landUseCode: 'ZZZ' }),
+          row({
+            propertyId: '5',
+            certificateSerial: 'CT 100005',
+            address: 'Số 3, Đường X, Xã Bình Mỹ, TP.HCM',
+          }),
+        ].join('\n'),
+        { dryRun: true },
+      );
+
+      expect(result.byOffice).toEqual([
+        { officeCode: 'CN01', count: 2 },
+        { officeCode: 'HQ', count: 1 },
+        { officeCode: null, count: 1 },
+      ]);
+    });
+
+    it('leaves rows already in the registry out of byOffice', async () => {
+      const { service } = makeService({ existing: ['1'], offices: { 'Sài Gòn': CN01 } });
+
+      const result = await service.importCsv(
+        [
+          HEADER,
+          row({ propertyId: '1' }),
+          row({ propertyId: '2', certificateSerial: 'CT 100002' }),
+        ].join('\n'),
+        { dryRun: true },
+      );
+
+      expect(result.byOffice).toEqual([{ officeCode: 'CN01', count: 1 }]);
+    });
+  });
+
+  describe('certificate supersession (D83, D90)', () => {
+    const successor = (supersedesPropertyIds: string, propertyId = '10') =>
+      [HEADER, row({ propertyId, supersedesPropertyIds })].join('\n');
+
+    it.each([
+      ['a non-numeric id', 'abc'],
+      ['a negative id', '-3'],
+      ['an id beyond the tree', (MAX_PROPERTY_ID + 1n).toString()],
+      ['a decimal', '1.5'],
+    ])('rejects %s as InvalidSupersedes', async (_label, value) => {
+      const { service, createMany } = makeService({ existing: ['1'] });
+
+      const result = await service.importCsv(successor(`1;${value}`));
+
+      expect(result.imported).toBe(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toMatchObject({
+        row: 2,
+        propertyId: '10',
+        code: 'InvalidSupersedes',
+      });
+      expect(createMany.mock.calls[0][0].data).toEqual([]);
+    });
+
+    it('rejects a row that supersedes itself', async () => {
+      const { service } = makeService({ existing: ['10'] });
+
+      const result = await service.importCsv(successor('10'));
+
+      expect(result.errors[0]).toMatchObject({ code: 'SelfSupersession', propertyId: '10' });
+      expect(result.imported).toBe(0);
+    });
+
+    it('rejects a predecessor that is not in the registry', async () => {
+      const { service } = makeService({ existing: ['1'] });
+
+      const result = await service.importCsv(successor('1;2'));
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toMatchObject({
+        row: 2,
+        code: 'PredecessorNotFound',
+        predecessorPropertyId: '2',
+      });
+      expect(result.errors[0].message).toContain('2');
+      expect(result.imported).toBe(0);
+    });
+
+    it('rejects a predecessor that was never issued', async () => {
+      const { service } = makeService({ statuses: { '1': 'IMPORTED' } });
+
+      const result = await service.importCsv(successor('1'));
+
+      expect(result.errors[0]).toMatchObject({
+        code: 'PredecessorNeverIssued',
+        predecessorPropertyId: '1',
+      });
+      expect(result.imported).toBe(0);
+    });
+
+    it('accepts a revoked predecessor — superseding it is the normal path', async () => {
+      const { service } = makeService({ statuses: { '1': 'REVOKED' } });
+
+      const result = await service.importCsv(successor('1'));
+
+      expect(result.errors).toEqual([]);
+      expect(result.imported).toBe(1);
+    });
+
+    it('warns, but still imports, when the predecessor already has a successor (a split)', async () => {
+      const { service } = makeService({
+        existing: ['1'],
+        edges: [{ predecessorPropertyId: '1', successorPropertyId: '9' }],
+      });
+
+      const result = await service.importCsv(successor('1'), { dryRun: true });
+
+      expect(result.errors).toEqual([]);
+      expect(result.imported).toBe(1);
+      expect(result.warnings).toEqual([
+        expect.objectContaining({
+          row: 2,
+          propertyId: '10',
+          code: 'PredecessorAlreadySucceeded',
+          predecessorPropertyId: '1',
+        }),
+      ]);
+    });
+
+    it('does not warn about the edge this same row already recorded', async () => {
+      const { service } = makeService({
+        existing: ['1', '10'],
+        edges: [{ predecessorPropertyId: '1', successorPropertyId: '10' }],
+      });
+
+      const result = await service.importCsv(successor('1'), { dryRun: true });
+
+      expect(result.warnings).toEqual([]);
+    });
+
+    it('keeps the line number and imports the other rows when one row fails', async () => {
+      const { service, created } = makeService({ existing: ['1'] });
+
+      const result = await service.importCsv(
+        [
+          HEADER,
+          row({ propertyId: '10', supersedesPropertyIds: '1' }),
+          row({ propertyId: '11', certificateSerial: 'CT 100011', supersedesPropertyIds: '77' }),
+          row({ propertyId: '12', certificateSerial: 'CT 100012' }),
+        ].join('\n'),
+      );
+
+      expect(result.errors).toEqual([
+        expect.objectContaining({ row: 3, propertyId: '11', code: 'PredecessorNotFound' }),
+      ]);
+      expect(created().map((d) => d.propertyId)).toEqual(['10', '12']);
+    });
+
+    it('ignores empty parts and whitespace in the list', async () => {
+      const { service, lineageCreateMany } = makeService({ existing: ['1', '2'] });
+
+      const result = await service.importCsv(successor(' 1 ; ;2;'));
+
+      expect(result.errors).toEqual([]);
+      expect(lineageCreateMany.mock.calls[0][0]).toMatchObject({
+        data: [
+          { predecessorPropertyId: '1', successorPropertyId: '10' },
+          { predecessorPropertyId: '2', successorPropertyId: '10' },
+        ],
+      });
+    });
+
+    it('writes nothing on a dry run, not even lineage', async () => {
+      const { service, createMany, lineageCreateMany, $transaction } = makeService({
+        existing: ['1'],
+      });
+
+      const result = await service.importCsv(successor('1'), { dryRun: true });
+
+      expect(result.imported).toBe(1);
+      expect(createMany).not.toHaveBeenCalled();
+      expect(lineageCreateMany).not.toHaveBeenCalled();
+      expect($transaction).not.toHaveBeenCalled();
+    });
+
+    it('commits the plots and their edges in one transaction', async () => {
+      const { service, createMany, lineageCreateMany, $transaction } = makeService({
+        existing: ['1', '2'],
+      });
+
+      const result = await service.importCsv(successor('1;2'));
+
+      expect(result).toMatchObject({ imported: 1, skipped: 0, errors: [] });
+      expect($transaction).toHaveBeenCalledTimes(1);
+      expect($transaction.mock.calls[0][0]).toHaveLength(2);
+      expect(createMany).toHaveBeenCalledTimes(1);
+      expect(lineageCreateMany).toHaveBeenCalledWith({
+        data: [
+          { predecessorPropertyId: '1', successorPropertyId: '10' },
+          { predecessorPropertyId: '2', successorPropertyId: '10' },
+        ],
+        skipDuplicates: true,
+      });
+    });
+
+    it('records no edge for a row that already exists in the registry', async () => {
+      const { service, lineageCreateMany, created } = makeService({ existing: ['1', '10'] });
+
+      const result = await service.importCsv(successor('1'));
+
+      expect(result).toMatchObject({ imported: 0, skipped: 1 });
+      expect(created()).toEqual([]);
+      expect(lineageCreateMany).toHaveBeenCalledWith({ data: [], skipDuplicates: true });
     });
   });
 

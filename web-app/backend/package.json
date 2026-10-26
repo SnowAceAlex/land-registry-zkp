@@ -16,6 +16,8 @@
     "test": "jest",
     "cert:generate": "ts-node scripts/generate-issuer-cert.ts",
     "seed:admin-units": "ts-node scripts/seed-admin-units.ts",
+    "seed:land-offices": "ts-node scripts/seed-land-offices.ts",
+    "office:rotate-key": "ts-node scripts/rotate-office-key.ts",
     "tree:bootstrap": "ts-node scripts/tree-bootstrap.ts",
     "bench:seed": "ts-node scripts/bench-seed-genesis.ts",
     "bench:month": "ts-node scripts/bench-replay-month.ts",

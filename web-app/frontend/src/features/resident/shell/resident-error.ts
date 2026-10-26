@@ -65,6 +65,13 @@ const TITLES: Record<ResidentErrorCode, keyof ErrorStrings> = {
   'attestation-expired': 'attestationExpired',
   'invalid-attestation': 'invalidAttestation',
   'procedure-open': 'procedureOpen',
+  // Government-only reasons; a resident never meets them, so they borrow existing wording.
+  'outside-office-area': 'forbidden',
+  'central-scope-required': 'forbidden',
+  'predecessor-not-revoked': 'conflict',
+  'item-in-open-draft': 'conflict',
+  'queue-changed': 'conflict',
+  forbidden: 'forbidden',
   unreachable: 'unreachable',
   unknown: 'unknown',
   revoked: 'revoked',

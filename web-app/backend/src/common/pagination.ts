@@ -60,7 +60,7 @@ export function parsePageQuery(skip?: string, take?: string): PaginationParams {
  * decision point: the descriptive certificate fields (address, area,
  * certificate serial, book entry number, map sheet number, land origin,
  * issuing authority, issue date) and internal bookkeeping (id, createdAt,
- * updatedAt, issuedAt, issuanceBatchId) all leaked onto the unauthenticated
+ * updatedAt, issuedAt) all leaked onto the unauthenticated
  * `GET /api/records*` routes even though `mortgage.circom` exists specifically
  * so a bank never has to see `encumbranceStatus`/`validityPeriod` directly.
  *
@@ -76,7 +76,7 @@ export function parsePageQuery(skip?: string, take?: string): PaginationParams {
  *  root this plot's leaf last changed in (D72). Deliberately excluded: every descriptive certificate
  *  field, the Merkle path itself (it belongs to the proof endpoint, which
  *  computes it from `merkle_nodes` — D72), and internal columns
- *  (`id`, `createdAt`, `updatedAt`, `issuedAt`, `issuanceBatchId`) —
+ *  (`id`, `createdAt`, `updatedAt`, `issuedAt`) —
  *  `updatedAt` in particular would tell an observer which plot last changed
  *  hands, which the anonymised history endpoint is designed not to reveal. */
 export function serializePropertyPublic<
@@ -140,7 +140,7 @@ export function serializePropertySummary<
  * same reason as the other two: a `...spread` here would mean the next column
  * added to the schema silently joins an API response nobody re-reviewed.
  *
- * Deliberately still absent: `id`, `createdAt`, `updatedAt`, `issuanceBatchId`,
+ * Deliberately still absent: `id`, `createdAt`, `updatedAt`,
  * `leaf`. Those are internal bookkeeping; the Merkle path belongs to the proof
  * endpoint, and an officer who needs the rest can query the database.
  */

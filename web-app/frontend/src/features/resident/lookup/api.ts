@@ -56,14 +56,31 @@ export interface PropertyEvent {
   occurredAt: string;
 }
 
-export interface PropertyHistory {
+/**
+ * One certificate in a plot's chain of re-issues (D90). `generation` is
+ * negative for ancestors, 0 for the queried certificate, positive for
+ * descendants. The id lists are DIRECT neighbours, so a split parent lists
+ * both children even when the sibling is not itself a node.
+ */
+export interface LineageNode {
   propertyId: string;
+  status: PropertyStatus;
+  generation: number;
+  predecessors: string[];
+  successors: string[];
   events: PropertyEvent[];
 }
 
-/** GET /api/records/:propertyId/history — oldest event first, no pagination. */
-export async function getPropertyHistory(propertyId: string): Promise<PropertyHistory> {
-  return apiFetch<PropertyHistory>(`/records/${propertyId}/history`);
+export interface Lineage {
+  propertyId: string;
+  nodes: LineageNode[];
+  /** The walk hit the server's node cap, so the chain is cut off. */
+  truncated: boolean;
+}
+
+/** GET /api/records/:propertyId/lineage — every certificate of the land, each with its events. */
+export async function getLineage(propertyId: string): Promise<Lineage> {
+  return apiFetch<Lineage>(`/records/${propertyId}/lineage`);
 }
 
 /** GET /api/records/:propertyId — the five-field public tier (D50). */

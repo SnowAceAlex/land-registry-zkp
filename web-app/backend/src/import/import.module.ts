@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { ImportService } from './import.service';
 import { LandLawModule } from '../land-law/land-law.module';
+import { LineageModule } from '../lineage/lineage.module';
 
 /**
  * ImportModule — bulk load of land records from an official CSV export.
@@ -15,7 +16,7 @@ import { LandLawModule } from '../land-law/land-law.module';
  * The statutory rules it validates against come from LandLawModule.
  */
 @Module({
-  imports: [LandLawModule],
+  imports: [LandLawModule, LineageModule],
   providers: [ImportService],
   exports: [ImportService],
 })

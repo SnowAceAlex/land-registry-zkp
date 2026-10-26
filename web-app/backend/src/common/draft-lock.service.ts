@@ -1,45 +1,37 @@
 import { ConflictException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
-export type OpenDraft = { kind: 'issuance' | 'changeset'; id: number };
+export type OpenDraft = { kind: 'changeset'; id: number };
+
+/** The service's own client, or the transaction createDraft holds its advisory lock in. */
+type DraftClient = Pick<Prisma.TransactionClient, 'changeSet'>;
 
 /**
- * DraftLockService — at most one open draft, across both draft types (D44).
+ * DraftLockService — at most one open draft (D44).
  *
- * A Merkle root commits to the WHOLE tree, not just the leaves that changed, so
- * two drafts computed from the same base tree silently overwrite each other:
- * publish an issuance root and then a change-set root that was computed before
- * it, and the newly issued plots vanish from the tree with no error anywhere —
- * the second root is perfectly valid, it just commits to a tree that never had
- * them. The owner finds out when their brand-new bundle fails with RootMismatch.
- *
- * Serialising drafts removes the whole class of problem without any conflict
- * detection. A registry publishes serially in practice anyway, and publishing is
- * a manual, scheduled action (D46), so this almost never blocks anyone.
+ * A Merkle root commits to the WHOLE tree, so two drafts computed from the same
+ * base tree silently overwrite each other: publish one root and then another
+ * computed before it, and the first round's changes vanish from the tree with
+ * no error anywhere. Serialising drafts removes that class of problem without
+ * conflict detection; publishing is a manual, scheduled action (D46), so this
+ * almost never blocks anyone.
  */
 @Injectable()
 export class DraftLockService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async openDraft(): Promise<OpenDraft | null> {
-    const issuance = await this.prisma.issuanceBatch.findFirst({
+  async openDraft(client: DraftClient = this.prisma): Promise<OpenDraft | null> {
+    const changeSet = await client.changeSet.findFirst({
       where: { status: 'DRAFT' },
       select: { id: true },
     });
-    if (issuance) return { kind: 'issuance', id: issuance.id };
-
-    const changeSet = await this.prisma.changeSet.findFirst({
-      where: { status: 'DRAFT' },
-      select: { id: true },
-    });
-    if (changeSet) return { kind: 'changeset', id: changeSet.id };
-
-    return null;
+    return changeSet ? { kind: 'changeset', id: changeSet.id } : null;
   }
 
-  async assertNoOpenDraft(): Promise<void> {
-    const open = await this.openDraft();
+  async assertNoOpenDraft(client: DraftClient = this.prisma): Promise<void> {
+    const open = await this.openDraft(client);
     if (!open) return;
 
     throw new ConflictException(

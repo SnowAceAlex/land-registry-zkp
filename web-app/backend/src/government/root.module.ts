@@ -5,16 +5,9 @@ import { RootService } from './root.service';
 /**
  * RootModule
  * ─────────────────────────────────────────────────────────────────────────────
- * RootService in its own module, separate from GovernmentModule.
- *
- * GovernmentModule imports IssuanceModule (for IssuanceService/IssuerService).
- * IssuanceModule's IssuanceBatchService (D43) also needs RootService — but
- * having IssuanceModule import GovernmentModule to reach it would close a
- * two-module cycle (GovernmentModule -> IssuanceModule -> GovernmentModule)
- * that only forwardRef() can break. Splitting RootService into its own module
- * removes the cycle instead of papering over it: both GovernmentModule and
- * IssuanceModule import RootModule directly, and neither depends on the other
- * for it.
+ * RootService in its own module, separate from GovernmentModule, so a module
+ * that needs it can import it without importing GovernmentModule (which imports
+ * IssuanceModule) and closing a cycle.
  *
  * GovernmentModule re-exports RootModule so existing consumers (TransfersModule,
  * which imports GovernmentModule for RootService) keep working unchanged.

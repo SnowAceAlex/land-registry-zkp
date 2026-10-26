@@ -80,6 +80,18 @@ describe('parseApiError', () => {
     }
   });
 
+  it('keeps the office-scope and queue reasons (D86, D87, D90)', () => {
+    const cases: [number, string][] = [
+      [403, 'OutsideOfficeArea'],
+      [403, 'CentralScopeRequired'],
+      [409, 'PredecessorNotRevoked'],
+      [409, 'ItemInOpenDraft'],
+    ];
+    for (const [status, reason] of cases) {
+      expect(parseApiError(status, { reason, message: 'x' }).reason).toBe(reason);
+    }
+  });
+
   it('ignores a reason that is not one of the D33 names', () => {
     expect(parseApiError(422, { reason: 42, message: 'x' }).reason).toBeUndefined();
   });

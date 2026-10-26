@@ -1,49 +1,62 @@
 import {
   ConflictException,
-  GoneException,
   Injectable,
   Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ChangeSet, DraftStatus, Property, Revocation, TransferRequest } from '@prisma/client';
-import { type TreeOverlay, hashRecord } from '@land-registry/blockchain/shared';
+import {
+  ChangeSet,
+  DraftStatus,
+  IssuanceRequest,
+  Prisma,
+  Property,
+  Revocation,
+  TransferRequest,
+} from '@prisma/client';
+import { hashRecord } from '@land-registry/blockchain/shared';
 
 import { ChainService } from '../chain/chain.service';
+import { Actor } from '../common/actor';
 import { DraftLockService } from '../common/draft-lock.service';
-import { ARCHIVE_TTL_DAYS, ArchiveEntry, ArchiveService } from '../issuance/archive.service';
+import { ARCHIVE_TTL_DAYS } from '../issuance/archive.service';
+import { IssuanceRequestDto } from '../issuance/dto/issuance-request.dto';
+import { toIssuanceRequestDto } from '../issuance/issuance-request.serializer';
 import { IssuanceService } from '../issuance/issuance.service';
 import { PropertyEventService } from '../history/property-event.service';
+import { LineageService } from '../lineage/lineage.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeStoreService } from '../tree/node-store.service';
 import { toLURRecord } from '../records/record.mapper';
 import { TransferRequestDto } from '../transfers/dto/transfer.response.dto';
+import { officeCodes } from '../common/office-codes';
 import { toTransferRequestDto } from '../transfers/transfer-request.serializer';
+import { RevocationDto } from './dto/revocation.response.dto';
+import { toRevocationDto } from './revocation.serializer';
 import { RootService } from './root.service';
+import { RoundArchiveBuilder } from './round-archive.builder';
+import { RoundArchiveService } from './round-archive.service';
 
 /**
- * Most revocations one change set may carry (D56, re-measured at D73).
- *
- * `publishRootWithRevocations` caps nothing itself, and a batch past the block
- * gas limit reverts WHOLESALE — nothing publishes at all. The cap lives here
- * rather than in the portal because `createDraft()` takes the entire queue:
- * there is no selection step a UI could limit.
- *
- * Measured in `blockchain/test/contracts/RootRegistry.revocation.test.ts`, on a
- * linear ~93k gas per revocation:
- *
- *     50 → 4,743,185    100 → 9,369,525    150 → 13,996,021    180 → 16,771,994
- *     190 and above → estimateGas itself fails on the dev network
- *
- * 150 is the largest rung still under half of a 30M block, which leaves room
- * for a gas-price spike, for other transactions in the same block, and for a
- * real mined call costing more than its estimate.
- *
- * Why 50 was too small: ~20,890 certificates are re-issued each month in HCMC
- * (re-books, splits and merges = revoke + issue), which at 50 a round is ~418
- * change sets a month — every one of them a publish and a wallet signature.
+ * Most revocations one round carries (D56/D73) — past the block gas limit the
+ * publish reverts wholesale. 150 is the largest measured rung under half of a
+ * 30M block on Hardhat (~93k gas each); see RootRegistry.revocation.test.ts.
  */
-export const MAX_REVOCATIONS_PER_CHANGESET = 150;
+export const DEFAULT_REVOCATION_CAP = 150;
+
+/** REVOCATION_CAP as a positive integer, else the default. Sepolia needs ≤ 60 (~448k gas each). */
+export function revocationCap(): number {
+  const raw = process.env.REVOCATION_CAP?.trim() ?? '';
+  const value = Number(raw);
+  return /^\d+$/.test(raw) && Number.isSafeInteger(value) && value > 0
+    ? value
+    : DEFAULT_REVOCATION_CAP;
+}
+
+/** Advisory-lock key ("LR_ROUND" in ASCII) that serialises draft creation across connections. */
+export const ROUND_DRAFT_LOCK_KEY = 0x4c525f524f554e44n;
+const ROUND_DRAFT_LOCK_SQL = `SELECT pg_advisory_xact_lock(${ROUND_DRAFT_LOCK_KEY})`;
+const DRAFT_TRANSACTION_TIMEOUT_MS = 120_000;
 
 /** Arguments for `RootRegistry.publishRootWithRevocations`, index-aligned. */
 export interface RevocationCalldata {
@@ -52,7 +65,7 @@ export interface RevocationCalldata {
   detailHashes: string[];
 }
 
-/** Summary row for `list()` — deliberately excludes `archiveZip` (D77). */
+/** Summary row for `list()` — never carries archive bytes (D77, D88). */
 export interface ChangeSetSummary {
   id: number;
   status: DraftStatus;
@@ -61,9 +74,12 @@ export interface ChangeSetSummary {
   txHash: string | null;
   createdAt: Date;
   publishedAt: Date | null;
-  archiveExpiresAt: Date | null;
+  issuanceCount: number;
   transferCount: number;
   revocationCount: number;
+  /** One archive per office that received bundles (D88). */
+  archiveCount: number;
+  archivesDownloaded: number;
 }
 
 /** What a portal needs to sign (or resume signing) a change-set draft (D53). */
@@ -72,6 +88,7 @@ export interface ChangeSetDraftDetail {
   id: number;
   newRoot: string;
   createdAt: Date;
+  issuanceRequestIds: number[];
   transferIds: number[];
   revocationIds: number[];
   revocationCalldata: RevocationCalldata;
@@ -79,37 +96,18 @@ export interface ChangeSetDraftDetail {
   deferredRevocations: number;
 }
 
+type IssuanceItem = Pick<IssuanceRequest, 'id' | 'propertyId' | 'ownerCommitment'>;
+type TransferItem = Pick<TransferRequest, 'id' | 'propertyId' | 'newOwnerCommitment'>;
+
+const notHeld = <T extends { heldAt: Date | null }>(rows: T[]): T[] =>
+  rows.filter((row) => row.heldAt === null);
+
 /**
- * ChangeSetService — one publishing round of approved transfers and revocations (D44/D46).
- *
- * Mirrors IssuanceBatchService's two-phase draft/confirm/discard shape (D43): a
- * DRAFT is a durable, inert record — createDraft() only `connect`s the
- * TransferRequest and Revocation rows it covers, never writes to Property or
- * to either row's `status` — and confirm() re-verifies against the chain
- * before applying anything for real.
- *
- * What differs from issuance is where the new root comes from. A transfer
- * proof's public signals carry a `newRoot`, but that value was computed
- * assuming only that ONE transfer happened; batching N transfers (and
- * revocations) together produces one root, not N superseding ones. So the
- * proof is authorisation evidence — proof that whoever submitted it held the
- * old owner's secret — never a source of truth for the tree. The tree here is
- * always rebuilt from the database, with every change in the round applied in
- * memory first, exactly the way IssuanceBatchService rebuilds from the
- * database rather than trusting anything computed at draft time.
- *
- * A revocation's enforcement falls out of that same rebuild for free: a
- * revoked plot is excluded because its Property.status becomes REVOKED
- * (membership is `status === ISSUED`, D45), so no Merkle path exists for it in
- * the new tree and the ownership/mortgage/transfer circuits simply cannot
- * produce a proof for it afterwards. The on-chain `revocations` mapping this
- * draft's calldata feeds is for public auditability, not enforcement —
- * enforcement is already free.
- *
- * Since D77 a round with transfers also produces an archive: each transferred
- * plot's folder holds the buyer's receipt, secret, certificate and README,
- * exactly like an issuance folder, and the secrets leave the TransferRequest
- * rows in the same transaction that stores it.
+ * The one publishing round (D84): READY issuances, APPROVED transfers and PENDING
+ * revocations projected into a single root. Same draft → sign → confirm shape as D43:
+ * a draft only attaches its items, and confirm() re-checks against the chain before
+ * writing anything. Transfer proofs are authorisation evidence only — the tree is
+ * always rebuilt from the database with the whole round applied.
  */
 @Injectable()
 export class ChangeSetService {
@@ -123,109 +121,96 @@ export class ChangeSetService {
     private readonly lock: DraftLockService,
     private readonly events: PropertyEventService,
     private readonly issuance: IssuanceService,
-    private readonly archive: ArchiveService,
+    private readonly roundArchives: RoundArchiveBuilder,
+    private readonly lineage: LineageService,
+    private readonly archives: RoundArchiveService,
   ) {}
 
   /**
-   * Everything eligible for the next change set, as the portal sees it, plus
-   * the cap (D73). Transfers go through toTransferRequestDto: the rows hold the
-   * buyers' secrets until a change set archives them (D77).
+   * Everything eligible for the next round, plus the cap (D73). Requests go through
+   * their serializers: the rows hold owner/buyer secrets until a round archives them.
    */
-  async pending(): Promise<{
+  async pending(actor: Actor): Promise<{
+    issuances: IssuanceRequestDto[];
     transfers: TransferRequestDto[];
-    revocations: Revocation[];
+    revocations: RevocationDto[];
     revocationCap: number;
   }> {
-    const { transfers, revocations } = await this.queue();
+    // D86: a branch sees only the plots of its own area.
+    const area = actor.scope === 'BRANCH' ? { landOfficeId: actor.officeId } : {};
+    const [queue, offices] = await Promise.all([this.queue(area), officeCodes(this.prisma)]);
     return {
-      transfers: transfers.map(toTransferRequestDto),
-      revocations,
-      revocationCap: MAX_REVOCATIONS_PER_CHANGESET,
+      issuances: notHeld(queue.issuances).map((row) => toIssuanceRequestDto(row, offices)),
+      transfers: notHeld(queue.transfers).map((row) => toTransferRequestDto(row, offices)),
+      revocations: notHeld(queue.revocations).map((row) => toRevocationDto(row, offices)),
+      revocationCap: revocationCap(),
     };
   }
 
-  /** The raw queue — rows with their secrets, for this service only. */
-  private async queue(): Promise<{ transfers: TransferRequest[]; revocations: Revocation[] }> {
-    const [transfers, revocations] = await Promise.all([
-      this.prisma.transferRequest.findMany({
-        where: { status: 'APPROVED', changeSetId: null },
-        orderBy: { createdAt: 'asc' },
-      }),
-      this.prisma.revocation.findMany({
-        // changeSetId: null mirrors the transfer query above. Without it, a
-        // revocation already `connect`ed to an open DRAFT would still be
-        // reported as "pending" here — misleading even though
-        // DraftLockService is already refusing to start a second draft that
-        // could batch it again.
-        where: { status: 'PENDING', changeSetId: null },
-        orderBy: { createdAt: 'asc' },
-      }),
+  /**
+   * The raw queue, rows with their secrets, for this service only. Held items are
+   * included: they are still open procedures, so they keep blocking conflicting ones
+   * even though they never enter a round (D87).
+   */
+  private async queue(
+    area: { landOfficeId?: number } = {},
+    client: Prisma.TransactionClient = this.prisma,
+  ): Promise<{
+    issuances: IssuanceRequest[];
+    transfers: TransferRequest[];
+    revocations: Revocation[];
+  }> {
+    const open = { changeSetId: null, ...area };
+    const orderBy = { createdAt: 'asc' as const };
+    const [issuances, transfers, revocations] = await Promise.all([
+      client.issuanceRequest.findMany({ where: { status: 'READY', ...open }, orderBy }),
+      client.transferRequest.findMany({ where: { status: 'APPROVED', ...open }, orderBy }),
+      client.revocation.findMany({ where: { status: 'PENDING', ...open }, orderBy }),
     ]);
-    return { transfers, revocations };
+    return { issuances, transfers, revocations };
   }
 
   /**
-   * Phase 1 — gather every approved transfer and pending revocation, project
-   * the ONE root that applying all of them at once produces, and store it as a
-   * draft. No Property, TransferRequest or Revocation row is written here —
-   * only `connect`ed to the new draft — so an abandoned draft can never leave
-   * any of them in a half-applied state.
+   * Phase 1 — take the whole queue, project the ONE root that applying all of it
+   * produces, and store it as a draft. Nothing but the new ChangeSet row and its items'
+   * `changeSetId` is written, so an abandoned draft leaves nothing half-applied.
+   * One transaction under an advisory lock, so two concurrent calls cannot both open a draft.
    */
-  async createDraft(): Promise<ChangeSetDraftDetail> {
-    await this.lock.assertNoOpenDraft();
+  async createDraft(actor: Actor): Promise<ChangeSetDraftDetail> {
+    return this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRawUnsafe(ROUND_DRAFT_LOCK_SQL);
+        await this.lock.assertNoOpenDraft(tx);
+        return this.buildDraft(tx, actor);
+      },
+      {
+        timeout: DRAFT_TRANSACTION_TIMEOUT_MS,
+        // The lock argument needs READ COMMITTED: each statement after the wait sees committed drafts.
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      },
+    );
+  }
 
-    const { transfers, revocations: pendingRevocations } = await this.queue();
-    if (transfers.length === 0 && pendingRevocations.length === 0) {
-      throw new ConflictException('Nothing to publish — no approved transfers, no revocations');
+  private async buildDraft(
+    tx: Prisma.TransactionClient,
+    actor: Actor,
+  ): Promise<ChangeSetDraftDetail> {
+    const queued = await this.queue({}, tx);
+    const issuances = notHeld(queued.issuances);
+    const transfers = notHeld(queued.transfers);
+    const pendingRevocations = notHeld(queued.revocations);
+    if (issuances.length === 0 && transfers.length === 0 && pendingRevocations.length === 0) {
+      throw new ConflictException(
+        'Nothing to publish — no issuance requests, approved transfers or revocations',
+      );
     }
 
-    // Defence in depth. TransfersService.submit() already refuses a second
-    // transfer while one is PENDING or APPROVED for the same property, and
-    // RevocationService.request() refuses a second pending revocation for the
-    // same property — but neither knows about the other. If a plot somehow
-    // had both, this batch would be asked to simultaneously keep it (under a
-    // new owner) and drop it from the tree. Refuse instead of silently
-    // picking one.
-    //
-    // Checked against the WHOLE queue, deferred revocations included: a plot
-    // transferred in this round and revoked in the next is the same conflict,
-    // just spread over two publishes.
-    // The message names what was actually found. The set used to be shared
-    // between both lists, so two queued transfers for one plot were reported as
-    // "a transfer and a revocation" — an officer sent looking for a revocation
-    // that does not exist. Keeping the two kinds apart costs one extra set and
-    // makes the error actionable.
-    const transferred = new Set<string>();
-    const revoked = new Set<string>();
-    for (const transfer of transfers) {
-      if (transferred.has(transfer.propertyId)) {
-        throw new ConflictException(
-          `Property ${transfer.propertyId} has more than one approved transfer waiting — ` +
-            `reject all but one before publishing.`,
-        );
-      }
-      transferred.add(transfer.propertyId);
-    }
-    for (const revocation of pendingRevocations) {
-      if (revoked.has(revocation.propertyId)) {
-        throw new ConflictException(
-          `Property ${revocation.propertyId} has more than one pending revocation — ` +
-            `reject all but one before publishing.`,
-        );
-      }
-      if (transferred.has(revocation.propertyId)) {
-        throw new ConflictException(
-          `Property ${revocation.propertyId} has both a transfer and a revocation pending — ` +
-            `resolve the conflict before publishing.`,
-        );
-      }
-      revoked.add(revocation.propertyId);
-    }
+    // Held items are left out of the round, not out of the conflict check.
+    this.assertNoConflicts(queued.issuances, queued.transfers, queued.revocations);
 
     // D77 — the buyer's secret travels with the request into this round's
-    // archive. A request submitted before D77 has none (the buyer took it home
-    // from the counter), and publishing its commitment would leave a plot whose
-    // archive holds no key. Refuse and name them.
+    // archive. A request submitted before D77 has none, and publishing its
+    // commitment would leave a plot whose archive holds no key.
     const secretless = transfers.filter((transfer) => transfer.newOwnerSecret === null);
     if (secretless.length > 0) {
       throw new ConflictException(
@@ -233,36 +218,53 @@ export class ChangeSetService {
           `secret — they were submitted before D77. Reject them and redo the transfers at the counter.`,
       );
     }
+    // D87: same rule for the owner's secret, kept on the request until the archive lands.
+    const keyless = issuances.filter((request) => request.ownerSecret === null);
+    if (keyless.length > 0) {
+      throw new ConflictException(
+        `Issuance request(s) ${keyless.map((r) => `#${r.id}`).join(', ')} carry no owner ` +
+          `secret. Withdraw them and queue the plots again.`,
+      );
+    }
+    const mismatched = await this.mismatchedCommitments(issuances);
+    if (mismatched.length > 0) {
+      throw new ConflictException(
+        `Issuance request(s) ${mismatched.map((id) => `#${id}`).join(', ')} hold a secret that ` +
+          `does not open their commitment. Withdraw them and queue the plots again.`,
+      );
+    }
+
+    // D90, re-checked: a re-issued certificate publishes only once all it replaces are REVOKED.
+    if (issuances.length > 0) {
+      await this.lineage.assertPredecessorsRevoked(issuances.map((r) => r.propertyId));
+    }
 
     // D56 — oldest first (queue() orders by createdAt), the rest wait.
-    const revocations = pendingRevocations.slice(0, MAX_REVOCATIONS_PER_CHANGESET);
+    const revocations = pendingRevocations.slice(0, revocationCap());
 
-    // Project every change at once and take ONE root. N transfers and
-    // revocations batched together produce one root, not N. Only the plots in
-    // this round are read (D72) — the projection walks up from their leaves
-    // instead of rebuilding the registry.
-    const { updates } = await this.leafUpdatesFor(transfers, revocations);
+    // Only the plots in this round are read (D72): the projection walks up from
+    // their leaves instead of rebuilding the registry.
+    const { updates } = await this.leafUpdatesFor(issuances, transfers, revocations, tx);
     const overlay = await this.nodes.projectRoot(updates);
 
-    // No relation `connect` touches Property here — same reasoning as
-    // IssuanceBatchService.createDraft(): only confirm() may write it, and
-    // only after a signature.
-    const draft = await this.prisma.changeSet.create({
+    const draft = await tx.changeSet.create({
       data: {
         status: 'DRAFT',
         newRoot: overlay.root.toString(),
-        transfers: { connect: transfers.map((t) => ({ id: t.id })) },
-        revocations: { connect: revocations.map((r) => ({ id: r.id })) },
+        createdByOfficeId: actor.officeId,
       },
     });
+    await this.attachItems(tx, draft.id, issuances, transfers, revocations);
 
     this.logger.log(
-      `change set draft #${draft.id}: ${transfers.length} transfer(s), ` +
-        `${revocations.length} revocation(s), projected root ${overlay.root}`,
+      `change set draft #${draft.id}: ${issuances.length} issuance(s), ` +
+        `${transfers.length} transfer(s), ${revocations.length} revocation(s), ` +
+        `projected root ${overlay.root}`,
     );
 
     return this.toDraftDetail(
       draft,
+      issuances,
       transfers,
       revocations,
       pendingRevocations.length - revocations.length,
@@ -270,15 +272,139 @@ export class ChangeSetService {
   }
 
   /**
-   * An open draft as the portal sees it (D53) — the same shape createDraft()
-   * returned, rebuilt from the stored relations. Without it a session that
-   * lost that response could never sign again: pending() excludes everything
-   * already connected to a draft, so the calldata would exist nowhere.
+   * Attaches each item only if it is still open, unheld and in no round. A withdraw or hold
+   * that committed after the queue read leaves a count short: 409 QueueChanged, rolled back.
+   */
+  private async attachItems(
+    tx: Prisma.TransactionClient,
+    changeSetId: number,
+    issuances: { id: number }[],
+    transfers: { id: number }[],
+    revocations: { id: number }[],
+  ): Promise<void> {
+    const data = { changeSetId };
+    const open = (rows: { id: number }[]) => ({
+      id: { in: rows.map((row) => row.id) },
+      changeSetId: null,
+      heldAt: null,
+    });
+    const check = (kind: string, count: number, expected: number) => {
+      if (count === expected) return;
+      throw new ConflictException({
+        reason: 'QueueChanged',
+        message:
+          `The queue changed while round #${changeSetId} was being built: only ${count} of ` +
+          `${expected} ${kind} item(s) were still open. Create the round again.`,
+      });
+    };
+
+    if (issuances.length > 0) {
+      const { count } = await tx.issuanceRequest.updateMany({
+        where: { ...open(issuances), status: 'READY' },
+        data,
+      });
+      check('issuance', count, issuances.length);
+    }
+    if (transfers.length > 0) {
+      const { count } = await tx.transferRequest.updateMany({
+        where: { ...open(transfers), status: 'APPROVED' },
+        data,
+      });
+      check('transfer', count, transfers.length);
+    }
+    if (revocations.length > 0) {
+      const { count } = await tx.revocation.updateMany({
+        where: { ...open(revocations), status: 'PENDING' },
+        data,
+      });
+      check('revocation', count, revocations.length);
+    }
+  }
+
+  /** D87: ids of requests whose stored secret does not open the stored commitment. */
+  private async mismatchedCommitments(
+    issuances: Pick<IssuanceRequest, 'id' | 'ownerSecret' | 'ownerCommitment'>[],
+  ): Promise<number[]> {
+    const mismatched: number[] = [];
+    for (const request of issuances) {
+      const commitment = await this.issuance.commitmentFor(BigInt(request.ownerSecret!));
+      if (commitment.toString() !== request.ownerCommitment) mismatched.push(request.id);
+    }
+    return mismatched;
+  }
+
+  /**
+   * Defence in depth: the request services already refuse a second open procedure
+   * on a plot (D80), but none of them sees the whole queue. A plot named twice would
+   * ask this round to apply two leaves at one slot — refuse instead of picking one.
+   * Checked against every queued revocation, deferred ones included.
+   */
+  private assertNoConflicts(
+    issuances: { propertyId: string }[],
+    transfers: { propertyId: string }[],
+    revocations: { propertyId: string }[],
+  ): void {
+    const issued = new Set<string>();
+    const transferred = new Set<string>();
+    const revoked = new Set<string>();
+
+    for (const { propertyId } of issuances) {
+      if (issued.has(propertyId)) {
+        throw new ConflictException(
+          `Property ${propertyId} has more than one issuance request queued — ` +
+            `withdraw all but one before publishing.`,
+        );
+      }
+      issued.add(propertyId);
+    }
+    for (const { propertyId } of transfers) {
+      if (transferred.has(propertyId)) {
+        throw new ConflictException(
+          `Property ${propertyId} has more than one approved transfer waiting — ` +
+            `reject all but one before publishing.`,
+        );
+      }
+      if (issued.has(propertyId)) {
+        throw new ConflictException(
+          `Property ${propertyId} has both an issuance request and a transfer queued — ` +
+            `resolve the conflict before publishing.`,
+        );
+      }
+      transferred.add(propertyId);
+    }
+    for (const { propertyId } of revocations) {
+      if (revoked.has(propertyId)) {
+        throw new ConflictException(
+          `Property ${propertyId} has more than one pending revocation — ` +
+            `reject all but one before publishing.`,
+        );
+      }
+      if (issued.has(propertyId)) {
+        throw new ConflictException(
+          `Property ${propertyId} has both an issuance request and a revocation queued — ` +
+            `resolve the conflict before publishing.`,
+        );
+      }
+      if (transferred.has(propertyId)) {
+        throw new ConflictException(
+          `Property ${propertyId} has both a transfer and a revocation pending — ` +
+            `resolve the conflict before publishing.`,
+        );
+      }
+      revoked.add(propertyId);
+    }
+  }
+
+  /**
+   * An open draft as the portal sees it (D53), rebuilt from the stored relations —
+   * pending() excludes everything connected to a draft, so this is the only way a
+   * session that lost the create response can sign again.
    */
   async draftDetail(id: number): Promise<ChangeSetDraftDetail> {
     const draft = await this.prisma.changeSet.findUnique({
       where: { id },
       include: {
+        issuances: { orderBy: { createdAt: 'asc' } },
         transfers: { orderBy: { createdAt: 'asc' } },
         revocations: { orderBy: { createdAt: 'asc' } },
       },
@@ -289,19 +415,18 @@ export class ChangeSetService {
     }
 
     const deferred = await this.prisma.revocation.count({
-      where: { status: 'PENDING', changeSetId: null },
+      where: { status: 'PENDING', changeSetId: null, heldAt: null },
     });
-    return this.toDraftDetail(draft, draft.transfers, draft.revocations, deferred);
+    return this.toDraftDetail(draft, draft.issuances, draft.transfers, draft.revocations, deferred);
   }
 
   /**
-   * One mapping for createDraft() and draftDetail(), so the calldata a resumed
-   * session signs is built by the same code as the calldata first shown. Order
-   * does not affect the root (it is rebuilt from the database) — only the
-   * order the contract writes its `revocations` mapping in.
+   * One mapping for createDraft() and draftDetail(), so a resumed session signs the
+   * calldata first shown. Order matters only for the contract's `revocations` writes.
    */
   private toDraftDetail(
     draft: Pick<ChangeSet, 'id' | 'newRoot' | 'createdAt'>,
+    issuances: Pick<IssuanceRequest, 'id'>[],
     transfers: Pick<TransferRequest, 'id'>[],
     revocations: Pick<Revocation, 'id' | 'propertyId' | 'reasonCode' | 'detailHash'>[],
     deferredRevocations: number,
@@ -311,6 +436,7 @@ export class ChangeSetService {
       id: draft.id,
       newRoot: draft.newRoot,
       createdAt: draft.createdAt,
+      issuanceRequestIds: issuances.map((r) => r.id),
       transferIds: transfers.map((t) => t.id),
       revocationIds: revocations.map((r) => r.id),
       revocationCalldata: {
@@ -323,32 +449,40 @@ export class ChangeSetService {
   }
 
   /**
-   * Phase 2 — the officer has signed both the root and (when the round
-   * includes any) the revocation calldata. Verify against the CHAIN, not
-   * against anything the caller says, then apply everything in one
-   * transaction.
+   * Phase 2 — the officer has signed the root (and the revocation calldata, if any).
+   * Verify against the CHAIN, not against anything the caller says, then apply
+   * everything in one transaction.
    */
   async confirm(
     id: number,
-    txHash?: string,
+    txHash: string | undefined,
+    actor: Actor,
   ): Promise<{
     id: number;
     rootVersion: number;
     txHash: string | null;
+    issuanceRequestIds: number[];
     transferIds: number[];
     revocationIds: number[];
   }> {
+    // D88: expired archives lose their server copy here, so their secrets do not linger (best effort).
+    try {
+      await this.archives.purgeExpired(new Date());
+    } catch (error) {
+      this.logger.warn(`purging expired archives failed: ${(error as Error).message}`);
+    }
+
     const draft = await this.prisma.changeSet.findUnique({
       where: { id },
-      include: { transfers: true, revocations: true },
+      include: { issuances: true, transfers: true, revocations: true },
     });
     if (!draft) throw new NotFoundException(`Change set #${id} not found`);
     if (draft.status !== 'DRAFT') {
       throw new ConflictException(`Change set #${id} is already ${draft.status}`);
     }
 
-    // Same rule as createDraft(), re-checked because a draft may predate D77.
-    // Before the chain read: nothing about this draft can be applied anyway.
+    // Same rules as createDraft(), re-checked before the chain read: a commitment
+    // published without its secret is a plot nobody can ever prove.
     const secretless = draft.transfers.filter((transfer) => transfer.newOwnerSecret === null);
     if (secretless.length > 0) {
       throw new UnprocessableEntityException(
@@ -356,19 +490,30 @@ export class ChangeSetService {
           `carry no buyer secret. Discard this change set, reject them, and redo them at the counter.`,
       );
     }
+    const keyless = draft.issuances.filter((request) => request.ownerSecret === null);
+    if (keyless.length > 0) {
+      throw new UnprocessableEntityException(
+        `Issuance request(s) ${keyless.map((r) => `#${r.id}`).join(', ')} in change set #${id} ` +
+          `carry no owner secret. Discard this change set, withdraw them, and queue the plots again.`,
+      );
+    }
+    const mismatched = await this.mismatchedCommitments(draft.issuances);
+    if (mismatched.length > 0) {
+      throw new UnprocessableEntityException(
+        `Issuance request(s) ${mismatched.map((r) => `#${r}`).join(', ')} in change set #${id} ` +
+          `hold a secret that does not open their commitment. Discard this change set, ` +
+          `withdraw them, and queue the plots again.`,
+      );
+    }
 
-    // `txHash` is a label for humans — surfaced later in history views so a
-    // reader can jump to a block explorer — never evidence that the publish
-    // happened. That authority stays exactly the chain read immediately
-    // below. Stashing it on the in-memory draft here just makes every write
-    // further down (the MerkleRoot row, the PropertyEvent rows, this row)
-    // carry the same label; nothing branches on whether it is present.
+    // `txHash` is a display label (history, explorer links), never evidence of the
+    // publish — that authority is the chain read right below.
     if (txHash !== undefined) {
       draft.txHash = txHash;
     }
 
-    // D74 — the root read is cached for 2 seconds; a confirm must always ask
-    // the chain itself, or a just-mined publish can be reported as unmined.
+    // D74 — the root read is cached; a confirm must always ask the chain itself,
+    // or a just-mined publish can be reported as unmined.
     this.chain.invalidateRootCache();
     const latestRoot = await this.chain.getLatestRoot();
     if (latestRoot.toString() !== draft.newRoot) {
@@ -379,20 +524,15 @@ export class ChangeSetService {
     }
     const rootVersion = await this.chain.getRootVersion();
 
-    // `beforeById` is the "before" snapshot the history rows need:
-    // previousOwnerCommitment / previousLeaf must describe the tree as it stood
-    // before THIS round (PropertyEventService writes only forward-looking
-    // rows). It comes out of leafUpdatesFor because that call already has to
-    // read exactly these plots — reading them twice was the old shape.
+    // `before` is the tree as it stood before THIS round, for the history rows.
     const {
       updates,
       newLeaves,
       before: beforeById,
-    } = await this.leafUpdatesFor(draft.transfers, draft.revocations);
+    } = await this.leafUpdatesFor(draft.issuances, draft.transfers, draft.revocations);
     const overlay = await this.nodes.projectRoot(updates);
 
-    // Paranoia that has already paid for itself once in IssuanceBatchService:
-    // if the re-projected root no longer matches the signed one, something moved
+    // If the re-projected root no longer matches the signed one, something moved
     // underneath the draft and applying it would corrupt the registry.
     if (overlay.root.toString() !== draft.newRoot) {
       throw new UnprocessableEntityException(
@@ -402,23 +542,48 @@ export class ChangeSetService {
     }
 
     const decidedAt = new Date();
-    const archiveZip =
-      draft.transfers.length > 0
-        ? await this.buildArchive({
-            changeSetId: draft.id,
-            txHash: draft.txHash,
-            rootVersion,
-            overlay,
-            transfers: draft.transfers,
-            before: beforeById,
-            newLeaves,
-            publishedAt: decidedAt,
-          })
-        : null;
     const archiveExpiresAt = new Date(decidedAt.getTime() + ARCHIVE_TTL_DAYS * 24 * 60 * 60 * 1000);
 
     try {
+      // Every secret this round clears lives on an issuance or a transfer, so a round
+      // with neither has no archive and nothing to clear.
+      const archives =
+        draft.issuances.length > 0 || draft.transfers.length > 0
+          ? await this.roundArchives.build({
+              changeSetId: draft.id,
+              txHash: draft.txHash,
+              rootVersion,
+              overlay,
+              issuances: draft.issuances,
+              transfers: draft.transfers,
+              before: beforeById,
+              newLeaves,
+              publishedAt: decidedAt,
+              offices: await officeCodes(this.prisma),
+            })
+          : [];
+
       await this.prisma.$transaction([
+        ...draft.issuances.map((request) =>
+          this.prisma.property.update({
+            where: { propertyId: request.propertyId },
+            data: {
+              status: 'ISSUED',
+              ownerCommitment: request.ownerCommitment,
+              leaf: newLeaves.get(request.propertyId)!,
+              rootVersion,
+              issuedAt: decidedAt,
+            },
+          }),
+        ),
+        ...draft.issuances.map((request) =>
+          this.prisma.issuanceRequest.update({
+            where: { id: request.id },
+            // D87 — the archive rows in this same transaction are now the secret's copy of record.
+            data: { status: 'PUBLISHED', publishedAt: decidedAt, ownerSecret: null },
+          }),
+        ),
+
         ...draft.transfers.map((transfer) =>
           this.prisma.property.update({
             where: { propertyId: transfer.propertyId },
@@ -432,16 +597,13 @@ export class ChangeSetService {
         ...draft.transfers.map((transfer) =>
           this.prisma.transferRequest.update({
             where: { id: transfer.id },
-            // D77 — the secret's copy of record is now the archive written by
-            // the changeSet update below, in this same transaction.
+            // D77 — same rule for the buyer's secret.
             data: { status: 'PUBLISHED', txHash: draft.txHash, decidedAt, newOwnerSecret: null },
           }),
         ),
 
-        // A revoked plot leaves the tree (status !== ISSUED, D45), and its leaf
-        // is cleared along with the root version that leaf belonged to. The
-        // node itself is deleted by `applyStatements` below — the two have to
-        // agree, or a row would claim a leaf the tree no longer holds.
+        // A revoked plot leaves the tree (status !== ISSUED, D45); its leaf is cleared
+        // here and its node deleted by applyStatements below — the two must agree.
         ...draft.revocations.map((revocation) =>
           this.prisma.property.update({
             where: { propertyId: revocation.propertyId },
@@ -460,13 +622,17 @@ export class ChangeSetService {
           version: rootVersion,
           txHash: draft.txHash ?? '',
         }),
-        // Writes exactly the nodes this round moved — O(k·TREE_DEPTH), not the
-        // whole registry (D72). Every other owner needs no write at all: their
-        // proof is read out of this same table when they ask for it. That is
-        // the difference between one publish touching a few thousand rows and
-        // one publish rewriting 2.5 million.
+        // D72: writes only the nodes this round moved — O(k·TREE_DEPTH), not the registry.
         ...this.nodes.applyStatements(overlay),
 
+        ...this.events.issuedStatements(
+          draft.issuances.map((request) => ({
+            propertyId: request.propertyId,
+            ownerCommitment: request.ownerCommitment,
+            leaf: newLeaves.get(request.propertyId)!,
+          })),
+          { rootVersion, txHash: draft.txHash },
+        ),
         ...this.events.transferredStatements(
           draft.transfers.map((transfer) => ({
             propertyId: transfer.propertyId,
@@ -483,11 +649,24 @@ export class ChangeSetService {
             previousLeaf: beforeById.get(revocation.propertyId)?.leaf ?? null,
             reasonCode: revocation.reasonCode,
             // detailHash, never detailText: the free-text reason stays off the
-            // public history the same way it stays off chain (see
-            // PropertyEventService.RevokedEventInput).
+            // public history the same way it stays off chain.
             detailHash: revocation.detailHash,
           })),
           { rootVersion, txHash: draft.txHash },
+        ),
+
+        // D88: the secrets above are cleared only because these archives land in the same
+        // transaction. Buffer IS a Uint8Array; the cast narrows its buffer type.
+        ...archives.map((archive) =>
+          this.prisma.changeSetArchive.create({
+            data: {
+              changeSetId: draft.id,
+              officeId: archive.officeId,
+              zip: archive.zip as Uint8Array<ArrayBuffer>,
+              propertyCount: archive.propertyCount,
+              expiresAt: archiveExpiresAt,
+            },
+          }),
         ),
 
         this.prisma.changeSet.update({
@@ -497,93 +676,95 @@ export class ChangeSetService {
             rootVersion,
             publishedAt: decidedAt,
             txHash: draft.txHash,
-            // Same rule as IssuanceBatchService.confirm(): the secrets are
-            // cleared above only because this archive lands in the same
-            // transaction. Buffer IS a Uint8Array; see the cast there.
-            ...(archiveZip
-              ? { archiveZip: archiveZip as Uint8Array<ArrayBuffer>, archiveExpiresAt }
-              : {}),
+            confirmedByOfficeId: actor.officeId,
           },
         }),
       ]);
     } catch (error) {
-      // The officer's wallet has already published this root on-chain (the
-      // latestRoot check above confirms it) — a failure past this point
-      // leaves the database behind a root that is now permanently true
-      // on-chain. warnChainAheadOfDatabase exists precisely to surface that
-      // loudly for manual reconciliation rather than let it pass silently.
+      // The wallet already published this root (checked above), so a failure here —
+      // archive build or transaction — leaves the database behind the chain.
       this.roots.warnChainAheadOfDatabase(draft.txHash ?? '', error);
       throw error;
     }
 
     this.logger.log(
       `change set #${draft.id} confirmed at root version ${rootVersion}: ` +
-        `${draft.transfers.length} transfer(s), ${draft.revocations.length} revocation(s)`,
+        `${draft.issuances.length} issuance(s), ${draft.transfers.length} transfer(s), ` +
+        `${draft.revocations.length} revocation(s)`,
     );
 
     return {
       id: draft.id,
       rootVersion,
       txHash: draft.txHash,
+      issuanceRequestIds: draft.issuances.map((r) => r.id),
       transferIds: draft.transfers.map((t) => t.id),
       revocationIds: draft.revocations.map((r) => r.id),
     };
   }
 
   /**
-   * Exactly what one publishing round needs to know: the new leaf of every
-   * transferred plot, `null` for every revoked one, and the "before" snapshot
-   * the history rows are written from.
-   *
-   * ⚠️ Reads ONLY the plots in the round. Before D72 this loaded the entire
-   * tree to rebuild a root; now `projectRoot()` walks up from these leaves, so
-   * reading one plot outside the round would be pure waste.
+   * The new leaf of every issued and transferred plot, `null` for every revoked one,
+   * and the "before" rows the history and the bundles are built from. Reads ONLY the
+   * plots in the round (D72).
    */
   private async leafUpdatesFor(
-    transfers: { propertyId: string; newOwnerCommitment: string }[],
+    issuances: IssuanceItem[],
+    transfers: TransferItem[],
     revocations: { propertyId: string }[],
+    client: Prisma.TransactionClient = this.prisma,
   ): Promise<{
     updates: Map<number, bigint | null>;
     newLeaves: Map<string, string>;
     before: Map<string, Property>;
   }> {
-    const propertyIds = [
-      ...transfers.map((transfer) => transfer.propertyId),
-      ...revocations.map((revocation) => revocation.propertyId),
-    ];
-    const rows = await this.prisma.property.findMany({
+    const propertyIds = [...issuances, ...transfers, ...revocations].map((item) => item.propertyId);
+    const rows = await client.property.findMany({
       where: { propertyId: { in: propertyIds } },
     });
     const before = new Map(rows.map((property) => [property.propertyId, property]));
 
     const updates = new Map<number, bigint | null>();
     const newLeaves = new Map<string, string>();
-
-    for (const transfer of transfers) {
-      const property = before.get(transfer.propertyId);
+    const plotOf = (propertyId: string): Property => {
+      const property = before.get(propertyId);
       if (!property) {
         throw new UnprocessableEntityException(
-          `Property ${transfer.propertyId} referenced by this round no longer exists. ` +
+          `Property ${propertyId} referenced by this round no longer exists. ` +
             `Discard the draft and start again.`,
         );
       }
-      // ⚠️ The status check is load-bearing, and its absence would be silent.
-      // Before D72 this method rebuilt from `loadIssuedProperties()`, which
-      // filtered on ISSUED and therefore dropped a revoked plot by accident.
-      // Reading by propertyId does not, so an APPROVED transfer left dangling
-      // on a plot revoked in an EARLIER round would put its leaf back into the
-      // tree — resurrecting a certificate the State has already reclaimed.
-      // TransfersService.submit() refuses a revoked plot, but it cannot refuse
-      // one that was revoked after approval.
+      return property;
+    };
+
+    for (const request of issuances) {
+      const property = plotOf(request.propertyId);
+      // D84: issuance fills an empty slot, so only a plot that never had a leaf qualifies.
+      if (property.status !== 'IMPORTED') {
+        throw new UnprocessableEntityException(
+          `Property ${request.propertyId} is ${property.status}, not IMPORTED, so issuance ` +
+            `request #${request.id} for it cannot be published. Withdraw that request first.`,
+        );
+      }
+      const leaf = await hashRecord(
+        toLURRecord({ ...property, ownerCommitment: request.ownerCommitment }),
+      );
+      updates.set(Number(request.propertyId), leaf);
+      newLeaves.set(request.propertyId, leaf.toString());
+    }
+
+    for (const transfer of transfers) {
+      const property = plotOf(transfer.propertyId);
+      // ⚠️ Load-bearing: reading by propertyId (D72) no longer filters out a plot
+      // revoked after its transfer was approved, and re-hashing it would resurrect a
+      // certificate the State has reclaimed.
       if (property.status !== 'ISSUED') {
         throw new UnprocessableEntityException(
           `Property ${transfer.propertyId} is ${property.status}, not ISSUED, so the approved ` +
             `transfer for it cannot be published. Reject that transfer request first.`,
         );
       }
-      // Only `ownerCommitment` changes — every other leaf field is carried over
-      // from the stored row, which is what makes a transfer a transfer and not
-      // an edit (D41/§2.4).
+      // Only `ownerCommitment` changes — that is what makes it a transfer, not an edit.
       const leaf = await hashRecord(
         toLURRecord({ ...property, ownerCommitment: transfer.newOwnerCommitment }),
       );
@@ -591,9 +772,8 @@ export class ChangeSetService {
       newLeaves.set(transfer.propertyId, leaf.toString());
     }
 
-    // Revocation = remove the leaf (D45). The enforcement lives here, not in
-    // the on-chain reason list: with no leaf there is no Merkle path, so no
-    // circuit can produce a proof for the plot afterwards.
+    // Revocation = remove the leaf (D45): with no leaf there is no Merkle path, so
+    // no circuit can prove anything about the plot afterwards.
     for (const revocation of revocations) {
       updates.set(Number(revocation.propertyId), null);
     }
@@ -601,90 +781,28 @@ export class ChangeSetService {
     return { updates, newLeaves, before };
   }
 
-  /**
-   * The buyers' bundles for this round (D77): one folder per transferred plot,
-   * the same four files as an issuance folder, built by the same
-   * IssuanceService.buildBundleFiles so the two formats cannot drift apart.
-   *
-   * Every path comes from the projected overlay, never from the node table:
-   * applyStatements has not run yet, so the table still holds the tree as it
-   * stood BEFORE this round, and a receipt built from it would not verify
-   * against the root that was just signed.
-   */
-  private async buildArchive(input: {
-    changeSetId: number;
-    txHash: string | null;
-    rootVersion: number;
-    overlay: TreeOverlay;
-    transfers: { propertyId: string; newOwnerCommitment: string; newOwnerSecret: string | null }[];
-    before: Map<string, Property>;
-    newLeaves: Map<string, string>;
-    publishedAt: Date;
-  }): Promise<Buffer> {
-    const { issuer, issuedOn } = this.issuance.batchContext();
-    const context = {
-      rootVersion: input.rootVersion,
-      merkleRoot: input.overlay.root,
-      transactionHash: input.txHash ?? '',
-      contractAddress: this.chain.rootRegistryAddress,
-      explorerTxUrlPrefix: this.chain.explorerTxUrlPrefix,
-    };
-
-    const entries: ArchiveEntry[] = [];
-    for (const transfer of input.transfers) {
-      const property = {
-        ...input.before.get(transfer.propertyId)!,
-        ownerCommitment: transfer.newOwnerCommitment,
-      };
-      const leaf = BigInt(input.newLeaves.get(transfer.propertyId)!);
-      const merkleProof = await this.nodes.proofInOverlay(property, leaf, input.overlay);
-      const built = await this.issuance.buildBundleFiles(
-        { property, ownerSecret: BigInt(transfer.newOwnerSecret!), merkleProof },
-        context,
-        issuer,
-        issuedOn,
-      );
-      entries.push({
-        propertyId: property.propertyId,
-        certificateSerial: property.certificateSerial,
-        leaf: leaf.toString(),
-        files: built.files,
-      });
-    }
-
-    return this.archive.build({
-      kind: 'changeset',
-      batchId: input.changeSetId,
-      rootVersion: input.rootVersion,
-      txHash: input.txHash,
-      publishedAt: input.publishedAt,
-      entries,
-    });
-  }
-
-  /**
-   * Abandon a draft. Nothing was ever written to Property, TransferRequest or
-   * Revocation — only `connect`ed to this draft — so releasing the relation is
-   * enough to return them to `pending()`.
-   */
+  /** Abandon a draft. Its items were only attached, so releasing them returns them to the queue. */
   async discard(id: number): Promise<void> {
     const draft = await this.prisma.changeSet.findUnique({ where: { id } });
     if (!draft) throw new NotFoundException(`Change set #${id} not found`);
     if (draft.status !== 'DRAFT') {
-      // Anything else is already PUBLISHED or DISCARDED. Relabelling it and
-      // detaching transfers/revocations with `set: []` would corrupt the
-      // audit trail — the on-chain state and the individual rows stay
-      // correct, but the record of which batch published what is destroyed.
+      // Relabelling a PUBLISHED round and detaching its items would destroy the
+      // record of which round published what.
       throw new ConflictException(`Change set #${id} is already ${draft.status}`);
     }
 
     await this.prisma.changeSet.update({
       where: { id },
-      data: { status: 'DISCARDED', transfers: { set: [] }, revocations: { set: [] } },
+      data: {
+        status: 'DISCARDED',
+        issuances: { set: [] },
+        transfers: { set: [] },
+        revocations: { set: [] },
+      },
     });
   }
 
-  /** Every change set, newest first. Summary columns only — never `archiveZip` (D77). */
+  /** Every change set, newest first. Counts and download stamps only — never archive bytes. */
   async list(): Promise<ChangeSetSummary[]> {
     const rows = await this.prisma.changeSet.findMany({
       orderBy: { createdAt: 'desc' },
@@ -696,33 +814,17 @@ export class ChangeSetService {
         txHash: true,
         createdAt: true,
         publishedAt: true,
-        archiveExpiresAt: true,
-        _count: { select: { transfers: true, revocations: true } },
+        archives: { select: { firstDownloadedAt: true } },
+        _count: { select: { issuances: true, transfers: true, revocations: true } },
       },
     });
-    return rows.map(({ _count, ...row }) => ({
+    return rows.map(({ _count, archives, ...row }) => ({
       ...row,
+      issuanceCount: _count.issuances,
       transferCount: _count.transfers,
       revocationCount: _count.revocations,
+      archiveCount: archives.length,
+      archivesDownloaded: archives.filter((a) => a.firstDownloadedAt !== null).length,
     }));
-  }
-
-  /** The buyers' archive, while it still exists. An expired archive is gone for good. */
-  async archiveFor(id: number): Promise<{ zip: Buffer; filename: string }> {
-    const changeSet = await this.prisma.changeSet.findUnique({
-      where: { id },
-      select: { archiveZip: true, archiveExpiresAt: true },
-    });
-    if (!changeSet || !changeSet.archiveZip) {
-      throw new NotFoundException(`Change set #${id} has no archive`);
-    }
-    if (changeSet.archiveExpiresAt && changeSet.archiveExpiresAt.getTime() < Date.now()) {
-      await this.prisma.changeSet.update({ where: { id }, data: { archiveZip: null } });
-      throw new GoneException(
-        `The archive for change set #${id} expired on ${changeSet.archiveExpiresAt.toISOString()}. ` +
-          `The buyers' secrets are unrecoverable — the affected plots must be re-issued.`,
-      );
-    }
-    return { zip: Buffer.from(changeSet.archiveZip), filename: `changeset-${id}.zip` };
   }
 }

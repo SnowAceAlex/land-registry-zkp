@@ -4,7 +4,7 @@
  *
  *  1. POST /api/government/revocations queues the request: reason code 1–5 plus
  *     free text whose keccak256 is the only part that reaches the chain.
- *  2. Nothing changes on chain until the next change set publishes
+ *  2. Nothing changes on chain until the next round publishes
  *     (/government/changes, D46); then the leaf is removed and the plot can no
  *     longer produce a proof.
  *  3. The list below is the queue from GET /api/government/pending-changes —
@@ -27,7 +27,7 @@ export function RevocationsView({
     <div className="space-y-8">
       <PageHeader title={t.title} description={t.description} />
       <RevocationForm t={t} errors={errors} />
-      <PendingRevocations t={t} />
+      <PendingRevocations t={t} errors={errors} />
     </div>
   );
 }

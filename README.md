@@ -42,7 +42,7 @@ land-registry-zkp/
 | Document                                                             | Description                                                                              |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | [`DEPLOYMENT.md`](./DEPLOYMENT.md)                                   | Deployment runbook: local node -> Sepolia trial -> Sepolia production, plus gas analysis |
-| [`CODING_ROADMAP.md`](./CODING_ROADMAP.md)                           | Locked technical design, circuit layout, and binding Design Decisions Log (D1–D82)       |
+| [`CODING_ROADMAP.md`](./CODING_ROADMAP.md)                           | Locked technical design, circuit layout, and binding Design Decisions Log (D1–D90)       |
 | [`THESIS_IMPLEMENTATION_GUIDE.md`](./THESIS_IMPLEMENTATION_GUIDE.md) | Academic framing, evaluation criteria, and defense alignment                             |
 | [`CLAUDE.md`](./CLAUDE.md)                                           | Technical instructions, workspace layout, and developer CLI references                   |
 

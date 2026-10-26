@@ -1,7 +1,7 @@
 # Demo đầy đủ trên Sepolia — từ deploy tới kịch bản bảo vệ
 
 Runbook dựng lại toàn bộ hệ thống trên Sepolia sau D82 (xác nhận tình trạng thay sổ ngăn chặn D79–D81), rồi chạy một kịch bản demo
-đi qua cả 6 use case, gồm hai case tấn công cửa sổ chờ change set phải bị từ chối.
+đi qua cả 6 use case, gồm hai case tấn công cửa sổ chờ đợt vào sổ phải bị từ chối.
 
 Mọi lệnh chạy từ **gốc repo** trong **Git Bash**. Dòng nào đặt biến môi trường kiểu `A=1 lệnh` thì
 PowerShell viết `$env:A='1'; lệnh`.
@@ -71,8 +71,13 @@ SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<KEY>
 AUTHORITY_PRIVATE_KEY=0x<khoá ví demo>
 ATTESTER_PRIVATE_KEY=0x<khoá attester> # khớp ATTESTER_ADDRESS; thiếu là backend không khởi động (D82)
 GOV_API_KEY=<giống gốc>
+REVOCATION_CAP=60 # tối đa thu hồi mỗi vòng; Sepolia ≤ 60 (xem dưới)
 FRONTEND_URL=http://localhost:3000
 ```
+
+⚠️ **`REVOCATION_CAP` trên Sepolia phải ≤ 60.** Từ fork Glamsterdam mỗi thu hồi tốn ~448k gas, nên mặc
+định 150 không còn nằm gọn trong một block. `GOV_API_KEY` là khoá của trụ sở (`HQ`, phạm vi trung
+ương); chi nhánh dùng khoá riêng in ra khi `seed:land-offices`.
 
 ⚠️ **Xoá dòng `RPC_URL=http://127.0.0.1:8545`** nếu còn: `RPC_URL` thắng mọi cấu hình khác, backend sẽ
 âm thầm đọc node local thay vì Sepolia.
@@ -178,7 +183,12 @@ pnpm run db:up
 pnpm --filter backend prisma migrate reset --force
 pnpm --filter backend run db:generate
 pnpm --filter backend run seed:admin-units DVHC_TPHCM.csv --province "TP.HCM"
+pnpm --filter backend run seed:land-offices
 ```
+
+`seed:land-offices` tạo các chi nhánh `CN01`…`CN38` và **in khoá API của từng chi nhánh một lần duy nhất**
+— lưu lại ngay (mất thì `pnpm --filter backend run office:rotate-key <MÃ>` cấp khoá mới). `HQ`, `CS2`,
+`CS3` đã có sẵn từ migration. Chạy sau `seed:admin-units` vì nó đối chiếu danh mục phường/xã.
 
 `seed:admin-units` chạy với thư mục `web-app/backend/`, nên đường dẫn `DVHC_TPHCM.csv` là tương đối
 tới đó.
@@ -226,17 +236,21 @@ export CHAIN_NETWORK=sepolia SEPOLIA_RPC_URL=<RPC> GOV_API_KEY=<key>
 
 ### 8.1 Đăng nhập + nhập dữ liệu (UC-2)
 
-1. `http://localhost:3000/vi/government` → nhập `GOV_API_KEY`.
-2. Thanh trạng thái: `sepolia · Chain 11155111`, chưa có gốc Merkle.
+1. `http://localhost:3000/vi/government` → nhập `GOV_API_KEY` (đăng nhập với tư cách trụ sở `HQ`).
+2. Thanh trạng thái: `sepolia · Chuỗi 11155111`, "Chưa công bố gốc nào"; ngay dưới có "Đơn vị: …Trụ sở chính".
 3. Trang Nhập dữ liệu → chọn `demoImport.csv` → dry-run liệt kê dòng hợp lệ / lỗi, **chưa ghi gì**
-   (D52) → **Nhập các dòng hợp lệ**. Các thửa ở bảng trên phải có mặt.
+   (D52) → **Nhập 10 dòng hợp lệ**. Các thửa ở bảng trên phải có mặt.
 
 ### 8.2 Cấp giấy (UC-1, D43)
 
-1. Trang Cấp giấy → chọn cả 10 thửa → **Tạo nháp cấp giấy**.
-2. Kết nối Metamask → **Ký và công bố gốc** → xác nhận `publishRoot` → chờ block (~12 s) → tự confirm
-   → "đã công bố ở gốc phiên bản 1".
-3. **Tải ZIP** → giải nén, ví dụ vào `demo/batch-1/` (mỗi thửa một thư mục `201/`, `202/`, …).
+1. Trang Cấp giấy (chỉ trụ sở) → chọn cả 10 thửa → **Đề nghị cấp** — mỗi thửa thành một
+   đề nghị trong hàng chờ chung (D87); chưa ký gì.
+2. Trang **Chốt sổ** → **Tạo đợt vào sổ** → **Kết nối ví** (Metamask) → **Ký và công bố đợt vào sổ** → xác nhận
+   `publishRoot` → chờ block (~12 s) → tự confirm → "Đợt vào sổ #1 đã công bố (v1)". Một đợt vào sổ gom cả
+   cấp giấy, chuyển nhượng và thu hồi dưới một gốc (D84).
+3. Trang **Hồ sơ các đợt vào sổ** → **Tải ZIP** ở từng dòng chi nhánh (mỗi chi nhánh một ZIP, chi nhánh chỉ tải được ZIP của mình,
+   D88; trụ sở tải được tất cả) → giải nén hết vào cùng `demo/batch-1/` (mỗi thửa một thư mục
+   `201/`, `202/`, …).
 4. Kiểm một bundle bằng CLI (chuỗi D30 + root on-chain):
 
    ```bash
@@ -255,9 +269,9 @@ export CHAIN_NETWORK=sepolia SEPOLIA_RPC_URL=<RPC> GOV_API_KEY=<key>
 ### 8.4 Chuyển nhượng tại quầy + **case tấn công 1** (UC-3, D82)
 
 1. Trang Chuyển nhượng → nạp hồ sơ bên bán `201/` → kiểm tra hồ sơ xanh. **Không** có bước ký ví nào.
-2. Bước 2: tạo proof chuyển nhượng → nộp → hàng chờ → **Duyệt** (trong vòng 10 phút kể từ khi tạo
-   proof) → trạng thái APPROVED, chờ change set. Từ lúc nộp, hồ sơ mở chính là khoá.
-3. **Tấn công — bên bán đem sổ đi vay trong lúc chờ change set:**
+2. Bước 2: **Tạo bằng chứng và nộp hồ sơ** → hàng chờ "Chờ duyệt" → **Phê duyệt** (trong vòng 10 phút kể từ khi tạo
+   proof) → trạng thái APPROVED, chờ đợt vào sổ. Từ lúc nộp, hồ sơ mở chính là khoá.
+3. **Tấn công — bên bán đem sổ đi vay trong lúc chờ đợt vào sổ:**
    - UC-5 với `201/` → dừng ở "Giấy chứng nhận đang có thủ tục chưa hoàn tất" (ngõ cụt `procedure-open`).
    - Sinh proof bằng CLI (không qua UI):
 
@@ -281,21 +295,21 @@ export CHAIN_NETWORK=sepolia SEPOLIA_RPC_URL=<RPC> GOV_API_KEY=<key>
 
 ### 8.5 Thu hồi + **case tấn công 2** (UC-4, D45/D82)
 
-1. Trang Thu hồi → thửa `203`, lý do "Thu hồi theo quyết định Nhà nước", ghi chú → **Gửi** → yêu cầu
+1. Trang Thu hồi → thửa `203`, lý do "Nhà nước thu hồi đất", "Căn cứ quyết định" tuỳ ý → **Đưa vào hàng chờ** → đề nghị
    vào hàng chờ ngay, không ký gì.
 2. **Tấn công — chủ bị thu hồi đem sổ đi vay:** lặp lại 8.4.3 với `203/`
    (`proof:bodies demo/batch-1/203 demo/attack-203`) → UC-5 ngõ cụt, UC-6 `InvalidAttestation`.
 
-### 8.6 Công bố change set (UC-4, D46)
+### 8.6 Chốt sổ (UC-4, D46, D84)
 
-1. Trang Thay đổi → hàng chờ có 1 chuyển nhượng + 1 thu hồi →
-   **Tạo nháp** → **Ký** (`publishRootWithRevocations`) → confirm → gốc v2.
-2. Tải archive của change set → giải nén vào `demo/changeset-1/` → có `201/` của **bên mua** (receipt +
-   secret mới, D77).
+1. Trang **Chốt sổ** → hàng chờ có 1 chuyển nhượng + 1 thu hồi →
+   **Tạo đợt vào sổ** → **Ký và công bố đợt vào sổ** (`publishRootWithRevocations`) → confirm → "Đợt vào sổ #2 đã công bố (v2)".
+2. Trang **Hồ sơ các đợt vào sổ** → tải ZIP của đợt #2 theo chi nhánh → giải nén vào `demo/changeset-1/` → có `201/` của **bên mua**
+   (receipt + secret mới, D77).
 3. Sau publish:
    - Bên mua: UC-5 với `demo/changeset-1/201/` → tạo proof → UC-6 xanh cả 5 check.
    - Bên bán cũ: UC-5 với `demo/batch-1/201/` → "Giấy chứng nhận không còn hiệu lực" (lá đã đổi).
-   - Chủ thửa 203: UC-5 → "đã bị thu hồi" (410, lá bị gỡ); UC-6 hiện bảng thu hồi (mã lý do on-chain).
+   - Chủ thửa 203: UC-5 → "đã bị thu hồi" (410, lá bị gỡ); lý do thu hồi (mã on-chain) xem ở `/vi/resident/lookup`.
    - `/vi/resident/lookup` → tra `201` và `203` → lịch sử có sự kiện chuyển nhượng / thu hồi gắn
      `rootVersion` + tx hash.
 

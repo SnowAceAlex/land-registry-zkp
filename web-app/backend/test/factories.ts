@@ -1,4 +1,5 @@
 import { Prisma, Property } from '@prisma/client';
+import { Actor } from '../src/common/actor';
 
 /**
  * Test factories — plain in-memory Prisma-shaped rows. No DB involved; the
@@ -35,9 +36,27 @@ export function makeProperty(overrides: Partial<Property> = {}): Property {
     // Default factory output represents an already-issued property (it also
     // carries a non-null ownerCommitment by default, above) — D45.
     status: 'ISSUED',
-    issuanceBatchId: null,
+    landOfficeId: null,
     createdAt: new Date('2026-01-15T00:00:00.000Z'),
     updatedAt: new Date('2026-01-15T00:00:00.000Z'),
     ...overrides,
   };
 }
+
+export const CENTRAL_ACTOR: Actor = {
+  officeId: 1,
+  officeCode: 'HQ',
+  officeName: 'Head office',
+  officeKind: 'HEAD_OFFICE',
+  scope: 'CENTRAL',
+  credentialId: null,
+};
+
+export const BRANCH_ACTOR: Actor = {
+  officeId: 9,
+  officeCode: 'CN01',
+  officeName: 'Branch CN01',
+  officeKind: 'BRANCH',
+  scope: 'BRANCH',
+  credentialId: 3,
+};

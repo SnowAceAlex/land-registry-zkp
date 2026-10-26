@@ -11,6 +11,7 @@ import type { Dictionary } from '@/i18n/dictionaries';
 import { Notice } from '@/components/ui/notice';
 
 import type { ImportResult } from '../../api/types';
+import { rowText } from '../lib/row-text';
 
 type Strings = Dictionary['govImport'];
 
@@ -39,6 +40,8 @@ export function ImportReport({ result, t }: { result: ImportResult; t: Strings }
         ))}
       </dl>
 
+      {result.byOffice.length > 0 ? <OfficeTable rows={result.byOffice} t={t} /> : null}
+
       {result.catalogEmpty ? (
         <Notice tone="warning" title={t.catalogEmptyTitle}>
           {t.catalogEmptyBody}
@@ -53,6 +56,41 @@ export function ImportReport({ result, t }: { result: ImportResult; t: Strings }
         <RowTable title={t.warningsTitle} rows={result.warnings} t={t} />
       ) : null}
     </div>
+  );
+}
+
+function OfficeTable({ rows, t }: { rows: ImportResult['byOffice']; t: Strings }) {
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className="font-medium text-ink">{t.byOfficeTitle}</h3>
+        <p className="mt-1 max-w-prose text-sm text-steel">{t.byOfficeBody}</p>
+      </div>
+      <div className="overflow-x-auto rounded-lg border border-hairline bg-white">
+        <table className="w-full min-w-[20rem] text-left text-sm">
+          <thead className="border-b border-hairline text-xs text-steel">
+            <tr>
+              <th scope="col" className="px-4 py-2 font-medium">{t.columnOffice}</th>
+              <th scope="col" className="px-4 py-2 text-right font-medium">{t.columnCount}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-whisper">
+            {rows.map(({ officeCode, count }) => (
+              <tr key={officeCode ?? 'unassigned'}>
+                <td className="px-4 py-2">
+                  {officeCode ? (
+                    <span className="font-mono text-xs">{officeCode}</span>
+                  ) : (
+                    <span className="text-steel">{t.officeUnassigned}</span>
+                  )}
+                </td>
+                <td className="px-4 py-2 text-right font-mono text-xs">{count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -87,7 +125,7 @@ function RowTable({
               <tr key={`${row.row}-${index}`} className="align-top">
                 <td className="px-4 py-2 font-mono text-xs text-steel">{row.row}</td>
                 <td className="px-4 py-2 font-mono text-xs">{row.propertyId ?? '—'}</td>
-                <td className="px-4 py-2 text-ink">{row.message}</td>
+                <td className="px-4 py-2 text-ink">{rowText(row, t)}</td>
               </tr>
             ))}
           </tbody>

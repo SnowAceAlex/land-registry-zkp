@@ -10,6 +10,14 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
  * failing the whole upload on one bad row would make that a guessing game.
  */
 
+/** Machine-readable rule behind a supersession error or warning (D90). */
+export type ImportRowCode =
+  | 'InvalidSupersedes'
+  | 'PredecessorNotFound'
+  | 'SelfSupersession'
+  | 'PredecessorNeverIssued'
+  | 'PredecessorAlreadySucceeded';
+
 export class ImportRowError {
   /** 1-based line number in the uploaded file, counting the header line. */
   @ApiProperty({ example: 3 })
@@ -20,6 +28,13 @@ export class ImportRowError {
 
   @ApiProperty({ example: "Unknown landUseCode 'ZZZ'" })
   message!: string;
+
+  @ApiPropertyOptional({ example: 'PredecessorNotFound' })
+  code?: ImportRowCode;
+
+  /** The one predecessor a lineage code (not found / never issued) is about. */
+  @ApiPropertyOptional({ example: '77' })
+  predecessorPropertyId?: string;
 }
 
 export class ImportRowWarning {
@@ -31,6 +46,22 @@ export class ImportRowWarning {
 
   @ApiProperty({ example: "ward 'Đa Kao' is not in the current administrative catalog" })
   message!: string;
+
+  @ApiPropertyOptional({ example: 'PredecessorAlreadySucceeded' })
+  code?: ImportRowCode;
+
+  /** The predecessor that already has a replacement. */
+  @ApiPropertyOptional({ example: '1' })
+  predecessorPropertyId?: string;
+}
+
+export class ImportOfficeCount {
+  /** Null when the commune has no land office assigned (or the catalog is empty). */
+  @ApiProperty({ type: String, nullable: true, example: 'CN01' })
+  officeCode!: string | null;
+
+  @ApiProperty({ example: 12 })
+  count!: number;
 }
 
 export class ImportResult {
@@ -70,4 +101,8 @@ export class ImportResult {
    */
   @ApiProperty({ example: false })
   catalogEmpty!: boolean;
+
+  /** Rows written (or, on a dry run, that would be) per derived land office (D85); null last. */
+  @ApiProperty({ type: [ImportOfficeCount] })
+  byOffice!: ImportOfficeCount[];
 }

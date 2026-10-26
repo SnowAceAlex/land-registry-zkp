@@ -36,6 +36,12 @@ export type ApiErrorCode =
   | 'attestation-expired'
   | 'invalid-attestation'
   | 'procedure-open'
+  | 'outside-office-area'
+  | 'central-scope-required'
+  | 'predecessor-not-revoked'
+  | 'item-in-open-draft'
+  | 'queue-changed'
+  | 'forbidden'
   | 'unreachable'
   | 'unknown';
 
@@ -46,11 +52,17 @@ const REASON_CODES: Record<ApiReason, ApiErrorCode> = {
   AttestationExpired: 'attestation-expired',
   InvalidAttestation: 'invalid-attestation',
   ProcedureOpen: 'procedure-open',
+  OutsideOfficeArea: 'outside-office-area',
+  CentralScopeRequired: 'central-scope-required',
+  PredecessorNotRevoked: 'predecessor-not-revoked',
+  ItemInOpenDraft: 'item-in-open-draft',
+  QueueChanged: 'queue-changed',
 };
 
 const STATUS_CODES: Record<number, ApiErrorCode> = {
   400: 'bad-request',
   401: 'unauthorized',
+  403: 'forbidden',
   404: 'not-found',
   409: 'conflict',
   410: 'gone',

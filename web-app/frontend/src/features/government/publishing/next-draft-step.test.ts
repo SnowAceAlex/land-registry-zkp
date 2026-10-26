@@ -1,31 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ChangeSetDraftDetail, IssuanceDraftDetail } from '../api/types';
+import type { ChangeSetDraftDetail } from '../api/types';
 import { type DraftStepInput, nextDraftStep } from './next-draft-step';
 
-const issuance: IssuanceDraftDetail = {
-  kind: 'issuance',
-  id: 7,
-  newRoot: '555',
-  createdAt: '2026-09-14T02:00:00.000Z',
-  propertyIds: ['1001'],
-};
-
-const changeSet: ChangeSetDraftDetail = {
+const draft: ChangeSetDraftDetail = {
   kind: 'changeset',
   id: 9,
-  newRoot: '777',
+  newRoot: '555',
   createdAt: '2026-09-14T03:00:00.000Z',
+  issuanceRequestIds: [3],
   transferIds: [1],
   revocationIds: [],
   revocationCalldata: { propertyIds: [], reasonCodes: [], detailHashes: [] },
   deferredRevocations: 0,
 };
 
-/** A wallet ready to sign an issuance draft that is not yet on chain. */
+/** A wallet ready to sign a round that is not yet on chain. */
 const ready: DraftStepInput = {
-  currentKind: 'issuance',
-  openDraft: issuance,
+  openDraft: draft,
   onChainLatestRoot: '111',
   walletConnected: true,
   walletChainId: 31337,
@@ -40,13 +32,6 @@ describe('nextDraftStep (D53)', () => {
 
   it('offers to create a draft when none is open', () => {
     expect(nextDraftStep({ ...ready, openDraft: null })).toBe('create');
-  });
-
-  it('blocks this page while the other kind of draft is open (D44)', () => {
-    expect(nextDraftStep({ ...ready, openDraft: changeSet })).toBe('blockedByOtherDraft');
-    expect(nextDraftStep({ ...ready, currentKind: 'changeset', openDraft: issuance })).toBe(
-      'blockedByOtherDraft',
-    );
   });
 
   it('waits for the chain before deciding between sign and confirm', () => {
@@ -82,8 +67,5 @@ describe('nextDraftStep (D53)', () => {
 
   it('signs when everything lines up', () => {
     expect(nextDraftStep(ready)).toBe('sign');
-    expect(
-      nextDraftStep({ ...ready, currentKind: 'changeset', openDraft: changeSet }),
-    ).toBe('sign');
   });
 });
