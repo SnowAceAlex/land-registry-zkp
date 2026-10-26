@@ -95,9 +95,7 @@
     "byOfficeBody": "Hệ thống tự động xác định chi nhánh dựa trên phường/xã trong địa chỉ của từng dòng dữ liệu.",
     "columnOffice": "Chi nhánh",
     "columnCount": "Số dòng",
-    "officeUnassigned": "Chưa phân địa bàn",
-    "columnHelpTitle": "Cột tùy chọn: supersedesPropertyIds (Mã thửa đất thay thế)",
-    "columnHelpSupersedes": "Danh sách mã thửa đất mà giấy chứng nhận này thay thế, phân tách bằng dấu chấm phẩy ; (ví dụ 1001;1002). Cấp đổi, cấp lại, tách thửa, hợp thửa hoặc bản án/quyết định của tòa án đều tạo thành một giấy chứng nhận mới với mã thửa đất mới."
+    "officeUnassigned": "Chưa phân địa bàn"
   },
   "govIssuance": {
     "title": "Cấp giấy chứng nhận",

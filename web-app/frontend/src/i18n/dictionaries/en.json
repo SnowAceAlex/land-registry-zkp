@@ -95,9 +95,7 @@
     "byOfficeBody": "The branch is derived from the commune in each address.",
     "columnOffice": "Branch",
     "columnCount": "Rows",
-    "officeUnassigned": "Unassigned",
-    "columnHelpTitle": "Optional column: supersedesPropertyIds (Replacement Property IDs)",
-    "columnHelpSupersedes": "The property IDs this certificate replaces, separated by ; (for example 1001;1002). A re-issue, split, merge, or court decision creates a new certificate with a new property ID."
+    "officeUnassigned": "Unassigned"
   },
   "govIssuance": {
     "title": "Issuance",
