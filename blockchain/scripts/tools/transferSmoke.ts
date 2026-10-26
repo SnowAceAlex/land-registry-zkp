@@ -328,9 +328,8 @@ async function publishChangeSetRoot(draft: ChangeSetDraft): Promise<string> {
   const newRoot = ethers.toBeHex(BigInt(draft.newRoot), 32);
   const { propertyIds, reasonCodes, detailHashes } = draft.revocationCalldata;
 
-  // publishRoot() and publishRootWithRevocations() both live on RootRegistry
-  // (D45) — only the second also writes the on-chain revocations mapping, so
-  // it is used only when this round actually contains any.
+  // publishRoot() and publishRootWithRevocations() both live on RootRegistry (D45); only the
+  // second records revocations on chain (bitmap bit + PropertyRevoked), so use it only when needed.
   const tx =
     draft.revocationIds.length > 0
       ? await registry.publishRootWithRevocations(

@@ -22,6 +22,7 @@
     "deploy:sepolia": "hardhat run scripts/chain/deploy.ts --network sepolia",
     "chain:smoke:localhost": "hardhat run scripts/chain/smokeDeployment.ts --network localhost",
     "chain:smoke:sepolia": "hardhat run scripts/chain/smokeDeployment.ts --network sepolia",
+    "chain:revocation-ceiling:sepolia": "hardhat run scripts/chain/revocationCeiling.ts --network sepolia",
     "sign:root": "hardhat run scripts/tools/signRoot.ts --network localhost",
     "sign:root:sepolia": "hardhat run scripts/tools/signRoot.ts --network sepolia",
     "circuits:compile": "ts-node scripts/circuits/compile.ts",
