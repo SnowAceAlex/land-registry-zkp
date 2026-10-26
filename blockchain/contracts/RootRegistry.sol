@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/structs/BitMaps.sol";
 
 /**
  * @title RootRegistry
@@ -18,6 +19,8 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
  *  - ATTESTER_ROLE: signs status attestations off-chain (D82); writes nothing here
  */
 contract RootRegistry is AccessControl {
+    using BitMaps for BitMaps.BitMap;
+
     // -------------------------------------------------------------------------
     // Roles
     // -------------------------------------------------------------------------
@@ -66,15 +69,9 @@ contract RootRegistry is AccessControl {
     uint8 public constant MIN_REASON_CODE = 1;
     uint8 public constant MAX_REASON_CODE = 5;
 
-    struct Revocation {
-        uint8 reasonCode;
-        bytes32 detailHash;
-        uint256 rootVersion;
-        uint64 revokedAt;
-    }
-
-    /// @notice propertyId => revocation entry. A zero reasonCode means "not revoked".
-    mapping(uint256 => Revocation) public revocations;
+    /// @notice D91: one bit per propertyId, 256 per storage slot. Reason, detail hash and
+    ///         root version are recorded only in PropertyRevoked.
+    BitMaps.BitMap private revoked;
 
     // -------------------------------------------------------------------------
     // Events
@@ -169,19 +166,17 @@ contract RootRegistry is AccessControl {
         for (uint256 i = 0; i < propertyIds.length; i++) {
             uint8 code = reasonCodes[i];
             if (code < MIN_REASON_CODE || code > MAX_REASON_CODE) revert InvalidReasonCode(code);
-            // Also catches a duplicate propertyId within this same call, since
-            // the first iteration has already written the entry.
-            if (revocations[propertyIds[i]].reasonCode != 0) revert AlreadyRevoked(propertyIds[i]);
-
-            revocations[propertyIds[i]] = Revocation({
-                reasonCode: code,
-                detailHash: detailHashes[i],
-                rootVersion: rootVersion,
-                revokedAt: uint64(block.timestamp)
-            });
+            // Also catches a duplicate propertyId within this call: its bit is already set.
+            if (revoked.get(propertyIds[i])) revert AlreadyRevoked(propertyIds[i]);
+            revoked.set(propertyIds[i]);
 
             emit PropertyRevoked(propertyIds[i], code, detailHashes[i], rootVersion);
         }
+    }
+
+    /// @notice Whether `propertyId` was ever revoked (D91 bitmap).
+    function isRevoked(uint256 propertyId) external view returns (bool) {
+        return revoked.get(propertyId);
     }
 
     function _publishRoot(bytes32 newRoot) private {
