@@ -40,48 +40,18 @@ export async function readChainRoot(client: PublicClient, registry: Address): Pr
   };
 }
 
-export interface RevocationEntry {
-  reasonCode: number;
-  detailHash: Hex;
-  rootVersion: number;
-  /** Unix seconds. Never 0 in a returned entry — see the null case below. */
-  revokedAt: bigint;
-}
-
-/**
- * The public revocation record for a property (D45), or null if there is none.
- *
- * Solidity mappings have no "absent": an unrevoked property reads back as an
- * all-zero struct. `revokedAt === 0` is therefore the sentinel for "no entry",
- * and it is resolved here rather than in each screen — a zeroed struct rendered
- * as a revocation would accuse a live title.
- *
- * Note what this is *for*. Enforcement already comes from removing the leaf: no
- * Merkle path exists, so no proof can be produced. This list exists for public
- * auditability, which is why the reason is a code plus an off-chain-detail hash
- * rather than free text.
- */
-export async function readRevocation(
+/** D91: whether the chain has revoked the plot (one bit per id); the reason is in its event. */
+export async function readIsRevoked(
   client: PublicClient,
   registry: Address,
   propertyId: bigint,
-): Promise<RevocationEntry | null> {
-  const entry = (await client.readContract({
+): Promise<boolean> {
+  return (await client.readContract({
     address: registry,
     abi: rootRegistryAbi,
-    functionName: 'revocations',
+    functionName: 'isRevoked',
     args: [propertyId],
-  })) as readonly [number, Hex, bigint, bigint];
-
-  const [reasonCode, detailHash, rootVersion, revokedAt] = entry;
-  if (revokedAt === 0n) return null;
-
-  return {
-    reasonCode: Number(reasonCode),
-    detailHash,
-    rootVersion: Number(rootVersion),
-    revokedAt,
-  };
+  })) as boolean;
 }
 
 /** D82: whether `account` may sign status attestations — read from the chain, never the backend. */

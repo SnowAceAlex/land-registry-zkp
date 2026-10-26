@@ -1,19 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import type { RevocationEntry } from '@/lib/registry-reads';
-
 import type { IssuerChainReport, LinkState } from './issuer-chain';
 import type { PipelineStep } from './proof-pipeline';
 import { type TrustFacts, summariseTrust } from './trust-summary';
 
 const DONE: PipelineStep = { kind: 'done' };
-
-const revocation: RevocationEntry = {
-  reasonCode: 3,
-  detailHash: '0xdead',
-  rootVersion: 4,
-  revokedAt: 1_800_000_000n,
-};
 
 function issuer(overrides: Partial<Record<keyof IssuerChainReport['links'], LinkState>> = {}): IssuerChainReport {
   return {
@@ -34,7 +25,7 @@ function issuer(overrides: Partial<Record<keyof IssuerChainReport['links'], Link
 function facts(overrides: Partial<TrustFacts> = {}): TrustFacts {
   return {
     step: DONE,
-    revocation: null,
+    revoked: false,
     issuer: issuer(),
     issuerRequired: true,
     chainReachable: true,
@@ -58,7 +49,7 @@ describe('summariseTrust (D63)', () => {
    * withdrawn (D45).
    */
   it('rejects a perfect proof on a revoked plot', () => {
-    const summary = summariseTrust(facts({ revocation }));
+    const summary = summariseTrust(facts({ revoked: true }));
 
     expect(summary.verdict).toBe('reject');
     expect(summary.reasons).toContain('property-revoked');
@@ -91,7 +82,7 @@ describe('summariseTrust (D63)', () => {
 
   it('names both problems when a revoked plot also has a bad issuer', () => {
     const summary = summariseTrust(
-      facts({ revocation, issuer: issuer({ organization: 'fail' }) }),
+      facts({ revoked: true, issuer: issuer({ organization: 'fail' }) }),
     );
 
     expect(summary.verdict).toBe('reject');
@@ -131,7 +122,7 @@ describe('summariseTrust (D63)', () => {
   });
 
   it('still rejects a revoked plot on the standard tab', () => {
-    const summary = summariseTrust(facts({ revocation, issuer: null, issuerRequired: false }));
+    const summary = summariseTrust(facts({ revoked: true, issuer: null, issuerRequired: false }));
 
     expect(summary).toEqual({ verdict: 'reject', reasons: ['property-revoked'] });
   });

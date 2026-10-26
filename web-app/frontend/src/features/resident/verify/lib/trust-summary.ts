@@ -25,8 +25,6 @@
  * has to be driven by hand.
  */
 
-import type { RevocationEntry } from '@/lib/registry-reads';
-
 import type { IssuerChainReport } from './issuer-chain';
 import type { PipelineStep } from './proof-pipeline';
 
@@ -42,8 +40,8 @@ export type TrustReason =
 
 export interface TrustFacts {
   step: PipelineStep;
-  /** null when the plot carries no on-chain revocation; undefined if unread. */
-  revocation: RevocationEntry | null | undefined;
+  /** True when the chain has revoked the plot; undefined if unread. */
+  revoked: boolean | undefined;
   /** null when no receipt was checked (yet). */
   issuer: IssuerChainReport | null;
   /** Agency tab: the receipt's issuer chain is part of the verdict. */
@@ -73,7 +71,7 @@ export function summariseTrust(f: TrustFacts): TrustSummary {
       f.issuer.links.signature === 'fail' ||
       f.issuer.links.certificate === 'fail');
 
-  const revoked = f.revocation != null;
+  const revoked = f.revoked === true;
 
   if (revoked || issuerMismatch) {
     if (revoked) reasons.push('property-revoked');

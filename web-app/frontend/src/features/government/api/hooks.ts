@@ -75,7 +75,7 @@ export function usePendingTransferCount() {
 
 /**
  * GET /government/pending-changes — what the next change set would publish
- * (D46), plus the revocation cap (D73). Read by the Changes page (the round)
+ * (D46), plus the revocation cap (D91). Read by the Changes page (the round)
  * and the Revocations page (what is already queued), so both share one key.
  */
 export function usePendingChanges() {
