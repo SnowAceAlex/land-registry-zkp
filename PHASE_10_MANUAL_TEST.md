@@ -90,7 +90,7 @@ pnpm --filter backend run cert:generate            # chứng thư X.509 của c�
   Thư mục đó trống thì `pnpm --filter blockchain run circuits:setup` (mất vài phút).
 - `web-app/backend/.env` cần: `CHAIN_NETWORK=localhost`, `RPC_URL=http://127.0.0.1:8545`,
   `AUTHORITY_PRIVATE_KEY` (khoá test Hardhat #0), `GOV_API_KEY`. Mẫu ở `.env.example`.
-  `REVOCATION_CAP` và `QUEUE_STALE_DAYS` để trống (mặc định 150 và 2); bước 10 sẽ tạm hạ cap.
+  `REVOCATION_CAP` và `QUEUE_STALE_DAYS` để trống (mặc định 591 và 2); bước 10 sẽ tạm hạ cap.
 
 ### 1.2 Khởi động (4 terminal)
 
@@ -555,10 +555,10 @@ Sao từ spec Phase 10 (§6.2, §8, §9, §2.1, §6.5) và D83, ghi ra thay vì 
    nào của mảnh đất chứng minh được — hướng hỏng an toàn, trùng quy trình ngoài đời (xoá sổ cũ trước, cấp sổ mới sau).
    Lỗ hổng còn lại: nếu import **không khai** `supersedesPropertyIds` thì hệ thống không biết hai sổ cùng một mảnh đất và không
    chặn được trường hợp cả hai cùng hiệu lực.
-6. **Cap thu hồi và nhu cầu ~950 hồ sơ/ngày (D56, D73, §6.5).** `REVOCATION_CAP` mặc định 150 (đo trên Hardhat); trên Sepolia sau
-   Glamsterdam mỗi thu hồi ~448k gas nên phải đặt ≤ 60. Nhu cầu ~950/ngày nghĩa là một phiên chốt sổ gồm *nhiều đợt nối tiếp*;
-   trang điều hành chỉ làm tồn đọng hiện ra rõ. Lời giải thật là gói struct `Revocation` — một quyết định contract riêng, kèm redeploy.
+6. **Cap thu hồi và nhu cầu ~950 hồ sơ/ngày (D56, D91).** `REVOCATION_CAP` mặc định 591 (mạng chưa Glamsterdam); Sepolia đặt
+   989, trên nhu cầu trung bình ~950/ngày nên mỗi ngày một đợt. Ngày vượt cap thì chạy thêm đợt ngay trong ngày bằng
+   "Tạo đợt tiếp".
 7. **Tạm giữ không đổi trạng thái.** Mục bị tạm giữ vẫn là READY / APPROVED / PENDING nên thửa vẫn "có thủ tục mở" (D80/D82):
    attestation vẫn bị từ chối cho tới khi mục được nhả hoặc rút.
-8. **Chưa kiểm** trong runbook này: Sepolia (cap ≤ 60, RPC công khai), ba trình duyệt khác Chrome, nhiều cán bộ cùng thao tác
+8. **Chưa kiểm** trong runbook này: Sepolia (cap 989, RPC công khai), ba trình duyệt khác Chrome, nhiều cán bộ cùng thao tác
    trên một hàng chờ, ví Metamask thật ngoài Hardhat #0, bench `bench:month` sau khi đổi đường cấp lần đầu sang `issuance-requests`.

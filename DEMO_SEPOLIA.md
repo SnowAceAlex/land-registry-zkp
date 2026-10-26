@@ -71,12 +71,13 @@ SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<KEY>
 AUTHORITY_PRIVATE_KEY=0x<khoá ví demo>
 ATTESTER_PRIVATE_KEY=0x<khoá attester> # khớp ATTESTER_ADDRESS; thiếu là backend không khởi động (D82)
 GOV_API_KEY=<giống gốc>
-REVOCATION_CAP=60 # tối đa thu hồi mỗi vòng; Sepolia ≤ 60 (xem dưới)
+REVOCATION_CAP=989 # tối đa thu hồi mỗi vòng (D91; xem dưới)
 FRONTEND_URL=http://localhost:3000
 ```
 
-⚠️ **`REVOCATION_CAP` trên Sepolia phải ≤ 60.** Từ fork Glamsterdam mỗi thu hồi tốn ~448k gas, nên mặc
-định 150 không còn nằm gọn trong một block. `GOV_API_KEY` là khoá của trụ sở (`HQ`, phạm vi trung
+⚠️ **`REVOCATION_CAP=989` trên Sepolia** (D91: sổ thu hồi dạng bitmap, trần đợt tệ nhất 1.039 thửa/tx,
+chừa 50). Sau mỗi lần deploy hoặc hard fork, `CAP=989 pnpm --filter blockchain run
+chain:revocation-ceiling:sepolia` phải in `PASS`. `GOV_API_KEY` là khoá của trụ sở (`HQ`, phạm vi trung
 ương); chi nhánh dùng khoá riêng in ra khi `seed:land-offices`.
 
 ⚠️ **Xoá dòng `RPC_URL=http://127.0.0.1:8545`** nếu còn: `RPC_URL` thắng mọi cấu hình khác, backend sẽ
