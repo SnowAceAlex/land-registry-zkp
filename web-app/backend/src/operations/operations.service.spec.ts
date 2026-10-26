@@ -1,6 +1,7 @@
 import { Logger, ServiceUnavailableException } from '@nestjs/common';
 
 import { BRANCH_ACTOR, CENTRAL_ACTOR } from '../../test/factories';
+import { DEFAULT_REVOCATION_CAP } from '../government/changeset.service';
 import { OperationsService } from './operations.service';
 
 const now = new Date('2026-10-15T12:00:00Z');
@@ -179,7 +180,7 @@ describe('OperationsService.overview (D89)', () => {
     });
     expect(dto.queue).toEqual({ issuance: 2, transfer: 5, revocation: 3, held: 1 });
     expect(dto.openDraft).toBeNull();
-    expect(dto.revocationCap).toBe(150);
+    expect(dto.revocationCap).toBe(DEFAULT_REVOCATION_CAP);
     expect(dto.roundsNeeded).toBe(1);
     expect(dto.alerts).toEqual([{ code: 'HeldItems', severity: 'info', count: 1 }]);
   });

@@ -38,13 +38,12 @@ import { RoundArchiveBuilder } from './round-archive.builder';
 import { RoundArchiveService } from './round-archive.service';
 
 /**
- * Most revocations one round carries (D56/D73) — past the block gas limit the
- * publish reverts wholesale. 150 is the largest measured rung under half of a
- * 30M block on Hardhat (~93k gas each); see RootRegistry.revocation.test.ts.
+ * Most revocations one round carries (D91): 50 under the worst case, every plot opening a new
+ * bitmap word (ceiling 641 on Hardhat). Sepolia measures its own with chain:revocation-ceiling.
  */
-export const DEFAULT_REVOCATION_CAP = 150;
+export const DEFAULT_REVOCATION_CAP = 591;
 
-/** REVOCATION_CAP as a positive integer, else the default. Sepolia needs ≤ 60 (~448k gas each). */
+/** REVOCATION_CAP as a positive integer, else the default. */
 export function revocationCap(): number {
   const raw = process.env.REVOCATION_CAP?.trim() ?? '';
   const value = Number(raw);
@@ -422,7 +421,7 @@ export class ChangeSetService {
 
   /**
    * One mapping for createDraft() and draftDetail(), so a resumed session signs the
-   * calldata first shown. Order matters only for the contract's `revocations` writes.
+   * calldata first shown.
    */
   private toDraftDetail(
     draft: Pick<ChangeSet, 'id' | 'newRoot' | 'createdAt'>,

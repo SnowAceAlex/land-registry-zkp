@@ -43,7 +43,7 @@ export type { ChainNetwork, DeploymentRecord };
 /**
  * How long a read of the current root stays FRESH (D74).
  *
- * 10 seconds. The root changes about six times a working day (D73), so ten
+ * 10 seconds. The root changes a few times a working day at most (D46), so ten
  * seconds is far inside what is actually true — the number is not chosen for
  * accuracy but to bound how often the RPC is touched at all.
  */

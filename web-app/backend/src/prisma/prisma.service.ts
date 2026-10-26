@@ -34,7 +34,7 @@ import { Pool } from 'pg';
  * 5s and was cut off mid-way — found by the bench harness, not in production.
  *
  * Two things bound how long that can get, so this is not an open-ended licence:
- * a change set carries at most `revocationCap()` revocations (D73), and the
+ * a change set carries at most `revocationCap()` revocations (D91), and the
  * officer decides how often to publish.
  */
 const PUBLISH_TRANSACTION_TIMEOUT_MS = 120_000;
