@@ -1100,25 +1100,25 @@ describe('ChangeSetService.createDraft — duplicate queue entries', () => {
   });
 });
 
-describe('DEFAULT_REVOCATION_CAP (D73)', () => {
+describe('DEFAULT_REVOCATION_CAP (D91)', () => {
   it('matches the value whose gas was measured on-chain', () => {
     // Double-entry ledger with BACKEND_CAP in
     // blockchain/test/contracts/RootRegistry.revocation.test.ts: the two
     // packages cannot import each other, so a change on one side fails here.
-    expect(DEFAULT_REVOCATION_CAP).toBe(150);
+    expect(DEFAULT_REVOCATION_CAP).toBe(591);
   });
 });
 
 describe('revocationCap() — REVOCATION_CAP from the env', () => {
   it.each([
-    [undefined, 150],
+    [undefined, DEFAULT_REVOCATION_CAP],
     ['60', 60],
     [' 60 ', 60],
-    ['abc', 150],
-    ['0', 150],
-    ['-5', 150],
-    ['1.5', 150],
-    ['', 150],
+    ['abc', DEFAULT_REVOCATION_CAP],
+    ['0', DEFAULT_REVOCATION_CAP],
+    ['-5', DEFAULT_REVOCATION_CAP],
+    ['1.5', DEFAULT_REVOCATION_CAP],
+    ['', DEFAULT_REVOCATION_CAP],
   ])('REVOCATION_CAP=%p → %p', (raw, expected) => {
     if (raw === undefined) delete process.env.REVOCATION_CAP;
     else process.env.REVOCATION_CAP = raw;

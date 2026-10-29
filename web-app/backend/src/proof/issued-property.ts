@@ -15,7 +15,7 @@ export async function requireIssuedProperty(
   if (property.status === 'REVOKED') {
     throw new GoneException(
       `The certificate for property ${propertyId} has been revoked. Its leaf is no longer in ` +
-        `the tree, so no Merkle proof exists — see the on-chain revocations mapping for the reason.`,
+        `the tree, so no Merkle proof exists — its PropertyRevoked event on chain gives the reason.`,
     );
   }
   if (property.ownerCommitment === null) {

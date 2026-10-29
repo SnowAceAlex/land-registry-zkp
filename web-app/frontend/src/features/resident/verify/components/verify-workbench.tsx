@@ -30,12 +30,7 @@ import type { Receipt } from '@land-registry/blockchain/shared/receipt';
 import { Notice } from '@/components/ui/notice';
 import { buttonStyles } from '@/components/ui/button';
 import { ProofFileError, parseProofFile } from '@/lib/proof-file';
-import {
-  type RevocationEntry,
-  readChainRoot,
-  readIsAttester,
-  readRevocation,
-} from '@/lib/registry-reads';
+import { readChainRoot, readIsAttester, readIsRevoked } from '@/lib/registry-reads';
 import { ArtifactMissingError, verifyProofOffChain } from '@/lib/zkp';
 import { checkAttestation } from '@/lib/status-attestation';
 
@@ -90,7 +85,7 @@ export function VerifyWorkbench({
   const [rejection, setRejection] = useState<ProofRejectionReason | undefined>(undefined);
   const [chainReachable, setChainReachable] = useState<boolean | undefined>(undefined);
   const [artifactsMissing, setArtifactsMissing] = useState(false);
-  const [revocation, setRevocation] = useState<RevocationEntry | null | undefined>(undefined);
+  const [revoked, setRevoked] = useState<boolean | undefined>(undefined);
   const [issuer, setIssuer] = useState<IssuerChainReport | null>(null);
   const [contractMatches, setContractMatches] = useState<boolean | undefined>(undefined);
   const [busy, setBusy] = useState(false);
@@ -107,7 +102,7 @@ export function VerifyWorkbench({
     setRejection(undefined);
     setChainReachable(undefined);
     setArtifactsMissing(false);
-    setRevocation(undefined);
+    setRevoked(undefined);
     setIssuer(null);
     setContractMatches(undefined);
     setFailure(null);
@@ -168,11 +163,11 @@ export function VerifyWorkbench({
     set('rootMatchesChain', 'running');
     const propertyId = BigInt(publicSignals[publicSignalIndex(circuitType, 'propertyId')]);
     try {
-      const [chain, entry] = await Promise.all([
+      const [chain, revokedOnChain] = await Promise.all([
         readChainRoot(client, config.contracts.RootRegistry),
-        readRevocation(client, config.contracts.RootRegistry, propertyId),
+        readIsRevoked(client, config.contracts.RootRegistry, propertyId),
       ]);
-      setRevocation(entry);
+      setRevoked(revokedOnChain);
 
       const claimedRoot =
         publicSignals[publicSignalIndex(circuitType, rootSignalName(circuitType))];
@@ -307,7 +302,7 @@ export function VerifyWorkbench({
 
   const trust = summariseTrust({
     step,
-    revocation,
+    revoked,
     issuer,
     issuerRequired: mode === 'agency',
     chainReachable,

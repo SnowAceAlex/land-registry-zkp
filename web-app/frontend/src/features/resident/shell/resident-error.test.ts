@@ -63,7 +63,7 @@ describe('residentErrorCode', () => {
  * headline above an English paragraph.
  */
 describe('residentFailure — every word comes from the dictionary', () => {
-  const BACKEND_PROSE = 'Its leaf is no longer in the tree, see the revocations mapping.';
+  const BACKEND_PROSE = 'Its leaf is no longer in the tree; its PropertyRevoked event on chain gives the reason.';
 
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {});

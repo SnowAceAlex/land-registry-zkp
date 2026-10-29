@@ -21,11 +21,8 @@ describe('RootRegistry — revocations (D45)', () => {
     await registry.publishRootWithRevocations(ROOT_A, [1001n], [3], [DETAIL]);
 
     expect(await registry.latestRoot()).to.equal(ROOT_A);
-    const entry = await registry.revocations(1001n);
-    expect(entry.reasonCode).to.equal(3);
-    expect(entry.detailHash).to.equal(DETAIL);
-    expect(entry.rootVersion).to.equal(1n);
-    expect(entry.revokedAt).to.be.greaterThan(0n);
+    expect(await registry.isRevoked(1001n)).to.equal(true);
+    expect(await registry.isRevoked(1002n)).to.equal(false); // same 256-bit word, untouched
   });
 
   it('emits PropertyRevoked per property', async () => {
@@ -59,16 +56,8 @@ describe('RootRegistry — revocations (D45)', () => {
       [DETAIL, DETAIL_2],
     );
 
-    // Verify each property stored with its own reason code and detail hash
-    const entry1 = await registry.revocations(propertyId1);
-    expect(entry1.reasonCode).to.equal(reasonCode1);
-    expect(entry1.detailHash).to.equal(DETAIL);
-    expect(entry1.rootVersion).to.equal(1n);
-
-    const entry2 = await registry.revocations(propertyId2);
-    expect(entry2.reasonCode).to.equal(reasonCode2);
-    expect(entry2.detailHash).to.equal(DETAIL_2);
-    expect(entry2.rootVersion).to.equal(1n);
+    expect(await registry.isRevoked(propertyId1)).to.equal(true);
+    expect(await registry.isRevoked(propertyId2)).to.equal(true);
 
     // Verify both PropertyRevoked events are emitted with correct arguments
     await expect(tx)
@@ -77,6 +66,16 @@ describe('RootRegistry — revocations (D45)', () => {
     await expect(tx)
       .to.emit(registry, 'PropertyRevoked')
       .withArgs(propertyId2, reasonCode2, DETAIL_2, 1n);
+  });
+
+  it('keeps every bit of a word independent, across rounds (D91)', async () => {
+    // 511 = bit 255 of word 1, 512 = bit 0 of word 2: both ends of the shift.
+    await registry.publishRootWithRevocations(ROOT_A, [511n, 512n], [1, 1], [DETAIL, DETAIL]);
+    // 510 shares word 1 with 511, so this round updates a non-empty word.
+    await registry.publishRootWithRevocations(ROOT_B, [510n], [1], [DETAIL]);
+
+    for (const id of [510n, 511n, 512n]) expect(await registry.isRevoked(id)).to.equal(true);
+    for (const id of [509n, 513n]) expect(await registry.isRevoked(id)).to.equal(false);
   });
 
   it('rejects mismatched array lengths', async () => {
@@ -115,75 +114,62 @@ describe('RootRegistry — revocations (D45)', () => {
   });
 
   /**
-   * The cap the backend actually applies (D56, re-measured at D73). MUST match
-   * `DEFAULT_REVOCATION_CAP` in
-   * `web-app/backend/src/government/changeset.service.ts` — the two packages
-   * cannot import each other, so this is a double-entry ledger:
-   * `changeset.service.spec.ts` pins the value on the backend side, this test
-   * pins what that value costs in gas.
+   * D91: the worst-case ceiling printed below minus HEADROOM. Must equal
+   * DEFAULT_REVOCATION_CAP in web-app/backend/src/government/changeset.service.ts.
    */
-  const BACKEND_CAP = 150;
+  const BACKEND_CAP = 591;
 
-  /**
-   * Half of a 30M block. Leaves room for a gas-price spike, for other
-   * transactions in the same block, and for estimateGas coming in under a real
-   * mined call.
-   */
-  const HALF_BLOCK_GAS = 15_000_000n;
+  /** D91: the cap stays this many plots under the measured worst-case ceiling. */
+  const HEADROOM = 50;
 
-  /**
-   * Rungs to print. Only the cap is asserted; the rest are Chapter 5 data.
-   *
-   * 180 and 190 bracket a measured ceiling: on this dev network `estimateGas`
-   * itself gives up somewhere between them ("Transaction ran out of gas"),
-   * while the block gas limit reports 60,000,000 and the sender's balance is
-   * nowhere near exhausted. The cause is not established here — what is
-   * established is that a batch that large cannot even be priced on the
-   * network the officer's wallet talks to in development, which is reason
-   * enough not to build one.
-   */
-  const LADDER = [50, 100, 150, 180, 190, 200];
+  /** EIP-7825 per-transaction gas cap; Hardhat prices storage pre-Glamsterdam. */
+  const TX_GAS_CAP = 16_777_216n;
 
-  it('measures the revocation gas ladder (D73 — the table goes in Chapter 5)', async () => {
-    // `registry` comes from the beforeEach above, with the default signer
-    // already granted STATE_AUTHORITY_ROLE. estimateGas only, so reusing ROOT_A
-    // across rungs is safe: nothing is ever mined, and the "no duplicate root"
-    // rule is never reached.
-    const estimateFor = async (batch: number): Promise<bigint> => {
-      const propertyIds = Array.from({ length: batch }, (_, i) => 2000n + BigInt(i));
-      return registry.publishRootWithRevocations.estimateGas(
-        ROOT_A,
-        propertyIds,
-        propertyIds.map(() => 1),
-        propertyIds.map(() => DETAIL),
+  // One plot per 256-bit word, so every revocation creates a slot: the worst case.
+  const wordIds = (n: number, bit: bigint) =>
+    Array.from({ length: n }, (_, i) => BigInt(i + 1) * 256n + bit);
+
+  it('measures the revocation ceiling (D91 — the numbers go in Chapter 5)', async () => {
+    const estimateFor = (root: string, ids: bigint[]) =>
+      registry.publishRootWithRevocations.estimateGas(
+        root,
+        ids,
+        ids.map(() => 1),
+        ids.map(() => DETAIL),
       );
-    };
+    const fits = (n: number) =>
+      estimateFor(ROOT_A, wordIds(n, 7n)).then(
+        (gas) => gas <= TX_GAS_CAP,
+        () => false, // the network will not even price it
+      );
 
-    const blockGasLimit = (await ethers.provider.getBlock('latest'))!.gasLimit;
-    console.log(`      network block gas limit: ${blockGasLimit}`);
-
-    for (const batch of LADDER) {
-      try {
-        const gas = await estimateFor(batch);
-        console.log(
-          `      publishRootWithRevocations × ${batch}: ${gas} gas ` +
-            `(${(Number(gas) / batch).toFixed(0)}/item)`,
-        );
-      } catch (error) {
-        // A rung that cannot be estimated at all. Reported rather than thrown:
-        // it is the most useful number on the ladder — the point past which a
-        // batch reverts wholesale and publishes nothing, which is the failure
-        // mode the backend cap exists to prevent.
-        console.log(
-          `      publishRootWithRevocations × ${batch}: NOT ESTIMABLE — ` +
-            `${(error as Error).message.split('\n')[0]}`,
-        );
-      }
+    // Largest worst-case round one transaction carries.
+    let ceiling = 0;
+    let hi = 2048;
+    while (ceiling < hi) {
+      const mid = Math.ceil((ceiling + hi) / 2);
+      if (await fits(mid)) ceiling = mid;
+      else hi = mid - 1;
     }
+    const base = await estimateFor(ROOT_A, []);
+    const fresh = await estimateFor(ROOT_A, wordIds(100, 7n));
+    console.log(`      worst-case ceiling: ${ceiling} revocations/tx`);
+    console.log(`      new words: ${(Number(fresh - base) / 100).toFixed(0)} gas/item`);
 
-    // The only assertion: what the backend will actually send stays under half
-    // a block. The other rungs exist to be read, not to be contracts.
-    expect(await estimateFor(BACKEND_CAP)).to.be.lessThan(HALF_BLOCK_GAS);
+    // Steady state: the same words already hold one revoked plot each.
+    const prep = wordIds(100, 7n);
+    await registry.publishRootWithRevocations(
+      ROOT_A,
+      prep,
+      prep.map(() => 1),
+      prep.map(() => DETAIL),
+    );
+    const steadyBase = await estimateFor(ROOT_B, []);
+    const steady = await estimateFor(ROOT_B, wordIds(100, 8n));
+    console.log(`      existing words: ${(Number(steady - steadyBase) / 100).toFixed(0)} gas/item`);
+
+    // The only assertion: the backend's cap stays HEADROOM plots under the ceiling.
+    expect(BACKEND_CAP + HEADROOM).to.be.at.most(ceiling);
   });
 
   it('still rejects a zero or duplicate root', async () => {

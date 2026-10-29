@@ -23,7 +23,7 @@
  *     WebCrypto, reusing only `issuerSignatureMessage` from the Node-only
  *     shared module. Chain verification is off-chain on purpose, because
  *     RSA-2048 and P-256 are not secp256k1.
- *  6. Revocation status comes from the chain's own `revocations` mapping (D45),
+ *  6. Revocation status comes from the chain's own bitmap (`isRevoked`, D91),
  *     not from the registry's API, and is shown through the verdict.
  *  7. Only the disclosed public signals are rendered, beside an explicit list
  *     of what was never revealed. That distinction is the whole point of the

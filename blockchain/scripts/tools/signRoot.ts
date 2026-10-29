@@ -13,7 +13,9 @@
  *   NEW_ROOT       decimal string, taken from the draft response (required)
  *   REVOCATIONS    optional JSON: [{ propertyId, reasonCode, detailHash }, ...]
  *                  when present, calls publishRootWithRevocations instead
+ *   REVOCATIONS_FILE  the same JSON from a file; wins over REVOCATIONS
  */
+import * as fs from 'fs';
 import * as path from 'path';
 import { ethers, network } from 'hardhat';
 
@@ -37,9 +39,11 @@ async function main(): Promise<void> {
   // The tree works in field elements (decimal); the contract takes bytes32.
   const newRoot = ethers.zeroPadValue(ethers.toBeHex(BigInt(newRootDecimal)), 32);
 
-  const revocations: RevocationArg[] = process.env.REVOCATIONS
-    ? (JSON.parse(process.env.REVOCATIONS) as RevocationArg[])
-    : [];
+  // A file because a full round (~100 KB of JSON at 950, D91) exceeds Windows' 32 KB env-var limit.
+  const json = process.env.REVOCATIONS_FILE
+    ? fs.readFileSync(process.env.REVOCATIONS_FILE, 'utf8')
+    : process.env.REVOCATIONS;
+  const revocations: RevocationArg[] = json ? (JSON.parse(json) as RevocationArg[]) : [];
 
   const tx =
     revocations.length > 0

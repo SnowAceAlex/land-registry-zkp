@@ -35,6 +35,7 @@
 import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as http from 'http';
+import * as os from 'os';
 import * as path from 'path';
 
 import { Prisma, PrismaClient } from '@prisma/client';
@@ -197,11 +198,14 @@ function signRoot(
   newRoot: string,
   revocations?: unknown,
 ): { txHash: string; gasUsed: string; rootVersion: number } {
+  // Through a file: a full round's JSON (~100 KB at 950, D91) exceeds Windows' 32 KB env-var limit.
+  const file = revocations ? path.join(os.tmpdir(), `bench-revocations-${process.pid}.json`) : null;
+  if (file) fs.writeFileSync(file, JSON.stringify(revocations));
   const out = execFileSync('pnpm', ['--filter', 'blockchain', 'run', SIGN_SCRIPT], {
     env: {
       ...process.env,
       NEW_ROOT: newRoot,
-      ...(revocations ? { REVOCATIONS: JSON.stringify(revocations) } : {}),
+      ...(file ? { REVOCATIONS_FILE: file } : {}),
     },
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,

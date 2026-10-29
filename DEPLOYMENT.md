@@ -186,7 +186,7 @@ AUTHORITY_ADDRESS=          # để trống = dùng luôn địa chỉ deployer
 AUTHORITY_ORG_NAME="So Tai nguyen va Moi truong TP.HCM"
 ```
 
-Backend đọc thêm hai biến tuỳ chọn trong `web-app/backend/.env`: `REVOCATION_CAP` (số thu hồi tối đa mỗi vòng công bố, mặc định 150) và `QUEUE_STALE_DAYS` (số ngày trước khi hàng chờ bị đánh dấu quá hạn, mặc định 2). **Trên Sepolia đặt `REVOCATION_CAP` ≤ 60**: từ fork Glamsterdam mỗi thu hồi tốn ~448k gas, 150 không còn vừa một block.
+Backend đọc thêm hai biến tuỳ chọn trong `web-app/backend/.env`: `REVOCATION_CAP` (số thu hồi tối đa mỗi vòng công bố, mặc định 591) và `QUEUE_STALE_DAYS` (số ngày trước khi hàng chờ bị đánh dấu quá hạn, mặc định 2). **Trên Sepolia đặt `REVOCATION_CAP=989`** (D91: trần đợt tệ nhất 1.039 trừ 50) và kiểm bằng `CAP=989 pnpm --filter blockchain run chain:revocation-ceiling:sepolia`.
 
 `AUTHORITY_ORG_NAME` sẽ được `keccak256` rồi neo on-chain (D30) — **phải khớp field Subject `O` của X.509 certificate** mà verifier portal dùng ở Phase 9. Đổi tên này sau khi deploy = phải deploy lại hoặc gọi `registerAuthority` lần nữa.
 
