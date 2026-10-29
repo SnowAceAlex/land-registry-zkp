@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "description": "Monorepo: Blockchain-based Land Use Rights management with Merkle tree + ZKP (Groth16)",
+  "author": "Bui Cong Vinh",
+  "license": "AGPL-3.0-only",
   "scripts": {
     "dev:backend": "pnpm --filter backend run start:dev",
     "dev:frontend": "pnpm --filter frontend run dev",

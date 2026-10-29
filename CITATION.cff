@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: 'If you use or build on this work, please cite it as below.'
+type: software
+title: 'Land Registry ZKP: a privacy-preserving Land Use Rights registry with sparse Merkle trees and zero-knowledge proofs'
+authors:
+  - family-names: Bui
+    given-names: Cong Vinh
+    affiliation: 'International University, Vietnam National University Ho Chi Minh City'
+repository-code: 'https://github.com/SnowAceAlex/land-registry-zkp'
+license: AGPL-3.0-only
+keywords:
+  - zero-knowledge proofs
+  - Groth16
+  - sparse Merkle tree
+  - land registry
+  - Ethereum
+  - Vietnam

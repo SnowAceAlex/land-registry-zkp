@@ -1,393 +1,170 @@
 # Land Registry ZKP
 
-> **Master's Thesis Project**: Application of Blockchain in Real Estate Management  
-> **Focus**: Privacy-Preserving Land Use Rights (LUR) Registry using **Sparse Merkle Trees + Zero-Knowledge Proofs (Groth16)** on Ethereum  
-> **Jurisdiction Alignment**: Compliant with statutory requirements of the **Vietnam Land Law 2024**, Decree 151/2025/ND-CP, and Circular 08/2024/TT-BTNMT.
+**A privacy-preserving Land Use Rights (LUR) registry for Vietnam — sparse Merkle tree commitments and Groth16 zero-knowledge proofs on Ethereum.**
 
-Land records live off-chain; only the **Merkle root** is anchored on-chain. Landowners prove cryptographic assertions about their property — _"I am the legitimate title holder"_, _"this title is unencumbered and has at least N years of remaining tenure"_, _"ownership transferred from party A to party B"_ — without disclosing the underlying record, owner identity, or exact property boundaries.
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+![Circom 2.2.3](https://img.shields.io/badge/circom-2.2.3-orange)
+![Solidity 0.8.36](https://img.shields.io/badge/solidity-0.8.36-363636)
+![NestJS 10](https://img.shields.io/badge/NestJS-10-e0234e)
+![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
 
----
+> Thesis project by **Bui Cong Vinh** (ITCSIU22165) — International University, Vietnam National University Ho Chi Minh City.
+> If you use or build on this work, please cite it: see [`CITATION.cff`](CITATION.cff) or GitHub's _Cite this repository_ button.
 
-## Architecture Overview
+Land records stay off-chain with the land offices; only the **Merkle root** of the registry is anchored on Ethereum. An owner can then prove a statement about their plot — _"I hold this title"_, _"this title is unencumbered and has at least N years left"_ — without revealing the record or their identity, and anyone can check that proof against the chain without trusting the registry's server.
 
-The system is organized as a unified monorepo managed with **pnpm workspaces**:
-
-```
-land-registry-zkp/
-├── blockchain/          # Cryptographic layer: circom circuits, Hardhat contracts, shared ZKP logic
-│   ├── circuits/        # Circom 2.2.3 circuits (ownership, mortgage, transfer, +3 shared templates)
-│   ├── contracts/       # Solidity 0.8.24+ (RootRegistry, LandRegistryVerifier, generated verifiers)
-│   ├── deployments/     # Deployed contract artifacts on Ethereum Sepolia and local networks
-│   ├── scripts/         # Automated scripts for circuits compilation, trusted setup, deploy, benchmarks
-│   └── shared/          # Single Source of Truth: Poseidon hashing, sparse tree, types, leaf order
-├── web-app/
-│   ├── backend/         # NestJS 10 API: Prisma 7 ORM, PostgreSQL 16 (merkle_nodes, properties, events),
-│   │                    # X.509 PKI issuer service, DejaVu Sans PDF engine, streaming ZIP bundles
-│   └── frontend/        # Next.js 16 (App Router) + React 19 + Tailwind CSS + wagmi/RainbowKit:
-│                        # - Government Portal: issuance, dry-run imports, transfers, batch change sets
-│                        # - Resident Portal: zero-trust client-side Groth16 prover & verifier workbench
-├── pki/                 # Government Root CA and X.509 certificate generation scripts
-└── docker-compose.yml   # PostgreSQL 16 on host port 5433
-```
-
-### Core Design Principles
-
-1. **Zero Crypto Duplication**: All Merkle tree operations, Poseidon hashing, and canonical leaf formatting live exclusively in `blockchain/shared/`. Both `backend` and `frontend` import them directly from `@land-registry/blockchain/shared` — preventing silent drift between off-chain computations and on-chain verifications.
-2. **Zero-Trust Verification**: The Resident Verification Workbench (UC-6) validates proofs independently in the client browser using `snarkjs` and direct Ethereum RPC reads (`eth_call`). It never asks the backend whether a proof is valid.
-3. **Double-Spending & Stale-Leaf Prevention (D41)**: A plot's leaf slot in the sparse Merkle tree is strictly bound to its `propertyId` (`0 <= propertyId < 2^24`). A single slot holds exactly one valid leaf at any time; once transferred or revoked, the previous leaf has no valid path to the new root.
-4. **HCMC-Scale Tree (D71, D72)**: Tree depth is fixed at **24** (`16,777,216` addressable slots), offering 6.7x headroom for Ho Chi Minh City's 2.5 million parcels. Stored in a PostgreSQL `merkle_nodes` table, Merkle proof retrieval requires only 24 primary-key lookups (`O(depth)`), completely eliminating whole-tree rebuilds.
-
-### Companion Documentation
-
-| Document                                                             | Description                                                                              |
-| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| [`DEPLOYMENT.md`](./DEPLOYMENT.md)                                   | Deployment runbook: local node -> Sepolia trial -> Sepolia production, plus gas analysis |
-| [`CODING_ROADMAP.md`](./CODING_ROADMAP.md)                           | Locked technical design, circuit layout, and binding Design Decisions Log (D1–D90)       |
-| [`THESIS_IMPLEMENTATION_GUIDE.md`](./THESIS_IMPLEMENTATION_GUIDE.md) | Academic framing, evaluation criteria, and defense alignment                             |
-| [`CLAUDE.md`](./CLAUDE.md)                                           | Technical instructions, workspace layout, and developer CLI references                   |
+The legal model follows the 2024 Land Law, Decree 151/2025/ND-CP and Circular 08/2024/TT-BTNMT.
 
 ---
 
-## Six Core Use Cases (UC-1 … UC-6)
-
-Modelled after the Vietnamese land administration procedure and aligned with **IU-SmartCert**:
+## How it works
 
 ```mermaid
-flowchart TD
-    subgraph Government Portal ["Government Portal (Metamask Authorized)"]
-        UC2["UC-2: CSV Import<br/>(Dry-run & Administrative Units Validation)"] --> UC1["UC-1: Issuance Batch<br/>(Draft -> Metamask Confirm -> ZIP Bundles)"]
-        UC3["UC-3: Transfer Counter<br/>(Seller ZKP Verify & Dual-Path Witness)"] --> UC4["UC-4: ChangeSets & Revocations<br/>(Batched On-chain Publish <= 150 items)"]
+flowchart LR
+    subgraph Gov["Government portal (MetaMask)"]
+        UC2["UC-2 Import"] --> UC1["UC-1 Issue"]
+        UC3["UC-3 Transfer"]
+        UC4["UC-4 Revoke"]
+        UC1 & UC3 & UC4 --> ROUND["Publishing round<br/>one new root"]
     end
-
-    subgraph Blockchain ["Ethereum Blockchain (Sepolia / Local)"]
-        RR["RootRegistry.sol<br/>(Merkle Root, History, Revocations, PKI Anchor)"]
-        LRV["LandRegistryVerifier.sol<br/>(Groth16 Dispatcher, Time Freshness)"]
+    subgraph Chain["Ethereum"]
+        RR["RootRegistry<br/>roots · revocations · issuer anchor"]
+        LRV["LandRegistryVerifier<br/>Groth16 · freshness · attestation"]
     end
-
-    subgraph Resident Portal ["Resident Portal (Zero-Trust, Logged-Out)"]
-        UC5["UC-5: Self-Service Proof Generation<br/>(Ownership & Mortgage ZKP in Web Worker)"]
-        UC6["UC-6: Independent Verification Workbench<br/>(Groth16 + On-chain Root + X.509 PKI Chain)"]
-        HIST["Public Lookup & History<br/>(Tamper-proof PropertyEvent Ledger)"]
+    subgraph Res["Resident portal (no login, no wallet)"]
+        UC5["UC-5 Prove<br/>in the browser"]
+        UC6["UC-6 Verify"]
     end
-
-    UC1 -->|Publish Root| RR
-    UC4 -->|Publish Root + Revocations| RR
-    UC5 -.->|Fetch Merkle Path| UC1
-    UC6 -->|Verify Root & Status| RR
-    UC6 -->|Verify Proof| LRV
+    ROUND -->|publishRoot| RR
+    UC5 -->|proof.json| UC6
+    UC6 --> RR
+    UC6 --> LRV
 ```
 
-- **UC-1: First-Time Land Use Rights Issuance**  
-  Cadastral officers create an issuance draft. The backend generates cryptographic secrets (`ownerSecret`, 248-bit entropy) and commitments, builds the new sparse Merkle tree, and awaits officer authorization via Metamask. Upon confirmation, the new root is published on-chain, and an issuance archive ZIP is generated containing `receipt.json`, `secret.json`, and an official electronic certificate PDF (with Vietnamese font subsetting via DejaVu Sans).
-- **UC-2: Land Data Import & Cadastral Validation**  
-  Bulk CSV ingestion with a mandatory 2-phase dry-run mode. Validates cadastral boundaries against official commune/ward reference data (`administrative_units`, Decree 151/2025/ND-CP) and checks legal land-use tenure according to the 2024 Land Law (Articles 171 and 172).
-- **UC-3: Land Transfer Counter & In-Person Verification**  
-  In-person administrative workflow. The officer verifies the seller's cryptographic bundle, generates the dual-path transfer witness (`oldSiblings` and `newSiblings`), provisions the buyer's secret and commitment, and enqueues the transfer for batched execution.
-- **UC-4: Changesets & Administrative Revocations**  
-  Batched periodic publication of approved transfers and administrative revocations. Revoked titles are cryptographically zeroed in the Merkle tree and recorded on-chain in `RootRegistry` with standardized reason codes and hashed details (capped at 150 items per transaction to operate well within Ethereum block gas limits).
-- **UC-5: Resident Self-Service Proof Generation**  
-  Landowners generate Groth16 zero-knowledge proofs directly in their web browser inside a background Web Worker. Proves ownership or unencumbered status with custom remaining tenure thresholds without revealing identity, exact term, or encumbrance status.
-- **UC-6: Independent Zero-Trust Verification Workbench**  
-  Third parties (commercial banks, prospective buyers, notaries) verify proofs against the live blockchain. Executes 4 checks sequentially: proof timestamp freshness (+/- 10 minutes), Groth16 cryptographic correctness, on-chain Merkle root match, and X.509 issuer certificate validation against a pinned Government Root CA.
+| Use case          | Who                           | What happens                                                                                                                                                                               |
+| ----------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **UC-1 Issue**    | Central land office           | Queues imported plots for a first certificate. The owner's secret is generated here; the bundle (`receipt.json`, `secret.json`, certificate PDF) is delivered once the round is published. |
+| **UC-2 Import**   | Central land office           | Bulk CSV import with a dry run, validated against the 2024 Land Law (land-use codes, tenure per Article 171) and the post-2025 commune catalog.                                            |
+| **UC-3 Transfer** | Branch office, at the counter | Checks the seller's bundle, issues the buyer's secret and verifies a `transfer` proof before approving.                                                                                    |
+| **UC-4 Revoke**   | Branch office                 | Queues a revocation with a reason code. The free-text reason stays off-chain; only its hash is published.                                                                                  |
+| **UC-5 Prove**    | Owner                         | Loads their bundle and generates an ownership or clean-title proof in a Web Worker. The secret never leaves the browser.                                                                   |
+| **UC-6 Verify**   | Bank, buyer, notary           | Checks freshness, the Groth16 proof, the on-chain root, the issuer's X.509 chain, revocation status and the status attestation — without asking the backend whether the proof is valid.    |
 
----
+Issuances, approved transfers and revocations are published together in one **round**: the central office signs a single `publishRoot` (or `publishRootWithRevocations`) in MetaMask, and the database is only updated once that root is on-chain. Every other change — re-issue, split, merge — is modelled as a revocation plus a new issuance with a new `propertyId`.
 
-## Cryptographic & Security Architecture
+## Design highlights
 
-### 1. Canonical 7-Field Poseidon Leaf Hash (D4, D36)
+- **One leaf per plot.** A leaf's index in the depth-24 sparse Merkle tree _is_ its `propertyId` (up to 16,777,215 plots), and the circuits constrain it. After a transfer or revocation the old leaf has no path to the new root, so the old owner can no longer prove anything.
+- **Seven-field Poseidon leaf.** `Poseidon(propertyId, ownerCommitment, useType, validityPeriod, encumbranceStatus, tenureType, offchainHash)`, where `offchainHash` commits to the printed certificate fields (address, area, …) that never go on-chain.
+- **Freshness.** `currentTimestamp` is a public input the prover chooses, so the contract and the off-chain verifier both require it to be within 600 s of now — a back-dated proof for an expired title is rejected.
+- **Status attestation.** Ownership and clean-title proofs carry a short-lived EIP-712 signature stating the plot has no open transfer or revocation, which closes the window between the counter and the next round.
+- **Issuer identity.** A demo Government Root CA issues the land office's X.509 certificate; its organization name is hashed on-chain by `registerAuthority`, and the verifier checks the whole chain in the browser.
+- **Revocations on-chain.** One bit per `propertyId` (`isRevoked(id)`); the reason code and detail hash are emitted as events for public audit.
+- **Built for Ho Chi Minh City scale.** The tree lives in PostgreSQL (`merkle_nodes`): a Merkle path is 24 primary-key lookups, and a round rewrites only the paths it touches.
+- **One copy of the crypto.** Poseidon, the tree and the leaf layout live only in `blockchain/shared/`, imported by both the backend and the browser.
 
-Every land record is committed to a single BN254 scalar leaf via Poseidon hashing:
+### Circuits
 
-```text
-leaf = Poseidon([propertyId, ownerCommitment, useType, validityPeriod, encumbranceStatus, tenureType, offchainHash])
-```
+| Circuit     | Proves                                                  | Constraints | Public signals                                                                                                                             |
+| ----------- | ------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ownership` | the prover holds the title and its term has not expired | 14,270      | `merkleRoot`, `propertyId`, `ownerCommitment`, `currentTimestamp`                                                                          |
+| `mortgage`  | the title is unencumbered and has at least N years left | 14,270      | the four above + `minRequiredRemainingTerm`                                                                                                |
+| `transfer`  | the same slot moves from the old owner to the new one   | 28,271      | `oldMerkleRoot`, `newMerkleRoot`, `propertyId`, `oldOwnerCommitment`, `newOwnerCommitment`, `currentTimestamp`, `minRequiredRemainingTerm` |
 
-- `propertyId`: Integer ID of the land parcel (`0 <= propertyId < 2^24`).
-- `ownerCommitment`: `Poseidon([ownerSecret])`.
-- `useType`: Land use category (`1` = Residential, `2` = Agricultural, `3` = Non-agricultural commercial, etc.).
-- `validityPeriod`: Unix epoch timestamp deadline (`0` sentinel for perpetual tenure).
-- `encumbranceStatus`: `0` = FREE, `1` = MORTGAGED, `2` = LITIGATED / DISPUTED.
-- `tenureType`: `0` = PERPETUAL (stable long-term land use), `1` = FIXED_TERM (statutory finite term, e.g., 50 years), `2` = PROJECT_LEASEHOLD (investment project lease, e.g., up to 50 or 70 years).
-- `offchainHash`: Length-prefixed canonical SHA-256 hash modulo BN254 field of the 8 descriptive fields (`certificateSerial`, `bookEntryNumber`, `address`, `area`, `issuingAuthority`, `issueDate`, `mapSheetNumber`, `landOrigin`). Prevents tampering with printed certificate metadata while maintaining zero on-chain storage overhead.
-
-### 2. Circom Circuits & Constraints
-
-Compiled using **Circom 2.2.3** and proven via **snarkjs (Groth16)** with public Hermez Powers-of-Tau ceremony files:
-
-| Circuit            | Purpose                                                                     | Non-linear Constraints | Total Constraints | Public Signals                                                                                                                                 | Setup PTAU |
-| ------------------ | --------------------------------------------------------------------------- | ---------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `ownership.circom` | Proves valid ownership and unexpired term without disclosing owner identity | 6,741                  | 14,270            | 4 (`merkleRoot`, `propertyId`, `ownerCommitment`, `currentTimestamp`)                                                                          | `2^14`     |
-| `mortgage.circom`  | Proves title is clean (`FREE`) and remaining tenure >= threshold            | 6,741                  | 14,270            | 5 (`merkleRoot`, `propertyId`, `ownerCommitment`, `currentTimestamp`, `minRequiredRemainingTerm`)                                              | `2^14`     |
-| `transfer.circom`  | Proves dual Merkle transition: old owner -> new owner at the same slot      | 13,221                 | 28,271            | 7 (`oldMerkleRoot`, `newMerkleRoot`, `propertyId`, `oldOwnerCommitment`, `newOwnerCommitment`, `currentTimestamp`, `minRequiredRemainingTerm`) | `2^15`     |
-
-### 3. Anti-Replay & Freshness Guard (D9, D26)
-
-Provers supply `currentTimestamp` as a public input. Both `LandRegistryVerifier.sol` and the off-chain verification workbench enforce:
-
-```text
-|currentTimestamp - block.timestamp| <= 600 seconds (10 minutes)
-```
-
-This invalidates back-dated or captured proofs while allowing for normal client-server clock drift.
-
-### 4. PKI Identity Anchoring (D30, D78)
-
-To prevent rogue entities from deploying dummy registries, the system implements a two-tier PKI:
-
-1. A **Government Root CA** (`pki/root-ca.cert.pem`) issues certificates to municipal land authorities (`So Tai nguyen va Moi truong TP.HCM` / Department of Natural Resources and Environment).
-2. The Subject Organization name is cryptographically hashed on-chain: `authorityInstitute[publisher] = keccak256("So Tai nguyen va Moi truong TP.HCM")`.
-3. Verifiers in the resident portal validate the X.509 certificate chain against the pinned Government Root CA, verify the publisher's digital signature over their Ethereum address, and confirm their on-chain authority role.
-
----
-
-## Current Status & Verification Metrics
-
-Phases 0 through 11 are fully completed, tested, and evaluated:
-
-| Phase  | Description                                                                               | Status       |
-| ------ | ----------------------------------------------------------------------------------------- | ------------ |
-| **0**  | Cadastral mock data generator, Vietnam UTC+7 calendar utilities                           | ✅ Completed |
-| **1**  | Merkle tree layer: Poseidon hash, hand-written fixed-depth-24 sparse tree                 | ✅ Completed |
-| **2**  | Circom 2.2.3 circuits (`ownership`, `mortgage`, `transfer` + common templates)            | ✅ Completed |
-| **3**  | Trusted setup: Groth16 Phase-2 ceremony, automated verifier sync, E2E test                | ✅ Completed |
-| **4**  | Smart contracts: `RootRegistry`, `LandRegistryVerifier`, Hardhat deploy scripts           | ✅ Completed |
-| **5**  | Backend core: LUR management, issuance batches, DejaVu Sans PDF engine, ZIP archive       | ✅ Completed |
-| **6**  | Proof API: Merkle proof generation, on-chain/off-chain verification                       | ✅ Completed |
-| **7**  | Realignment to UC-1…UC-6 flow (SmartCert-aligned, 2-phase draft confirmation)             | ✅ Completed |
-| **8**  | Frontend Government Portal (UC-1 issuance, UC-2 import, UC-3 transfers, UC-4 changes)     | ✅ Completed |
-| **9**  | Frontend Resident Portal (UC-5 client-side prover, UC-6 zero-trust verifier, history)     | ✅ Completed |
-| **10** | HCMC Scale: Depth-24 tree, PostgreSQL `merkle_nodes` store, `O(depth)` incremental update | ✅ Completed |
-| **11** | Benchmarking & Evaluation: 1-month HCMC simulation replay, Sepolia testnet deployment     | ✅ Completed |
-
-### Automated Test Suite (710 Passing Tests)
+## Repository layout
 
 ```
-Test Suites:
-  - Blockchain layer: 183 passing (Hardhat, circuit witnesses, gas ladders, contracts)
-  - Backend API:      265 passing (28 test suites, NestJS, Prisma, services)
-  - Frontend portal:  262 passing (30 test suites, Vitest, bundle integrity, verifier logic)
-Total: 710 automated unit and integration tests passing.
+blockchain/           circom circuits, Solidity contracts, Hardhat scripts, shared Merkle/ZKP code
+├── circuits/         ownership, mortgage, transfer + common templates
+├── contracts/        RootRegistry, LandRegistryVerifier (Groth16 verifiers are generated)
+├── shared/           Poseidon, sparse Merkle tree, leaf layout, receipt format
+└── deployments/      sepolia.json — the live testnet deployment
+web-app/
+├── backend/          NestJS API, Prisma + PostgreSQL, certificate bundles (PDF/ZIP), X.509 issuer
+└── frontend/         Next.js 16: government portal (wagmi/RainbowKit) and resident portal
 ```
 
----
+## Getting started
 
-## Performance Benchmarks
+**Prerequisites:** Node.js ≥ 20, pnpm, Docker (PostgreSQL 16 on port 5433), Rust with `cargo install circom` (circom ≥ 2.2.3), and MetaMask for the government portal.
 
-### 1. Merkle Tree & Query Throughput (HCMC Scale — 2,500,000 Parcels)
-
-| Operation                         | Implementation                                 | Latency (p50) | Latency (p95) | Throughput                   |
-| --------------------------------- | ---------------------------------------------- | ------------- | ------------- | ---------------------------- |
-| **Proof Retrieval (Cold/Full)**   | `NodeStoreService` (24 key lookups)            | 10.2 ms       | 12.4 ms       | ~210 req/s                   |
-| **Proof Retrieval (Conditional)** | HTTP ETag 304 Revalidation (D74)               | 2.8 ms        | 3.5 ms        | **690 req/s (3.3x speedup)** |
-| **Tree Confirmation (Batch)**     | Incremental overlay projection (3,144 updates) | 12.9 s        | 15.1 s        | Peak RSS < 400 MB            |
-
-### 2. ZKP Proving & On-Chain Verification
-
-| Circuit            | Proving Time (p50) | Verification Gas (Ethereum) | On-Chain Function |
-| ------------------ | ------------------ | --------------------------- | ----------------- |
-| `ownership.circom` | 728 ms             | 247,955 gas                 | `verifyOwnership` |
-| `mortgage.circom`  | 671 ms             | 254,624 gas                 | `verifyMortgage`  |
-| `transfer.circom`  | 1,018 ms           | 255,160 gas                 | `verifyTransfer`  |
-
-### 3. One-Month HCMC Cadastral Replay Benchmark (`bench:month`)
-
-Simulates **22 full business days** of mutations under real-world municipal load (~20,890 transactions/month):
-
-- Confirmed with **0 memory leaks** (constant RSS memory profile throughout).
-- On-chain batch revocation gas measured linearly at ~93k gas/item, safe up to the 150-item operational cap (~13.9M gas, well below half of the 30M block gas limit).
-
----
-
-## Prerequisites
-
-| Tool                | Minimum Version | Installation / Notes                                          |
-| ------------------- | --------------- | ------------------------------------------------------------- |
-| **Node.js**         | `>= 20.x`       | [nodejs.org](https://nodejs.org)                              |
-| **pnpm**            | `>= 8.x`        | `npm install -g pnpm`                                         |
-| **Rust & Cargo**    | Stable          | [rustup.rs](https://rustup.rs)                                |
-| **Circom Compiler** | `>= 2.2.3`      | `cargo install circom` _(Rust binary, required for circuits)_ |
-| **Docker Desktop**  | Latest          | [docker.com](https://www.docker.com) _(Runs PostgreSQL 16)_   |
-
----
-
-## Quick Start Guide
-
-Run all commands from the repository root:
-
-### 1. Clone & Install Dependencies
+### 1. Install and configure
 
 ```bash
 git clone https://github.com/SnowAceAlex/land-registry-zkp.git
 cd land-registry-zkp
-cp .env.example .env
 pnpm install
+cp .env.example .env                   # read by Hardhat and Prisma
+cp .env.example web-app/backend/.env   # read by the backend
+echo "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=<your id>" > web-app/frontend/.env
 ```
 
-### 2. Start PostgreSQL Database
+The defaults in `.env.example` are enough for a local chain. `GOV_API_KEY` is the head-office key you type into the government portal.
+
+### 2. Database, certificates, circuits, contracts
 
 ```bash
-# Starts PostgreSQL 16 on port 5433 (avoids standard 5432 conflicts)
-pnpm run db:up
-
-# Run database migrations
+pnpm run db:up                                   # PostgreSQL 16 on port 5433
 pnpm --filter backend run db:migrate
-```
-
-### 3. Generate PKI Certificates & Reference Data
-
-```bash
-# Generates Government Root CA (pki/) and Municipal Issuer Certificate (certs/)
-pnpm --filter backend run cert:generate
-
-# (Optional) Seed official commune/ward administrative catalog
-# pnpm --filter backend run seed:admin-units <path-to-admin-units.json>
-```
-
-### 4. Compile Circuits & Run Trusted Setup
-
-```bash
-# Compile circom circuits to R1CS and WASM
+pnpm --filter backend run cert:generate          # demo Root CA (pki/) + issuer certificate (certs/)
 pnpm --filter blockchain run circuits:compile
-
-# Run Groth16 Phase-2 trusted setup and auto-sync Solidity verifiers
-# Note: First run downloads public Powers-of-Tau files (~18MB and ~36MB, cached)
-pnpm --filter blockchain run circuits:setup
+pnpm --filter blockchain run circuits:setup      # Groth16 setup; downloads Powers of Tau on first run
+pnpm run compile                                 # Solidity + TypeChain
 ```
 
-### 5. Compile Smart Contracts & Run Tests
+### 3. Run
 
 ```bash
-# Compile Solidity contracts and generate TypeChain bindings
-pnpm run compile
-
-# Run blockchain test suite (183 passing)
-pnpm run test:blockchain
-
-# Run backend test suite (265 passing)
-pnpm run test:backend
-
-# Run frontend test suite (262 passing)
-pnpm --filter frontend run test
+pnpm --filter blockchain run node                # terminal 1: local chain on :8545 (chain id 31337)
+pnpm --filter blockchain run deploy:localhost    # terminal 2
+pnpm run dev:backend                             # terminal 2: API on :3001 (Swagger at /api/docs)
+pnpm run dev:frontend                            # terminal 3: app on :3000
 ```
 
-### 6. Local Deployment & Web App Launch
+Open <http://localhost:3000> and pick **Government** (enter `GOV_API_KEY`, connect MetaMask to `localhost:8545`) or **Resident** (no login).
 
-**Terminal 1 — Persistent Local Hardhat Node:**
+Optional: `pnpm --filter backend run seed:admin-units <file>` loads the commune catalog, then `seed:land-offices` creates the branch offices CN01…CN38 and prints each office's key once.
+
+Deploying to Sepolia is covered in [`DEPLOYMENT.md`](DEPLOYMENT.md) (Vietnamese).
+
+### Tests
 
 ```bash
-pnpm --filter blockchain run node
+pnpm run test:blockchain           # Merkle layer, circuits, contracts
+pnpm run test:backend              # Jest
+pnpm --filter frontend run test    # Vitest
 ```
 
-**Terminal 2 — Deploy Contracts & Health Check:**
+Tests that need real proofs skip themselves until `circuits:setup` has run.
 
-```bash
-# Deploy to local node
-pnpm --filter blockchain run deploy:localhost
+## Sepolia deployment
 
-# Run deployment smoke test
-pnpm --filter blockchain run chain:smoke:localhost
-```
+Chain id `11155111`, deployed 2026-10-26. The full record is [`blockchain/deployments/sepolia.json`](blockchain/deployments/sepolia.json).
 
-**Terminal 3 — Start NestJS Backend (Port 3001):**
+| Contract                   | Address                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `RootRegistry`             | [`0x173637ec906aF093C92e86C0E11d95849Fa77eb5`](https://sepolia.etherscan.io/address/0x173637ec906aF093C92e86C0E11d95849Fa77eb5) |
+| `LandRegistryVerifier`     | [`0x661094990C4f1B8c14E8386BEAcC08953d01070d`](https://sepolia.etherscan.io/address/0x661094990C4f1B8c14E8386BEAcC08953d01070d) |
+| `Groth16VerifierOwnership` | [`0xA0FcdACC0F0c56Ba564DEB13C2979316D615ed7A`](https://sepolia.etherscan.io/address/0xA0FcdACC0F0c56Ba564DEB13C2979316D615ed7A) |
+| `Groth16VerifierMortgage`  | [`0xd48938358BbdbD1fD91b65Fdd5f4034b9bBc9261`](https://sepolia.etherscan.io/address/0xd48938358BbdbD1fD91b65Fdd5f4034b9bBc9261) |
+| `Groth16VerifierTransfer`  | [`0xef7502fd73cE4B2a81BDDeE927e849B9a824fc3a`](https://sepolia.etherscan.io/address/0xef7502fd73cE4B2a81BDDeE927e849B9a824fc3a) |
 
-```bash
-pnpm run dev:backend
-```
+State authority `0xc128Eb26F177BB6a3b4374A715be350887ED7726` (_So Tai nguyen va Moi truong TP.HCM_), status attester `0x55636981fA9f7b2c357025691C9a26B066dD25c8`.
 
-**Terminal 4 — Start Next.js Frontend (Port 3000):**
+## Tech stack
 
-```bash
-pnpm run dev:frontend
-```
+Circom 2.2.3 and snarkjs (Groth16 over BN254) · Solidity 0.8.36, OpenZeppelin 5, Hardhat 2 · NestJS 10, Prisma 7, PostgreSQL 16 · Next.js 16, React 19, wagmi 2, viem, RainbowKit · pdf-lib, @peculiar/x509.
 
-Open [http://localhost:3000](http://localhost:3000) in your browser:
+## Status
 
-- **/government**: Government administration portal (requires `GOV_API_KEY` from `.env` and Metamask connected to Hardhat Local / Sepolia).
-- **/resident**: Resident self-service portal (zero-trust, no login required).
-
----
-
-## Commands Reference
-
-```bash
-# ── Cryptography & Circuits ──────────────────────────────────────────────────
-pnpm --filter blockchain run circuits:compile        # Compile circom circuits
-pnpm --filter blockchain run circuits:setup          # Run trusted setup & sync verifiers
-pnpm --filter blockchain run circuits:sync-frontend  # Sync proving keys to frontend public/
-pnpm --filter blockchain run circuits:smoke          # End-to-end ZKP proving & verify smoke test
-pnpm --filter blockchain run mock:generate [N]       # Generate N mock land records (default: 20)
-
-# ── Blockchain & Smart Contracts ─────────────────────────────────────────────
-pnpm run compile                                     # Hardhat compile + TypeChain
-pnpm run test:blockchain                             # Execute all contract & circuit tests
-pnpm --filter blockchain run node                    # Start local Ethereum node (port 8545)
-pnpm --filter blockchain run deploy:localhost        # Deploy contracts to local node
-pnpm --filter blockchain run deploy:sepolia          # Deploy contracts to Sepolia testnet
-pnpm --filter blockchain run chain:smoke:localhost   # Deployment health check (local)
-pnpm --filter blockchain run chain:smoke:sepolia     # Deployment health check (Sepolia)
-
-# ── Backend & Database ───────────────────────────────────────────────────────
-pnpm run db:up / db:down                             # Start / stop PostgreSQL via Docker
-pnpm run dev:backend                                 # Start NestJS backend in watch mode (3001)
-pnpm run test:backend                                # Run NestJS Jest unit & integration tests
-pnpm --filter backend run cert:generate              # Generate/rotate X.509 PKI certificates
-pnpm --filter backend run tree:bootstrap             # Bootstrap merkle_nodes table from DB
-pnpm --filter backend run openapi:export             # Export OpenAPI spec to openapi.json
-
-# ── Frontend (Next.js) ───────────────────────────────────────────────────────
-pnpm run dev:frontend                                # Start Next.js portal (3000)
-pnpm --filter frontend run test                      # Run Vitest frontend test suite
-pnpm --filter frontend run build                     # Production Next.js build
-
-# ── Benchmarks & Evaluation (Chapter 5) ──────────────────────────────────────
-DATABASE_URL=$BENCH_DB pnpm --filter backend run bench:seed    # Seed 2.5M HCMC genesis records
-DATABASE_URL=$BENCH_DB pnpm --filter backend run bench:month   # Replay 1 month of HCMC mutations
-pnpm --filter blockchain run bench:proof-load                  # Concurrency load test on proof API
-pnpm --filter blockchain run bench:prove                       # Measure proving/verify gas costs
-```
-
----
-
-## Ethereum Sepolia Testnet Deployment
-
-Official deployment on the Ethereum Sepolia network:
-
-- **Network Name**: Sepolia Testnet
-- **Chain ID**: `11155111`
-- **Deployer / State Authority**: `0xc128Eb26F177BB6a3b4374A715be350887ED7726`
-- **Authority Organization**: `So Tai nguyen va Moi truong TP.HCM`
-- **Institute Anchor (`authorityInstitute`)**: `0x1f730914c2418f93d7466bfc23ec84f2790208f8c887355a7acaa798fa0ba603`
-
-| Contract                       | Sepolia Address                              | Etherscan Link                                                                                       |
-| ------------------------------ | -------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **`RootRegistry`**             | `0x0a0d25B553cFD341F11700B938414dCF96826bDA` | [View on Etherscan](https://sepolia.etherscan.io/address/0x0a0d25B553cFD341F11700B938414dCF96826bDA) |
-| **`LandRegistryVerifier`**     | `0x30e5975529Cc71E95A8f3ce60d8E7e873BbC70e1` | [View on Etherscan](https://sepolia.etherscan.io/address/0x30e5975529Cc71E95A8f3ce60d8E7e873BbC70e1) |
-| **`Groth16VerifierOwnership`** | `0x2394fb1AA08f1Db3aBF80d4e7e501ea212B3D478` | [View on Etherscan](https://sepolia.etherscan.io/address/0x2394fb1AA08f1Db3aBF80d4e7e501ea212B3D478) |
-| **`Groth16VerifierMortgage`**  | `0x4F8E816ae087E3960520F82f03CC0B386D262e47` | [View on Etherscan](https://sepolia.etherscan.io/address/0x4F8E816ae087E3960520F82f03CC0B386D262e47) |
-| **`Groth16VerifierTransfer`**  | `0x29a7422e95719FF069bBF0E63BB7d0d8E52e0ad9` | [View on Etherscan](https://sepolia.etherscan.io/address/0x29a7422e95719FF069bBF0E63BB7d0d8E52e0ad9) |
-
----
-
-## Technology Stack
-
-| Layer                          | Technology                           | Rationale & Specifications                                                     |
-| ------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------ |
-| **Zero-Knowledge Circuits**    | Circom 2.2.3                         | Domain-specific language for arithmetic circuits                               |
-| **Proof System**               | snarkjs (Groth16)                    | Succinct, constant-size proofs (~3 group elements, 248k gas verify)            |
-| **Cryptographic Primitives**   | Poseidon (circomlibjs)               | SNARK-friendly algebraic hash function over the BN254 scalar field             |
-| **Sparse Merkle Tree**         | Custom depth-24 implementation       | `2^24 = 16.7M` leaves, constant-memory streaming bootstrap, `O(depth)` lookups |
-| **Smart Contracts**            | Solidity 0.8.24+ & OpenZeppelin 5    | AccessControl, custom errors, gas-optimized dispatching                        |
-| **Contract Framework**         | Hardhat 2 + TypeChain                | Typed ethers.js bindings, comprehensive test harness                           |
-| **Backend Framework**          | NestJS 10 (Express)                  | Modular enterprise architecture, OpenAPI/Swagger generation                    |
-| **Database & ORM**             | PostgreSQL 16 + Prisma 7             | High-performance node index queries, robust relational schema                  |
-| **Frontend Framework**         | Next.js 16 (App Router) + React 19   | Server/Client components, Web Worker offloaded proving                         |
-| **Web3 & Wallet**              | wagmi v2 + viem + RainbowKit         | Type-safe wallet interactions, EIP-712 / Metamask support                      |
-| **PKI & Digital Certificates** | X.509 + WebCrypto + `@peculiar/x509` | Two-tier PKI, RSA-2048 identity chaining to pinned Root CA                     |
-| **Document Generation**        | pdf-lib + fontkit + DejaVu Sans      | Pure JavaScript Vietnamese PDF rendering without system font dependencies      |
-| **Package Management**         | pnpm Workspaces                      | Monorepo modularization with zero duplicate logic                              |
-
----
+Research prototype. The Root CA, land offices and keys are demo values, and the Groth16 phase-2 setup is a single local contribution rather than a multi-party ceremony, so it is not fit for production use.
 
 ## License
 
-This project is submitted as an academic thesis work. All rights reserved.
+Copyright © 2026 Bui Cong Vinh.
+
+Licensed under the [GNU Affero General Public License v3.0 only](LICENSE). You may use, study and modify this code, but any version you distribute or run as a network service must keep this notice and publish its complete source under the same license. Files that carry their own SPDX header are under that license.
+
+This project builds on circomlib, circomlibjs and snarkjs (GPL-3.0); the generated Groth16 verifier contracts carry snarkjs's GPL-3.0 header.
+
+This repository accompanies a thesis. Reusing it in academic work without citing it is plagiarism, whatever the code license allows.
