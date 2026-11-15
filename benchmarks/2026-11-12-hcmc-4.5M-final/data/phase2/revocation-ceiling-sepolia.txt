@@ -1,0 +1,5 @@
+$ hardhat run scripts/chain/revocationCeiling.ts --network sepolia
+sepolia RootRegistry 0x173637ec906aF093C92e86C0E11d95849Fa77eb5
+  worst-case ceiling: 1039 revocations/tx (114896 gas each)
+  REVOCATION_CAP ≤ 989
+  CAP=989: PASS

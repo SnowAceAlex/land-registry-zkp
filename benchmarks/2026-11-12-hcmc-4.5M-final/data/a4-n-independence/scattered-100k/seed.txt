@@ -1,0 +1,85 @@
+$ ts-node scripts/bench-seed-genesis.ts
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPrismaModule dependencies initialized[39m[38;5;3m +26ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mChainModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mThrottlerModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mLandLawModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mLineageModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mRootModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDraftLockModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTreeModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mRecordsModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPublicConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mImportModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mHistoryModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mIssuanceModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProofModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOperationsModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTransfersModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mGovernmentModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[ChainService] [39m[32mconnected to localhost (http://127.0.0.1:8545) as 0xc128Eb26F177BB6a3b4374A715be350887ED7726; RootRegistry=0x5FbDB2315678afecb367f032d93F642f64180aa3[39m
+[33m[Nest] 34132  - [39m15/11/2026, 13:22:19 [33m   WARN[39m [38;5;3m[ChainService] [39m[33mcould not check STATE_AUTHORITY_ROLE (is the node running?): could not decode result data (value="0x", info={ "method": "STATE_AUTHORITY_ROLE", "signature": "STATE_AUTHORITY_ROLE()" }, code=BAD_DATA, version=6.17.0)[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[IssuerService] [39m[32missuer certificate loaded — O="So Tai nguyen va Moi truong TP.HCM"[39m
+[32m[Nest] 34132  - [39m15/11/2026, 13:22:19 [32m    LOG[39m [38;5;3m[IssuerService] [39m[32missuer certificate chains to "Demo Government Root CA"[39m
+[33m[Nest] 34132  - [39m15/11/2026, 13:22:19 [33m   WARN[39m [38;5;3m[IssuerService] [39m[33mcould not verify identity anchor: could not decode result data (value="0x", info={ "method": "authorityInstitute", "signature": "authorityInstitute(address)" }, code=BAD_DATA, version=6.17.0)[39m
+[31m[Nest] 34132  - [39m15/11/2026, 13:22:19 [31m  ERROR[39m [38;5;3m[ChainService] [39m[31mchain read failed against localhost: could not decode result data (value="0x", info={ "method": "hasRole", "signature": "hasRole(bytes32,address)" }, code=BAD_DATA, version=6.17.0)[39m
+[33m[Nest] 34132  - [39m15/11/2026, 13:22:19 [33m   WARN[39m [38;5;3m[AttestationService] [39m[33mcould not check ATTESTER_ROLE: The registry could not reach the blockchain (localhost). This is usually transient — retry in a few seconds.[39m
+  seeding 100,000 plots (scattered), depth 24
+  rows: 100,000 / 100,000  (21s)
+  rows inserted in 21.1s — building the tree…
+  leaves: 5,000
+  leaves: 10,000
+  leaves: 15,000
+  leaves: 20,000
+  leaves: 25,000
+  leaves: 30,000
+  leaves: 35,000
+  leaves: 40,000
+  leaves: 45,000
+  leaves: 50,000
+  leaves: 55,000
+  leaves: 60,000
+  leaves: 65,000
+  leaves: 70,000
+  leaves: 75,000
+  leaves: 80,000
+  leaves: 85,000
+  leaves: 90,000
+  leaves: 95,000
+  leaves: 100,000
+  height 1: 100,000
+  height 2: 100,000
+  height 3: 100,000
+  height 4: 100,000
+  height 5: 100,000
+  height 6: 100,000
+  height 7: 100,000
+  height 8: 65,234
+  height 9: 32,617
+  height 10: 16,309
+  height 11: 8,155
+  height 12: 4,078
+  height 13: 2,039
+  height 14: 1,020
+  height 15: 510
+  height 16: 255
+  height 17: 128
+  height 18: 64
+  height 19: 32
+  height 20: 16
+  height 21: 8
+  height 22: 4
+  height 23: 2
+  height 24: 1
+
+  leaves    : 100,000
+  nodes     : 930,472
+  root      : 7321759661978987434942197011151260288518568162561991771414776145178401420805
+  rows      : 21.1s
+  bootstrap : 102.8s
+  db size   : 170 MB
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-15T06-24-23-533Z
+
+  Publish this root before measuring anything else:
+    NEW_ROOT=7321759661978987434942197011151260288518568162561991771414776145178401420805 pnpm --filter blockchain run sign:root

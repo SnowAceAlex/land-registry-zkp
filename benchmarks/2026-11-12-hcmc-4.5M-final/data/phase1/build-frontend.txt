@@ -1,0 +1,81 @@
+$ next build --webpack
+▲ Next.js 16.2.9 (webpack)
+- Environments: .env
+
+  Creating an optimized production build ...
+⚠ Compiled with warnings in 64s
+
+../../node_modules/.pnpm/web-worker@1.2.0/node_modules/web-worker/cjs/node.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+../../node_modules/.pnpm/web-worker@1.2.0/node_modules/web-worker/cjs/node.js
+../../node_modules/.pnpm/ffjavascript@0.2.63/node_modules/ffjavascript/src/threadman.js
+../../node_modules/.pnpm/ffjavascript@0.2.63/node_modules/ffjavascript/src/engine.js
+../../node_modules/.pnpm/ffjavascript@0.2.63/node_modules/ffjavascript/src/bn128.js
+../../node_modules/.pnpm/ffjavascript@0.2.63/node_modules/ffjavascript/main.js
+../../node_modules/.pnpm/circomlibjs@0.1.7_bufferutil@4.1.0_utf-8-validate@5.0.10/node_modules/circomlibjs/src/eddsa.js
+../../node_modules/.pnpm/circomlibjs@0.1.7_bufferutil@4.1.0_utf-8-validate@5.0.10/node_modules/circomlibjs/main.js
+../../blockchain/shared/merkleTree.ts
+../../blockchain/shared/index.ts
+./src/features/government/transfers/components/transfer-counter.tsx
+
+  Running TypeScript ...
+  Finished TypeScript in 22.9s ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/29) ...
+  Generating static pages using 15 workers (7/29) 
+  Generating static pages using 15 workers (14/29) 
+  Generating static pages using 15 workers (21/29) 
+✓ Generating static pages using 15 workers (29/29) in 3.0s
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)
+┌ ○ /_not-found
+├ ● /[lang]
+│ ├ /vi
+│ └ /en
+├ ● /[lang]/government
+│ ├ /vi/government
+│ └ /en/government
+├ ● /[lang]/government/archives
+│ ├ /vi/government/archives
+│ └ /en/government/archives
+├ ● /[lang]/government/changes
+│ ├ /vi/government/changes
+│ └ /en/government/changes
+├ ● /[lang]/government/import
+│ ├ /vi/government/import
+│ └ /en/government/import
+├ ● /[lang]/government/issuance
+│ ├ /vi/government/issuance
+│ └ /en/government/issuance
+├ ● /[lang]/government/operations
+│ ├ /vi/government/operations
+│ └ /en/government/operations
+├ ● /[lang]/government/revocations
+│ ├ /vi/government/revocations
+│ └ /en/government/revocations
+├ ● /[lang]/government/transfers
+│ ├ /vi/government/transfers
+│ └ /en/government/transfers
+├ ● /[lang]/resident
+│ ├ /vi/resident
+│ └ /en/resident
+├ ● /[lang]/resident/lookup
+│ ├ /vi/resident/lookup
+│ └ /en/resident/lookup
+├ ● /[lang]/resident/proof
+│ ├ /vi/resident/proof
+│ └ /en/resident/proof
+└ ● /[lang]/resident/verify
+  ├ /vi/resident/verify
+  └ /en/resident/verify
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)  prerendered as static content
+●  (SSG)     prerendered as static HTML (uses generateStaticParams)
+

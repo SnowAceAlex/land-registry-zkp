@@ -1,0 +1,2 @@
+{"valid":false,"reason":"InvalidAttestation","message":"The status attestation was not signed by an attester for this proof (D82)"}
+HTTP 422

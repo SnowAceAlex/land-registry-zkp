@@ -1,0 +1,26 @@
+{
+  "at": "2026-11-15T05:43:36.384Z",
+  "machine": {
+    "platform": "win32",
+    "arch": "x64",
+    "cpus": 16,
+    "cpuModel": "AMD Ryzen 7 6800HS with Radeon Graphics         ",
+    "totalMemGb": 15,
+    "node": "v22.15.0"
+  },
+  "kind": "tree-check",
+  "network": "localhost",
+  "latestRoot": "11702296860727049138302983784517888337400862820554383193698987101668478869142",
+  "checked": 3200,
+  "sampled": 2000,
+  "extraIds": 1200,
+  "tally": {
+    "ISSUED:http200": 2991,
+    "recordLeafMatches": 1031,
+    "verified": 2991,
+    "recordLeafNull": 1960,
+    "REVOKED:http410": 209,
+    "missingId:http404": 1
+  },
+  "failures": []
+}

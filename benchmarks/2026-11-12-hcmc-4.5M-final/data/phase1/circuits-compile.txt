@@ -1,0 +1,16 @@
+$ ts-node scripts/circuits/compile.ts
+
+Compiling circuits -> circuits\build/
+
+  compiling ownership.circom ... ok
+  compiling mortgage.circom ... ok
+  compiling transfer.circom ... ok
+
+  circuit    non-linear   linear   public   private    wires   min .ptau
+  ─────────────────────────────────────────────────────────────────────
+  ownership       6741     7529        4        54    14297        2^14
+  mortgage        6741     7529        5        54    14297        2^14
+  transfer       13221    15050        7       103    28322        2^15
+
+  Trusted setup (Phase 3) needs powersOfTau28_hez_final_15.ptau or larger.
+

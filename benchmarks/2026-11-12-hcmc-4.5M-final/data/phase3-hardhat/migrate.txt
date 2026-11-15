@@ -1,0 +1,40 @@
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "land_registry_bench_final", schema "public" at "localhost:5433"
+
+9 migrations found in prisma/migrations
+
+Applying migration `20260803030630_init`
+Applying migration `20260806025356_administrative_unit_catalog`
+Applying migration `20260806030000_audit_land_user_type_and_gcn_fields`
+Applying migration `20260806100000_rev2_land_user_type_and_cultural_purpose`
+Applying migration `20260907080258_phase7_uc_flow_realignment`
+Applying migration `20260923040000_d72_merkle_nodes`
+Applying migration `20260924090000_d77_buyer_secret_archive`
+Applying migration `20261015090000_phase10_offices_and_procedures`
+Applying migration `20261015100000_phase10_drop_issuance_batch`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260803030630_init/
+    └─ migration.sql
+  └─ 20260806025356_administrative_unit_catalog/
+    └─ migration.sql
+  └─ 20260806030000_audit_land_user_type_and_gcn_fields/
+    └─ migration.sql
+  └─ 20260806100000_rev2_land_user_type_and_cultural_purpose/
+    └─ migration.sql
+  └─ 20260907080258_phase7_uc_flow_realignment/
+    └─ migration.sql
+  └─ 20260923040000_d72_merkle_nodes/
+    └─ migration.sql
+  └─ 20260924090000_d77_buyer_secret_archive/
+    └─ migration.sql
+  └─ 20261015090000_phase10_offices_and_procedures/
+    └─ migration.sql
+  └─ 20261015100000_phase10_drop_issuance_batch/
+    └─ migration.sql
+
+All migrations have been successfully applied.

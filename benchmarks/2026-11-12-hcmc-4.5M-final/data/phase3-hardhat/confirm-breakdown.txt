@@ -1,0 +1,34 @@
+$ ts-node scripts/bench-confirm-breakdown.ts
+[31m[Nest] 28964  - [39m12/11/2026, 20:37:56 [31m  ERROR[39m [38;5;3m[ChainService] [39m[31msigner 0xc128Eb26F177BB6a3b4374A715be350887ED7726 does NOT hold STATE_AUTHORITY_ROLE on 0x5FbDB2315678afecb367f032d93F642f64180aa3 — any on-chain write signed with this role will be rejected. Run registerAuthority() for this account (see DEPLOYMENT.md).[39m
+[31m[Nest] 28964  - [39m12/11/2026, 20:37:56 [31m  ERROR[39m [38;5;3m[IssuerService] [39m[31midentity anchor mismatch for 0xc128Eb26F177BB6a3b4374A715be350887ED7726: certificate O="So Tai nguyen va Moi truong TP.HCM" hashes to 0x1f730914c2418f93d7466bfc23ec84f2790208f8c887355a7acaa798fa0ba603, but the contract stores 0x0000000000000000000000000000000000000000000000000000000000000000. Issued bundles will FAIL the Phase 9 issuer check — regenerate the certificate with the AUTHORITY_ORG_NAME used at deploy time.[39m
+{
+  "kind": "confirm-breakdown",
+  "at": "2026-11-12T13:38:40.014Z",
+  "sample": 200,
+  "projectRootMs": 548,
+  "medianMsPerPlot": {
+    "proofInOverlay": 5.2764,
+    "buildBundleFiles": 96.6769,
+    "pdfRender": 104.3417,
+    "zip": 2.358863
+  },
+  "meanMsPerPlot": {
+    "proofInOverlay": 5.752070499999998,
+    "buildBundleFiles": 99.71992750000007,
+    "pdfRender": 104.97869299999995,
+    "zip": 2.358863,
+    "total": 107.83086100000006
+  },
+  "zipBytes": 7598156,
+  "zipBytesPerPlot": 37991,
+  "projectedFor2994": {
+    "seconds": 323,
+    "zipMb": 108
+  },
+  "machine": {
+    "platform": "win32",
+    "cpus": 16,
+    "node": "v22.15.0"
+  }
+}
+  report: D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T13-38-40-015Z

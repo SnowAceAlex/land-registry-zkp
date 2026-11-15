@@ -1,0 +1,94 @@
+$ jest
+PASS src/common/ttl-cache.spec.ts (25.059 s)
+PASS src/operations/alerts.spec.ts (25.805 s)
+PASS src/lineage/lineage-of.spec.ts (30.719 s)
+PASS src/operations/queue.service.spec.ts (32.72 s)
+PASS src/offices/land-office-catalog.spec.ts
+PASS src/government/revocation.service.spec.ts (32.804 s)
+PASS src/government/round-archive.service.spec.ts (34.182 s)
+PASS src/issuance/metadata-integrity.spec.ts (9.659 s)
+PASS src/land-law/land-use-code.map.spec.ts (34.908 s)
+PASS src/history/property-event.service.spec.ts
+[33m[Nest] 24384  - [39m12/11/2026, 13:47:01 [33m   WARN[39m [38;5;3m[AdministrativeUnitsService] [39m[33madministrative_units is empty — ward existence cannot be verified. Seed it with: pnpm --filter backend run seed:admin-units <file>[39m
+PASS src/import/import.service.spec.ts (36.159 s)
+[33m[Nest] 24384  - [39m12/11/2026, 13:47:02 [33m   WARN[39m [38;5;3m[AdministrativeUnitsService] [39m[33madministrative_units is empty — ward existence cannot be verified. Seed it with: pnpm --filter backend run seed:admin-units <file>[39m
+PASS src/common/pagination.spec.ts
+PASS src/lineage/lineage.service.spec.ts
+PASS src/issuance/receipt.builder.spec.ts
+PASS src/tree/node-store.service.spec.ts (38.413 s)
+PASS src/proof/attestation.service.spec.ts (38.678 s)
+PASS src/common/actor-resolver.spec.ts
+PASS src/issuance/issuance-request.service.spec.ts (14.147 s)
+PASS src/tree/tree.service.spec.ts (7.554 s)
+[31m[Nest] 24816  - [39m12/11/2026, 13:47:06 [31m  ERROR[39m [38;5;3m[IssuerService] [39m[31missuer certificate does not chain to the pinned root CA: the issuer certificate was not issued by the pinned root. Issued bundles will FAIL the verifier's certificate check — re-run `FORCE=1 pnpm --filter backend run cert:generate`.[39m
+PASS src/issuance/issuer.service.spec.ts (7.384 s)
+[32m[Nest] 24816  - [39m12/11/2026, 13:47:06 [32m    LOG[39m [38;5;3m[IssuerService] [39m[32missuer certificate loaded — O="So Tai nguyen va Moi truong TP.HCM"[39m
+[32m[Nest] 24816  - [39m12/11/2026, 13:47:06 [32m    LOG[39m [38;5;3m[IssuerService] [39m[32midentity anchor verified on-chain for 0xc128Eb26F177BB6a3b4374A715be350887ED7726[39m
+PASS src/government/government.service.spec.ts
+PASS src/government/revocation.serializer.spec.ts
+PASS src/transfers/transfer-request.serializer.spec.ts
+PASS src/land-law/administrative-units.service.spec.ts
+PASS src/operations/queue-item.spec.ts
+[33m[Nest] 13856  - [39m12/11/2026, 13:47:07 [33m   WARN[39m [38;5;3m[ProofService] [39m[33mproof for property 1 was built against root 10455948824479350757284135504977801746227343694364582373657937449424384623864, but the chain holds 999 (version 3) — the database has unpublished changes[39m
+[33m[Nest] 12920  - [39m12/11/2026, 13:47:07 [33m   WARN[39m [38;5;3m[AdministrativeUnitsService] [39m[33madministrative_units is empty — ward existence cannot be verified. Seed it with: pnpm --filter backend run seed:admin-units <file>[39m
+PASS src/records/record.mapper.spec.ts
+[33m[Nest] 13856  - [39m12/11/2026, 13:47:08 [33m   WARN[39m [38;5;3m[ProofService] [39m[33mproof for property 1 was built against root 10455948824479350757284135504977801746227343694364582373657937449424384623864, but the chain holds 999 (version 3) — the database has unpublished changes[39m
+PASS src/issuance/archive.service.spec.ts
+PASS src/common/office-scope.spec.ts
+PASS src/proof/proof.service.spec.ts (42.179 s)
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:08 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #4: 0 issuance(s), 0 transfer(s), 2 revocation(s), projected root 777[39m
+PASS src/issuance/issuance-request.serializer.spec.ts
+PASS src/common/draft-lock.service.spec.ts
+PASS src/chain/chain.service.spec.ts (5.189 s)
+PASS src/common/api-key.guard.spec.ts
+PASS src/public-config/public-config.service.spec.ts (6.821 s)
+PASS src/history/property-event.serializer.spec.ts
+PASS src/government/round-archive.builder.spec.ts (43.617 s)
+PASS src/operations/operations.service.spec.ts (43.701 s)
+PASS src/common/central-only.guard.spec.ts
+PASS src/proof/proof-etag.spec.ts
+PASS src/transfers/transfers.service.spec.ts (44.157 s)
+[32m[Nest] 18616  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[TransfersService] [39m[32mtransfer #1 approved for property 1001 — queued for the next change set[39m
+[32m[Nest] 18616  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[TransfersService] [39m[32mtransfer #1 approved for property 1001 — queued for the next change set[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #9 confirmed at root version 9: 0 issuance(s), 1 transfer(s), 1 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #9 confirmed at root version 9: 0 issuance(s), 1 transfer(s), 1 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #9 confirmed at root version 9: 0 issuance(s), 1 transfer(s), 1 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #9 confirmed at root version 9: 0 issuance(s), 1 transfer(s), 1 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #9 confirmed at root version 9: 0 issuance(s), 1 transfer(s), 1 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #9 confirmed at root version 9: 0 issuance(s), 1 transfer(s), 1 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #9 confirmed at root version 9: 0 issuance(s), 1 transfer(s), 1 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #9 confirmed at root version 9: 0 issuance(s), 1 transfer(s), 1 revocation(s)[39m
+[32m[Nest] 4756  - [39m15/10/2026, 10:00:00 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #9 confirmed at root version 9: 0 issuance(s), 1 transfer(s), 1 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #9 confirmed at root version 9: 0 issuance(s), 1 transfer(s), 1 revocation(s)[39m
+[33m[Nest] 4756  - [39m12/11/2026, 13:47:10 [33m   WARN[39m [38;5;3m[ChangeSetService] [39m[33mpurging expired archives failed: db hiccup[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #9 confirmed at root version 9: 0 issuance(s), 1 transfer(s), 1 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #4 confirmed at root version 5: 0 issuance(s), 0 transfer(s), 1 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #4: 0 issuance(s), 1 transfer(s), 2 revocation(s), projected root 777[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #4: 0 issuance(s), 1 transfer(s), 591 revocation(s), projected root 777[39m
+PASS src/offices/office-key.spec.ts
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #4: 0 issuance(s), 1 transfer(s), 2 revocation(s), projected root 777[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #4: 0 issuance(s), 1 transfer(s), 2 revocation(s), projected root 777[39m
+PASS src/government/changeset.service.spec.ts (44.824 s)
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #30: 1 issuance(s), 0 transfer(s), 0 revocation(s), projected root 555[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #30: 1 issuance(s), 1 transfer(s), 1 revocation(s), projected root 555[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #30: 1 issuance(s), 1 transfer(s), 1 revocation(s), projected root 555[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #30: 1 issuance(s), 0 transfer(s), 0 revocation(s), projected root 555[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #30 confirmed at root version 12: 1 issuance(s), 0 transfer(s), 0 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #30 confirmed at root version 12: 1 issuance(s), 0 transfer(s), 0 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #30 confirmed at root version 12: 1 issuance(s), 0 transfer(s), 0 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #30 confirmed at root version 12: 1 issuance(s), 0 transfer(s), 0 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #30 confirmed at root version 12: 1 issuance(s), 1 transfer(s), 0 revocation(s)[39m
+[32m[Nest] 4756  - [39m12/11/2026, 13:47:10 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #30 confirmed at root version 12: 1 issuance(s), 0 transfer(s), 0 revocation(s)[39m
+PASS src/history/history.controller.spec.ts
+PASS src/issuance/issuance.service.spec.ts (6.255 s)
+PASS src/government/open-draft.service.spec.ts (5.124 s)
+PASS src/issuance/pdf.service.spec.ts (14.183 s)
+PASS src/operations/operations.controller.spec.ts (6.967 s)
+PASS src/government/government.controller.spec.ts (8.547 s)
+PASS src/public-config/public-config.module.spec.ts (9.504 s)
+
+Test Suites: 49 passed, 49 total
+Tests:       505 passed, 505 total
+Snapshots:   0 total
+Time:        53.979 s
+Ran all test suites.

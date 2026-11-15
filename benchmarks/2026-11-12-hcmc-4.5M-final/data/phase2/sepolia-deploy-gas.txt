@@ -1,0 +1,5 @@
+RootRegistry gasUsed 4860941 price gwei 1.000 block 11997290
+LandRegistryVerifier gasUsed 6981030 price gwei 1.000 block 11997294
+Groth16VerifierOwnership gasUsed 2737714 price gwei 1.000 block 11997291
+Groth16VerifierMortgage gasUsed 2873768 price gwei 1.000 block 11997292
+Groth16VerifierTransfer gasUsed 3161338 price gwei 1.000 block 11997293

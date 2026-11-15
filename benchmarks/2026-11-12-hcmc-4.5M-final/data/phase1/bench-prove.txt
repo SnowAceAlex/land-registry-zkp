@@ -1,0 +1,7 @@
+$ ts-node scripts/bench/proveBench.ts
+  depth 24, 10 iteration(s) per circuit (Node, not browser)
+  ownership  prove p50 783ms (p95 1265) · verify p50 16ms · proof 724 B · 4 public signals
+  mortgage   prove p50 680ms (p95 837) · verify p50 15ms · proof 723 B · 5 public signals
+  transfer   prove p50 1143ms (p95 1227) · verify p50 13ms · proof 722 B · 7 public signals
+
+  report: D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T06-50-57-360Z\prove.json

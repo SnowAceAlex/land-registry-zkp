@@ -1,0 +1,30 @@
+{
+  "kind": "confirm-breakdown",
+  "at": "2026-11-12T13:38:40.014Z",
+  "sample": 200,
+  "projectRootMs": 548,
+  "medianMsPerPlot": {
+    "proofInOverlay": 5.2764,
+    "buildBundleFiles": 96.6769,
+    "pdfRender": 104.3417,
+    "zip": 2.358863
+  },
+  "meanMsPerPlot": {
+    "proofInOverlay": 5.752070499999998,
+    "buildBundleFiles": 99.71992750000007,
+    "pdfRender": 104.97869299999995,
+    "zip": 2.358863,
+    "total": 107.83086100000006
+  },
+  "zipBytes": 7598156,
+  "zipBytesPerPlot": 37991,
+  "projectedFor2994": {
+    "seconds": 323,
+    "zipMb": 108
+  },
+  "machine": {
+    "platform": "win32",
+    "cpus": 16,
+    "node": "v22.15.0"
+  }
+}

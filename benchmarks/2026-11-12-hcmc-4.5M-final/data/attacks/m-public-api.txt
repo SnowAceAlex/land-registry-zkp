@@ -1,0 +1,5 @@
+$ curl -s "http://localhost:3001/api/records?take=3"
+{"total":4520890,"items":[{"propertyId":"1","ownerCommitment":"14475611005371760382091263772263010846368300547517440284960838772583786016323","status":"ISSUED","leaf":"8743953687533223365681036394298078926156299086628556256511549746357444294004","rootVersion":2},{"propertyId":"4","ownerCommitment":"18902451255243898017680292516192736534271377946497624962964849281117740232662","status":"ISSUED","leaf":null,"rootVersion":null},{"propertyId":"7","ownerCommitment":"16016877134203678775305182825070299680878839019702156226394469773533842865119","status":"ISSUED","leaf":null,"rootVersion":null}]}
+
+$ curl -s -w " -> HTTP %{http_code}" "http://localhost:3001/api/government/properties/1"   # no API key
+{"message":"Missing or invalid x-gov-api-key header","error":"Unauthorized","statusCode":401} -> HTTP 401

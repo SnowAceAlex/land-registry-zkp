@@ -1,0 +1,9 @@
+[13:21:53] scattered: fresh database land_registry_bench_100k_scattered
+NOTICE:  database "land_registry_bench_100k_scattered" does not exist, skipping
+[13:22:07] scattered: seed 100k
+[13:25:03] scattered: 3 working days
+[13:48:43] contiguous: fresh database land_registry_bench_100k_contiguous
+NOTICE:  database "land_registry_bench_100k_contiguous" does not exist, skipping
+[13:48:53] contiguous: seed 100k
+[13:50:45] contiguous: 3 working days
+[14:14:03] A4 DONE

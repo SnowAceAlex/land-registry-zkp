@@ -1,0 +1,2 @@
+{"valid":true,"circuitType":"ownership","checks":{"cryptographic":true,"freshness":true,"rootMatchesChain":true,"statusAttested":true,"onChain":true},"disclosed":{"merkleRoot":"13184623186568514804109520104043042446620855488507496955123344274207954886424","propertyId":"201","ownerCommitment":"9476819273695219512740659341846542879744264147219837256004789314107172242938","currentTimestamp":"1794736384"}}
+HTTP 200

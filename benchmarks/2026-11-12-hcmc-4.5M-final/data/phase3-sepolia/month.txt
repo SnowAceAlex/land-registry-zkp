@@ -1,0 +1,19 @@
+$ ts-node scripts/bench-replay-month.ts
+  imported 4750 replacement plots (REISSUE)
+  replaying 14,970 transfers + 4,750 revocations over 5 working day(s), signing via sign:root:sepolia
+$ hardhat run scripts/tools/signRoot.ts --network sepolia
+  day 1/5: 2994 transfer, 950 revoke, 0 issue in 1 round(s) (0 deferred) — queue 14182ms, draft 18327ms, confirm 361858ms, gas 108460895
+$ hardhat run scripts/tools/signRoot.ts --network sepolia
+  day 2/5: 2994 transfer, 950 revoke, 950 issue in 1 round(s) (0 deferred) — queue 20579ms, draft 20853ms, confirm 483798ms, gas 108449483
+$ hardhat run scripts/tools/signRoot.ts --network sepolia
+  day 3/5: 2994 transfer, 950 revoke, 950 issue in 1 round(s) (0 deferred) — queue 22684ms, draft 17405ms, confirm 480207ms, gas 108460883
+$ hardhat run scripts/tools/signRoot.ts --network sepolia
+  day 4/5: 2994 transfer, 950 revoke, 950 issue in 1 round(s) (0 deferred) — queue 19996ms, draft 17165ms, confirm 474457ms, gas 108460907
+$ hardhat run scripts/tools/signRoot.ts --network sepolia
+  day 5/5: 2994 transfer, 950 revoke, 950 issue in 1 round(s) (0 deferred) — queue 17230ms, draft 16889ms, confirm 475829ms, gas 108460883
+
+  publishes : 5
+  total gas : 542,293,051
+  confirm   : p50 475829ms, max 483798ms
+  peak RSS  : 342 MB
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T13-48-36-724Z

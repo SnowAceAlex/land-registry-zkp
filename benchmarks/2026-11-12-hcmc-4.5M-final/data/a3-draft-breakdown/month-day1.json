@@ -1,0 +1,46 @@
+{
+  "kind": "month",
+  "at": "2026-11-15T05:56:00.629Z",
+  "assumptions": [
+    "every mutation modelled as a transfer (conservative upper bound)",
+    "transfer proofs measured separately by bench:prove, not generated here",
+    "no per-procedure transaction: the lock is the open request row, enforced by the status attestation (D82)",
+    "changed plots are every step-th plot of the register, so each day is spread over the whole id range",
+    "each revoked certificate is replaced the next day by a new one at id+1 with a lineage link (D83/D90)",
+    "follow-on rounds in the same day while the revocation cap defers some (max 10)"
+  ],
+  "transfers": 65868,
+  "revocations": 20890,
+  "days": 22,
+  "publishes": 1,
+  "totalGas": "24804536",
+  "peakRssMb": 375,
+  "perDay": [
+    {
+      "day": 1,
+      "transfers": 2994,
+      "revocations": 950,
+      "deferredRevocations": 0,
+      "issuances": 0,
+      "rounds": 2,
+      "queueMs": 20746,
+      "draftMs": 22288,
+      "signMs": 16533,
+      "confirmMs": 508692,
+      "gasUsed": "24804536",
+      "rootVersion": 3,
+      "txHash": "0x2c92e952163635769844a4e918199fe9b3e9d2ba3a7e2c579be242daf947f07e",
+      "txHashes": [
+        "0xd67361a05559378af735380ccba12e6f3eccacc530380f4f23f0df3ae83b3af8",
+        "0x2c92e952163635769844a4e918199fe9b3e9d2ba3a7e2c579be242daf947f07e"
+      ]
+    }
+  ],
+  "machine": {
+    "platform": "win32",
+    "arch": "x64",
+    "cpus": 16,
+    "totalMemGb": 15,
+    "node": "v22.15.0"
+  }
+}

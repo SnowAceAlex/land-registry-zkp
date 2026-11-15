@@ -1,0 +1,19 @@
+{
+  "kind": "tree-check",
+  "at": "2026-11-15T05:43:36.384Z",
+  "network": "localhost",
+  "latestRoot": "11702296860727049138302983784517888337400862820554383193698987101668478869142",
+  "checked": 3200,
+  "sampled": 2000,
+  "extraIds": 1200,
+  "tally": {
+    "ISSUED:http200": 2991,
+    "recordLeafMatches": 1031,
+    "verified": 2991,
+    "recordLeafNull": 1960,
+    "REVOKED:http410": 209,
+    "missingId:http404": 1
+  },
+  "failures": []
+}
+  report: D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-15T05-43-36-385Z\tree-check.json

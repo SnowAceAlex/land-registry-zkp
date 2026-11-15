@@ -1,0 +1,771 @@
+$ hardhat node
+[32mStarted HTTP and WebSocket JSON-RPC server at http://127.0.0.1:8545/[39m
+
+Accounts
+========
+
+[1mWARNING: These accounts, and their private keys, are publicly known.[22m
+[1mAny funds sent to them on Mainnet or any other live network WILL BE LOST.[22m
+
+Account #0: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 (10000 ETH)
+Private Key: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+
+Account #1: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 (10000 ETH)
+Private Key: 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+
+Account #2: 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC (10000 ETH)
+Private Key: 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
+
+Account #3: 0x90F79bf6EB2c4f870365E785982E1f101E93b906 (10000 ETH)
+Private Key: 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6
+
+Account #4: 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65 (10000 ETH)
+Private Key: 0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a
+
+Account #5: 0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc (10000 ETH)
+Private Key: 0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba
+
+Account #6: 0x976EA74026E726554dB657fA54763abd0C3a0aa9 (10000 ETH)
+Private Key: 0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e
+
+Account #7: 0x14dC79964da2C08b23698B3D3cc7Ca32193d9955 (10000 ETH)
+Private Key: 0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356
+
+Account #8: 0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f (10000 ETH)
+Private Key: 0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97
+
+Account #9: 0xa0Ee7A142d267C1f36714E4a8F75612F20a79720 (10000 ETH)
+Private Key: 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6
+
+Account #10: 0xBcd4042DE499D14e55001CcbB24a551F3b954096 (10000 ETH)
+Private Key: 0xf214f2b2cd398c806f84e317254e0f0b801d0643303237d97a22a48e01628897
+
+Account #11: 0x71bE63f3384f5fb98995898A86B02Fb2426c5788 (10000 ETH)
+Private Key: 0x701b615bbdfb9de65240bc28bd21bbc0d996645a3dd57e7b12bc2bdf6f192c82
+
+Account #12: 0xFABB0ac9d68B0B445fB7357272Ff202C5651694a (10000 ETH)
+Private Key: 0xa267530f49f8280200edf313ee7af6b827f2a8bce2897751d06a843f644967b1
+
+Account #13: 0x1CBd3b2770909D4e10f157cABC84C7264073C9Ec (10000 ETH)
+Private Key: 0x47c99abed3324a2707c28affff1267e45918ec8c3f20b8aa892e8b065d2942dd
+
+Account #14: 0xdF3e18d64BC6A983f673Ab319CCaE4f1a57C7097 (10000 ETH)
+Private Key: 0xc526ee95bf44d8fc405a158bb884d9d1238d99f0612e9f33d006bb0789009aaa
+
+Account #15: 0xcd3B766CCDd6AE721141F452C550Ca635964ce71 (10000 ETH)
+Private Key: 0x8166f546bab6da521a8369cab06c5d2b9e46670292d85c875ee9ec20e84ffb61
+
+Account #16: 0x2546BcD3c84621e976D8185a91A922aE77ECEc30 (10000 ETH)
+Private Key: 0xea6c44ac03bff858b476bba40716402b03e41b8e97e276d1baec7c37d42484a0
+
+Account #17: 0xbDA5747bFD65F08deb54cb465eB87D40e51B197E (10000 ETH)
+Private Key: 0x689af8efa8c651a91ad287602527f3af2fe9f6501a7ac4b061667b5a93e037fd
+
+Account #18: 0xdD2FD4581271e230360230F9337D5c0430Bf44C0 (10000 ETH)
+Private Key: 0xde9be858da4a475276426320d5e9262ecfc3ba460bfac56360bfa6c4c28b4ee0
+
+Account #19: 0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199 (10000 ETH)
+Private Key: 0xdf57089febbacf7ba0bc227dafbffa9fc08a93fdc68e1e42411a14efcf23656e
+
+[1mWARNING: These accounts, and their private keys, are publicly known.[22m
+[1mAny funds sent to them on Mainnet or any other live network WILL BE LOST.[22m
+
+[32meth_accounts[0m
+[32mhardhat_metadata[0m
+[32mhardhat_metadata (2)[0m
+[32mhardhat_metadata (3)[0m
+[32mhardhat_metadata (4)[0m
+[32mhardhat_metadata (5)[0m
+[32mhardhat_metadata (6)[0m
+[32mhardhat_metadata (7)[0m
+[32mhardhat_metadata (8)[0m
+[32mhardhat_metadata (9)[0m
+[32mhardhat_metadata (10)[0m
+[32mhardhat_metadata (11)[0m
+[32mhardhat_metadata (12)[0m
+[32mhardhat_metadata (13)[0m
+[32mhardhat_metadata (14)[0m
+[32mhardhat_metadata (15)[0m
+[32mhardhat_metadata (16)[0m
+[32mhardhat_metadata (17)[0m
+[32mhardhat_metadata (18)[0m
+[32mhardhat_metadata (19)[0m
+[32mhardhat_metadata (20)[0m
+[32meth_getBalance[0m
+[32meth_accounts[0m
+[32mhardhat_metadata[0m
+[32mhardhat_metadata (2)[0m
+[32mhardhat_metadata (3)[0m
+[32mhardhat_metadata (4)[0m
+[32mhardhat_metadata (5)[0m
+[32mhardhat_metadata (6)[0m
+[32mhardhat_metadata (7)[0m
+[32mhardhat_metadata (8)[0m
+[32mhardhat_metadata (9)[0m
+[32mhardhat_metadata (10)[0m
+[32mhardhat_metadata (11)[0m
+[32mhardhat_metadata (12)[0m
+[32mhardhat_metadata (13)[0m
+[32mhardhat_metadata (14)[0m
+[32mhardhat_metadata (15)[0m
+[32mhardhat_metadata (16)[0m
+[32mhardhat_metadata (17)[0m
+[32mhardhat_metadata (18)[0m
+[32mhardhat_metadata (19)[0m
+[32mhardhat_metadata (20)[0m
+[32meth_blockNumber[0m
+[32meth_getBlockByNumber[0m
+[32meth_feeHistory[0m
+[32meth_maxPriorityFeePerGas[0m
+[32meth_sendTransaction[0m
+  Contract deployment: RootRegistry
+  Contract address:    0x5fbdb2315678afecb367f032d93f642f64180aa3
+  Transaction:         0x7ccc36f8165be5a039c3d9459c6f0a35f686957a0495fba2764635a443025853
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  Value:               0 ETH
+  Gas used:            716879 of 16777216
+  Block #1:            0xb66e82413374ed4f777bebffaa54d26c5e170086853ea78743636b0e7c37e498
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_accounts[0m
+[32mhardhat_metadata[0m
+[32mhardhat_metadata (2)[0m
+[32mhardhat_metadata (3)[0m
+[32mhardhat_metadata (4)[0m
+[32mhardhat_metadata (5)[0m
+[32mhardhat_metadata (6)[0m
+[32mhardhat_metadata (7)[0m
+[32mhardhat_metadata (8)[0m
+[32mhardhat_metadata (9)[0m
+[32mhardhat_metadata (10)[0m
+[32mhardhat_metadata (11)[0m
+[32mhardhat_metadata (12)[0m
+[32mhardhat_metadata (13)[0m
+[32mhardhat_metadata (14)[0m
+[32mhardhat_metadata (15)[0m
+[32mhardhat_metadata (16)[0m
+[32mhardhat_metadata (17)[0m
+[32mhardhat_metadata (18)[0m
+[32mhardhat_metadata (19)[0m
+[32mhardhat_metadata (20)[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_sendTransaction[0m
+  Contract deployment: Groth16VerifierOwnership
+  Contract address:    0xe7f1725e7734ce288f8367e1bb143e90bb3f0512
+  Transaction:         0x6af9473d5cfaf487d1133fc5dcceb4cf12407c4b7443e5c173b9015977bd5d98
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  Value:               0 ETH
+  Gas used:            406922 of 16777216
+  Block #2:            0x80991d2612a22b8d171c3212f761e7a6206e4f2d7aaddc7e17918e0990a8f944
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_accounts[0m
+[32mhardhat_metadata[0m
+[32mhardhat_metadata (2)[0m
+[32mhardhat_metadata (3)[0m
+[32mhardhat_metadata (4)[0m
+[32mhardhat_metadata (5)[0m
+[32mhardhat_metadata (6)[0m
+[32mhardhat_metadata (7)[0m
+[32mhardhat_metadata (8)[0m
+[32mhardhat_metadata (9)[0m
+[32mhardhat_metadata (10)[0m
+[32mhardhat_metadata (11)[0m
+[32mhardhat_metadata (12)[0m
+[32mhardhat_metadata (13)[0m
+[32mhardhat_metadata (14)[0m
+[32mhardhat_metadata (15)[0m
+[32mhardhat_metadata (16)[0m
+[32mhardhat_metadata (17)[0m
+[32mhardhat_metadata (18)[0m
+[32mhardhat_metadata (19)[0m
+[32mhardhat_metadata (20)[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_sendTransaction[0m
+  Contract deployment: Groth16VerifierMortgage
+  Contract address:    0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0
+  Transaction:         0x29c0c5eecd168ebaa6f6825c9ea0587362938db3f76eb204d38864db3db8bacc
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  Value:               0 ETH
+  Gas used:            425924 of 16777216
+  Block #3:            0x4e2c350638441bd15da10fe9cde48ba3ebd4fcda3545a67bef5a470da47c45d5
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_accounts[0m
+[32mhardhat_metadata[0m
+[32mhardhat_metadata (2)[0m
+[32mhardhat_metadata (3)[0m
+[32mhardhat_metadata (4)[0m
+[32mhardhat_metadata (5)[0m
+[32mhardhat_metadata (6)[0m
+[32mhardhat_metadata (7)[0m
+[32mhardhat_metadata (8)[0m
+[32mhardhat_metadata (9)[0m
+[32mhardhat_metadata (10)[0m
+[32mhardhat_metadata (11)[0m
+[32mhardhat_metadata (12)[0m
+[32mhardhat_metadata (13)[0m
+[32mhardhat_metadata (14)[0m
+[32mhardhat_metadata (15)[0m
+[32mhardhat_metadata (16)[0m
+[32mhardhat_metadata (17)[0m
+[32mhardhat_metadata (18)[0m
+[32mhardhat_metadata (19)[0m
+[32mhardhat_metadata (20)[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_sendTransaction[0m
+  Contract deployment: Groth16VerifierTransfer
+  Contract address:    0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9
+  Transaction:         0x17878b9fb9fd86c41bc6f8819458c4b96f6db686c223f885dd76ce07a6d70b5e
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  Value:               0 ETH
+  Gas used:            466078 of 16777216
+  Block #4:            0xb82981d6e29faf836de1695bb253b3c6d52ad8efff03c5ee65f78090bb096272
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_accounts[0m
+[32mhardhat_metadata[0m
+[32mhardhat_metadata (2)[0m
+[32mhardhat_metadata (3)[0m
+[32mhardhat_metadata (4)[0m
+[32mhardhat_metadata (5)[0m
+[32mhardhat_metadata (6)[0m
+[32mhardhat_metadata (7)[0m
+[32mhardhat_metadata (8)[0m
+[32mhardhat_metadata (9)[0m
+[32mhardhat_metadata (10)[0m
+[32mhardhat_metadata (11)[0m
+[32mhardhat_metadata (12)[0m
+[32mhardhat_metadata (13)[0m
+[32mhardhat_metadata (14)[0m
+[32mhardhat_metadata (15)[0m
+[32mhardhat_metadata (16)[0m
+[32mhardhat_metadata (17)[0m
+[32mhardhat_metadata (18)[0m
+[32mhardhat_metadata (19)[0m
+[32mhardhat_metadata (20)[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_sendTransaction[0m
+  Contract deployment: LandRegistryVerifier
+  Contract address:    0xdc64a140aa3e981100a9beca4e685f962f0cf6c9
+  Transaction:         0xf29a001097e1ad018913a4ce66ce0c497b38cc51e8b2f3e8258be27e778a5caa
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  Value:               0 ETH
+  Gas used:            1014838 of 16777216
+  Block #5:            0xb9d435802f4578aa85f0d8af05522b553e7e842021da854a184a6b95f765ffd8
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_chainId[0m
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_sendTransaction[0m
+  Contract call:       RootRegistry#registerAuthority
+  Transaction:         0xddebfbea2aac06e641d2efbbbfc825678b835ed6fbf7b5089faee3fe8aa71c53
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+  Value:               0 ETH
+  Gas used:            73077 of 16777216
+  Block #6:            0x0b696d8db34b62785a1f92b89d33ff8a87c6e9c4010265d1f69ae93c30e4c2a9
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#ATTESTER_ROLE
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_blockNumber[0m
+[32meth_feeHistory[0m
+[32meth_sendTransaction[0m
+  Contract call:       RootRegistry#grantRole
+  Transaction:         0x3a52247bb530b7658cc206e1de6dc8462e263a27b5f2a37066ff8ff729e6e7c3
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+  Value:               0 ETH
+  Gas used:            51507 of 16777216
+  Block #7:            0x9565547f1179a48b079b730e511ea853748ec39e76616f94cf086166ec15d744
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#STATE_AUTHORITY_ROLE
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#authorityInstitute
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_accounts[0m
+[32mhardhat_metadata[0m
+[32mhardhat_metadata (2)[0m
+[32mhardhat_metadata (3)[0m
+[32mhardhat_metadata (4)[0m
+[32mhardhat_metadata (5)[0m
+[32mhardhat_metadata (6)[0m
+[32mhardhat_metadata (7)[0m
+[32mhardhat_metadata (8)[0m
+[32mhardhat_metadata (9)[0m
+[32mhardhat_metadata (10)[0m
+[32mhardhat_metadata (11)[0m
+[32mhardhat_metadata (12)[0m
+[32mhardhat_metadata (13)[0m
+[32mhardhat_metadata (14)[0m
+[32mhardhat_metadata (15)[0m
+[32mhardhat_metadata (16)[0m
+[32mhardhat_metadata (17)[0m
+[32mhardhat_metadata (18)[0m
+[32mhardhat_metadata (19)[0m
+[32mhardhat_metadata (20)[0m
+[32meth_blockNumber[0m
+[32meth_getBlockByNumber[0m
+[32meth_feeHistory[0m
+[32meth_sendTransaction[0m
+  Contract call:       RootRegistry#publishRoot
+  Transaction:         0x371eafe59fbb01c05ed930ea69c74c9186950853754c1e2f222974c1ff9e6ba2
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+  Value:               0 ETH
+  Gas used:            115639 of 16777216
+  Block #8:            0x10283be7bbd197ee25875cdf1019ecec2e3aed4bd66726875a8eb49474de3ec9
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#rootVersion
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_call[0m
+  Contract call:       RootRegistry#rootVersion
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#latestRoot
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#rootVersion
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_accounts[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#latestRoot
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#rootVersion
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_getTransactionByHash[0m
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#STATE_AUTHORITY_ROLE
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_chainId (2)[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#authorityInstitute
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#latestRoot
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#rootVersion
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_chainId (2)[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[31meth_call[0m
+  Contract call:       LandRegistryVerifier#verifyOwnership
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0xdc64a140aa3e981100a9beca4e685f962f0cf6c9
+
+  Error: VM Exception while processing transaction: reverted with an unrecognized custom error (return data: 0xbd8ba84d)
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#latestRoot
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#rootVersion
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_getTransactionByHash[0m
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#STATE_AUTHORITY_ROLE
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#authorityInstitute
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#latestRoot
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#rootVersion
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[31meth_call[0m
+  Contract call:       LandRegistryVerifier#verifyOwnership
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0xdc64a140aa3e981100a9beca4e685f962f0cf6c9
+
+  Error: VM Exception while processing transaction: reverted with an unrecognized custom error (return data: 0xbd8ba84d)
+
+[32meth_chainId[0m
+[32meth_chainId (2)[0m
+[32mevm_mine[0m
+  Mined empty block #9 with base fee 305370017
+
+[32meth_chainId[0m
+[32meth_getBlockByNumber[0m
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       LandRegistryVerifier#verifyOwnership
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0xdc64a140aa3e981100a9beca4e685f962f0cf6c9
+
+[32meth_chainId[0m
+[32mevm_mine[0m
+  Mined empty block #10 with base fee 267198765
+
+[32meth_chainId[0m
+[32meth_getBlockByNumber[0m
+[32meth_chainId[0m
+[31meth_call[0m
+  Contract call:       LandRegistryVerifier#verifyOwnership
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0xdc64a140aa3e981100a9beca4e685f962f0cf6c9
+
+  Error: VM Exception while processing transaction: reverted with an unrecognized custom error (return data: 0xe80214f1000000000000000000000000000000000000000000000000000000006af97e5f000000000000000000000000000000000000000000000000000000006af98101)
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#latestRoot
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#rootVersion
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       LandRegistryVerifier#verifyOwnership
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0xdc64a140aa3e981100a9beca4e685f962f0cf6c9
+
+[32meth_call[0m
+  Contract call:       LandRegistryVerifier#verifyTransfer
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0xdc64a140aa3e981100a9beca4e685f962f0cf6c9
+
+[32meth_chainId[0m
+[32meth_chainId (2)[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#STATE_AUTHORITY_ROLE
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_getTransactionCount[0m
+[32meth_chainId[0m
+[32meth_estimateGas[0m
+[32meth_chainId[0m
+[32meth_chainId (2)[0m
+[32meth_getBlockByNumber[0m
+[32meth_gasPrice[0m
+[32meth_maxPriorityFeePerGas[0m
+[32meth_blockNumber[0m
+[32meth_chainId[0m
+[32meth_sendRawTransaction[0m
+  Contract call:       RootRegistry#publishRoot
+  Transaction:         0x9a40b46c82f1d80772659701c6fd81f11286e8a411c82f4558725c704bad1117
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+  Value:               0 ETH
+  Gas used:            64351 of 64351
+  Block #11:           0xbe6878886e0ba3760ff2a560f1d8ea0556f4be968040c6c068ea1a98e4c8ae0c
+
+[32meth_chainId[0m
+[32meth_getTransactionReceipt[0m
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#latestRoot
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#rootVersion
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32mevm_mine[0m
+  Mined empty block #12 with base fee 204636744
+
+[32meth_chainId[0m
+[32meth_getBlockByNumber[0m
+[32meth_chainId[0m
+[31meth_call[0m
+  Contract call:       LandRegistryVerifier#verifyOwnership
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0xdc64a140aa3e981100a9beca4e685f962f0cf6c9
+
+  Error: VM Exception while processing transaction: reverted with an unrecognized custom error (return data: 0x7c532e3109bf5b99fb289abc52861c459c530ea0e4a81603a827272d4aa7605c4b4d861f1d263b762e6073c67435676b0953a756f45f009e778cc943c38bf4bfc266df18)
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#latestRoot
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#rootVersion
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[31meth_call[0m
+  Contract call:       LandRegistryVerifier#verifyOwnership
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0xdc64a140aa3e981100a9beca4e685f962f0cf6c9
+
+  Error: VM Exception while processing transaction: reverted with an unrecognized custom error (return data: 0xbd8ba84d)
+
+[32meth_chainId[0m
+[32mevm_mine[0m
+  Mined empty block #13 with base fee 179057151
+
+[32meth_chainId[0m
+[32meth_getBlockByNumber[0m
+[32meth_chainId[0m
+[31meth_call[0m
+  Contract call:       LandRegistryVerifier#verifyOwnership
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0xdc64a140aa3e981100a9beca4e685f962f0cf6c9
+
+  Error: VM Exception while processing transaction: reverted with an unrecognized custom error (return data: 0x6b3df6920000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006af98124)
+
+[32meth_accounts[0m
+[32mhardhat_metadata[0m
+[32mhardhat_metadata (2)[0m
+[32mhardhat_metadata (3)[0m
+[32mhardhat_metadata (4)[0m
+[32mhardhat_metadata (5)[0m
+[32mhardhat_metadata (6)[0m
+[32mhardhat_metadata (7)[0m
+[32mhardhat_metadata (8)[0m
+[32mhardhat_metadata (9)[0m
+[32mhardhat_metadata (10)[0m
+[32mhardhat_metadata (11)[0m
+[32mhardhat_metadata (12)[0m
+[32mhardhat_metadata (13)[0m
+[32mhardhat_metadata (14)[0m
+[32mhardhat_metadata (15)[0m
+[32mhardhat_metadata (16)[0m
+[32mhardhat_metadata (17)[0m
+[32mhardhat_metadata (18)[0m
+[32mhardhat_metadata (19)[0m
+[32mhardhat_metadata (20)[0m
+[32meth_blockNumber[0m
+[32meth_getBlockByNumber[0m
+[32meth_feeHistory[0m
+[32meth_maxPriorityFeePerGas[0m
+[32meth_sendTransaction[0m
+  Contract call:       RootRegistry#publishRootWithRevocations
+  Transaction:         0xb0f79334e5f7b1292e58667a602ea43c612820556eb03a1c787e66de660c1e21
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+  Value:               0 ETH
+  Gas used:            92008 of 16777216
+  Block #14:           0x12ea0e29e86f178da5192ad17ba4099d1c8d2f03dea215a69aed2ca21fb8ccba
+
+[32meth_getTransactionByHash[0m
+[32meth_getTransactionReceipt[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#rootVersion
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_call[0m
+  Contract call:       RootRegistry#rootVersion
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_call[0m
+  Contract call:       RootRegistry#latestRoot
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_chainId (2)[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#rootVersion
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#isRevoked
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_call[0m
+  Contract call:       RootRegistry#isRevoked
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#STATE_AUTHORITY_ROLE
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#authorityInstitute
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+[32meth_chainId[0m
+[32meth_call[0m
+  Contract call:       RootRegistry#hasRole
+  From:                0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+  To:                  0x5fbdb2315678afecb367f032d93f642f64180aa3
+
+D:\thesis\land-registry-zkp\blockchain:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @land-registry/blockchain@0.1.0 node: `hardhat node`
+Exit status 1

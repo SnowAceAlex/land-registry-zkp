@@ -1,0 +1,265 @@
+$ pnpm --filter blockchain run test
+$ hardhat test
+
+
+  circuits/common/merkleProof.circom (Phase 2)
+    ✔ recomputes the same root as shared/merkleTree.ts buildTree() (924ms)
+    ✔ agrees with the TS layer for every leaf in the tree (both left and right children) (118ms)
+    ✔ handles a single-record tree (path is entirely zero-hashes) (40ms)
+    ✔ produces a different root when a sibling is tampered with
+    ✔ rejects a non-binary pathIndex
+    ✔ rejects a path whose indices do not encode expectedIndex (D41)
+
+  circuits/mortgage.circom (Phase 2)
+    ✔ accepts a clean title with term to spare and exposes public signals in the D21 order (417ms)
+    ✔ accepts a title sitting exactly on the threshold (90ms)
+    ✔ accepts a perpetual title against any threshold (D5/D23) (88ms)
+    ✔ rejects a title one second short of the threshold
+    ✔ rejects a mortgaged title
+    ✔ rejects a litigated title
+    ✔ rejects a wrong ownerSecret
+
+  circuits/ownership.circom (Phase 2)
+    ✔ accepts a valid fixed-term title and exposes public signals in the D21 order (421ms)
+    ✔ accepts a perpetual title whose validityPeriod is the 0 sentinel (D5/D23) (93ms)
+    ✔ accepts regardless of encumbrance — that is the mortgage circuit's job (94ms)
+    ✔ rejects a wrong ownerSecret
+    ✔ rejects an expired fixed-term title
+    ✔ rejects a title expiring exactly now (boundary: strictly greater than)
+    ✔ rejects a proof against the wrong merkleRoot
+    ✔ rejects a tampered Merkle sibling
+    ✔ accepts a leaf sitting at its own propertyId slot (D41 control) (94ms)
+    ✔ rejects a leaf sitting at any other slot — this is the stale-leaf guard (D41)
+
+  circuits/transfer.circom (Phase 2)
+    ✔ accepts a clean transfer and exposes public signals in the D21 order (711ms)
+    ✔ rejects a transfer the seller did not authorise
+    ✔ rejects a transfer to a commitment the buyer cannot open
+    ✔ rejects transferring a mortgaged title
+    ✔ rejects a newMerkleRoot that does not contain the new leaf
+    ✔ rejects an oldMerkleRoot that does not contain the old leaf
+    ✔ accepts a perpetual title against any threshold (D5/D23) (187ms)
+    ✔ rejects transferring an expired title even with a zero threshold (D27)
+    ✔ accepts a title expiring exactly now at a zero threshold (D27 boundary) (183ms)
+    ✔ rejects a transfer claiming more remaining term than the title has
+    ✔ refuses to build an input that also edits a non-owner field
+    ✔ rejects a transfer whose new leaf sits at a different slot (D41)
+
+  contracts/LandRegistryVerifier — real proofs (integration, Phase 4)
+    ownership
+      ✔ verifies a real proof against the published root, and measures gas (211ms)
+      ✔ rejects a cryptographically tampered proof (InvalidProof) (86ms)
+      ✔ rejects when latestRoot moved on — error echoes publicSignals[0] (D21) (88ms)
+      ✔ rejects a replayed proof after ±tolerance — error echoes publicSignals[3] (D9/D26) (73ms)
+      ✔ rejects a real proof attested by a non-attester, accepts the attester (D82) (69ms)
+    mortgage
+      ✔ verifies a real proof against the published root, and measures gas (94ms)
+      ✔ rejects a cryptographically tampered proof (InvalidProof) (88ms)
+      ✔ rejects when latestRoot moved on — error echoes publicSignals[0] (D21) (74ms)
+      ✔ rejects a replayed proof after ±tolerance — error echoes publicSignals[3] (D9/D26) (65ms)
+      ✔ rejects a real proof attested by a non-attester, accepts the attester (D82) (68ms)
+    transfer
+      ✔ verifies a real proof against the published root, and measures gas (126ms)
+      ✔ rejects a cryptographically tampered proof (InvalidProof) (67ms)
+      ✔ rejects when latestRoot moved on — error echoes publicSignals[0] (D21) (81ms)
+      ✔ rejects a replayed proof after ±tolerance — error echoes publicSignals[5] (D9/D26) (64ms)
+      ✔ two-step flow (§3): verify BEFORE publishRoot(newRoot); afterwards the proof is spent (75ms)
+
+      gas metrics → circuits\build\gas-metrics.json
+┌─────────┬─────────────┬────────────────┬───────────┐
+│ (index) │ circuit     │ publishRootGas │ verifyGas │
+├─────────┼─────────────┼────────────────┼───────────┤
+│ 0       │ 'ownership' │ '115651'       │ '255216'  │
+│ 1       │ 'mortgage'  │ '115651'       │ '262041'  │
+│ 2       │ 'transfer'  │ '115651'       │ '267065'  │
+└─────────┴─────────────┴────────────────┴───────────┘
+
+  contracts/LandRegistryVerifier — mock verifiers (Phase 4)
+    ✔ rejects a zero address for any constructor dependency (61ms)
+    ✔ mirrors PROOF_TIMESTAMP_TOLERANCE_SECONDS from shared/datetime.ts (D26)
+    ✔ verifyTransfer ignores newMerkleRoot — it need not be published yet (§3 two-step flow)
+    verifyOwnership
+      ✔ returns true when proof, root, and timestamp all pass
+      ✔ reverts InvalidProof when the Groth16 verifier returns false
+      ✔ reverts RootMismatch when the root signal is not latestRoot
+      ✔ accepts drift of exactly ±tolerance and rejects one second beyond (D9/D26)
+    verifyMortgage
+      ✔ returns true when proof, root, and timestamp all pass
+      ✔ reverts InvalidProof when the Groth16 verifier returns false
+      ✔ reverts RootMismatch when the root signal is not latestRoot
+      ✔ accepts drift of exactly ±tolerance and rejects one second beyond (D9/D26) (44ms)
+    verifyTransfer
+      ✔ returns true when proof, root, and timestamp all pass
+      ✔ reverts InvalidProof when the Groth16 verifier returns false
+      ✔ reverts RootMismatch when the root signal is not latestRoot
+      ✔ accepts drift of exactly ±tolerance and rejects one second beyond (D9/D26)
+    status attestation (D82)
+      ✔ mirrors ATTESTATION_TTL_SECONDS from shared/statusAttestation.ts
+      ✔ attestationDigest equals the shared EIP-712 hash (parity with ethers/viem)
+      ✔ verifyOwnership accepts an attestation expiring this second, and rejects one already expired
+      ✔ verifyOwnership rejects an expiry beyond the TTL — a leaked key cannot sign long-lived notes
+      ✔ verifyOwnership rejects a signer without ATTESTER_ROLE — a state authority included
+      ✔ verifyOwnership rejects once the attester's role is revoked
+      ✔ verifyOwnership rejects an attestation signed for another plot, owner or root
+      ✔ verifyOwnership reports a malformed signature as InvalidAttestation, not a raw revert
+      ✔ verifyOwnership: the earlier rules still win over the attestation
+      ✔ verifyMortgage accepts an attestation expiring this second, and rejects one already expired
+      ✔ verifyMortgage rejects an expiry beyond the TTL — a leaked key cannot sign long-lived notes
+      ✔ verifyMortgage rejects a signer without ATTESTER_ROLE — a state authority included
+      ✔ verifyMortgage rejects once the attester's role is revoked
+      ✔ verifyMortgage rejects an attestation signed for another plot, owner or root
+      ✔ verifyMortgage reports a malformed signature as InvalidAttestation, not a raw revert
+      ✔ verifyMortgage: the earlier rules still win over the attestation
+
+  RootRegistry — revocations (D45)
+    ✔ publishes the root and records each revocation
+    ✔ emits PropertyRevoked per property
+    ✔ still emits RootPublished, so the root path is unchanged
+    ✔ accepts an empty revocation list (a plain publish)
+    ✔ revokes two distinct properties with correct per-index wiring
+    ✔ keeps every bit of a word independent, across rounds (D91)
+    ✔ rejects mismatched array lengths
+    ✔ rejects an out-of-range reason code
+    ✔ rejects revoking the same property twice
+    ✔ rejects a duplicate propertyId inside one call
+    ✔ rejects a caller without STATE_AUTHORITY_ROLE
+      worst-case ceiling: 641 revocations/tx
+      new words: 25960 gas/item
+      existing words: 8860 gas/item
+    ✔ measures the revocation ceiling (D91 — the numbers go in Chapter 5) (1213ms)
+    ✔ still rejects a zero or duplicate root
+
+  contracts/RootRegistry (Phase 4)
+    publishRoot
+      ✔ stores the root, bumps the version, and records history (D29) (66ms)
+      ✔ emits RootPublished with the previous root and publisher
+      ✔ rejects the zero root
+      ✔ rejects re-publishing the current root
+      ✔ allows re-publishing an OLDER root (rollback is a new version, not a dup)
+      ✔ rejects callers without STATE_AUTHORITY_ROLE (admin included)
+    registerAuthority (D30)
+      ✔ grants the role and sets the institute anchor in one transaction
+      ✔ emits AuthorityRegistered
+      ✔ rejects the zero address as authority
+      ✔ rejects a zero institute hash
+      ✔ rejects non-admin callers
+      ✔ revokeRole removes the role but keeps the anchor (history semantics)
+
+  percentiles (bench harness)
+    ✔ reads the nearest-rank value, not an interpolation
+    ✔ does not mutate the caller array — the caller still needs its order
+    ✔ handles a single sample
+    ✔ throws on an empty set rather than reporting zeros
+
+  syncFrontendArtifacts (D55)
+    ✔ copies wasm, zkey and verification key into public/circuits/<circuit>/
+    ✔ refuses to sync when the trusted setup has not produced a zkey, naming the fix
+    ✔ copies nothing when any source is missing, so a stale set is never half-replaced
+
+  blockchain/shared stays bundleable for the browser (Phase 8/9)
+    ✔ never uses a node: scheme specifier, static or dynamic
+    ✔ never statically imports a Node-only built-in
+    ✔ keeps treeDimensions.ts free of runtime imports, so a page can read it cheaply
+    ✔ keeps leafFields.ts free of runtime imports, so a page can read it cheaply
+    ✔ keeps solidityCalldata.ts free of runtime imports, so a page can read it cheaply
+    ✔ keeps statusAttestation.ts free of runtime imports, so a page can read it cheaply
+
+  publicSignalIndex
+    ✔ matches the index table in CODING_ROADMAP §2.5
+    ✔ throws for a signal the circuit does not have, naming the ones it does
+
+  rootSignalName
+    ✔ names the root each circuit must be checked against
+    ✔ always names a signal the circuit actually declares
+
+  circuitTypeForSignalCount
+    ✔ identifies each circuit by its signal count
+    ✔ agrees with PUBLIC_SIGNAL_ORDER for every circuit
+    ✔ throws for a count no circuit produces, listing the valid ones
+
+  describePublicSignals
+    ✔ labels signals in declaration order (D21)
+    ✔ discloses the mortgage threshold but nothing resembling an expiry date
+    ✔ rejects an array whose length does not match the circuit
+
+  datetime — proof timestamp freshness (D9/D26)
+    ✔ accepts a timestamp matching real time
+    ✔ accepts drift in both directions up to the tolerance
+    ✔ rejects one second beyond the tolerance, both directions
+    ✔ rejects the replay case: a proof dated a year ago
+    ✔ assertTimestampFresh throws with an actionable message (73ms)
+    ✔ assertTimestampFresh stays silent for a fresh timestamp
+    ✔ honours a caller-supplied tolerance
+    ✔ defaults `now` to the real clock
+
+  datetime — UTC+7 calendar conversion (D10)
+    ✔ round-trips a Vietnam-local calendar date through epoch seconds
+    ✔ keeps a date stable across the UTC day boundary
+
+  merkleTree (Phase 1)
+    ✔ builds a tree and produces a non-zero root
+    ✔ generates a proof that verifies against the tree root
+    ✔ rejects a proof tampered with a wrong sibling
+    ✔ rejects a valid proof checked against the wrong root
+    ✔ produces a stable root across repeated builds of the same records
+    ✔ produces a valid full-depth proof even for a single-record tree
+    ✔ fails fast when records contain a duplicate propertyId
+    ✔ rejects a record whose fields drifted from the tree leaf
+    ✔ rejects a proof with a malformed pathIndices entry
+    ✔ places each leaf at index = propertyId (D41)
+    ✔ produces the same root regardless of input order (D41 supersedes D24)
+    ✔ rejects a propertyId outside the addressable range (D41)
+    LEAF_FIELD_ORDER (D4/D67)
+      ✔ is the 7 leaf fields in the order the circuits hash them
+      ✔ is the order hashRecord actually hashes in
+
+  addressable range (D71)
+    ✔ covers the HCMC parcel count with headroom for subdivision
+    ✔ is exactly 2^TREE_DEPTH − 1
+
+  offchainMetadata — WebCrypto twin agrees with node:crypto (Phase 8)
+    ✔ hashes Vietnamese descriptive fields to the same field element
+    ✔ agrees on decomposed (NFD) input, which both normalise to NFC
+    ✔ keeps null and the empty string distinct on both routes
+
+  receiptToLURRecordAsync (Phase 8)
+    ✔ rebuilds exactly the record the synchronous reader rebuilds
+    ✔ applies the area number → 2dp bridge, so 266.1 and 266.10 are one record
+
+  sparseTree — incremental updates (D72)
+    ✔ siblingCoordsFor returns one coord per level, bottom-up
+    ✔ changing one leaf gives the same root AND the same node set as a full rebuild (447ms)
+    ✔ removing a leaf (revocation) matches a rebuild without it, including deleted nodes (414ms)
+    ✔ batches k changes into one overlay identical to rebuilding with all of them (374ms)
+    ✔ proofFrom reproduces the proof a full tree would generate (43ms)
+    ✔ overlayReader answers from the projection, so a proof can be taken before anything is written (82ms)
+    ✔ an empty update set leaves the root untouched (43ms)
+    ✔ building from empty by inserting every leaf matches buildTree (bootstrap invariant) (87ms)
+    ✔ emptying the tree removes every node and returns the empty root (105ms)
+
+  shared/statusAttestation
+    ✔ keeps the TTL equal to the proof freshness window (D26)
+    ✔ reads root, propertyId and commitment at the indices PUBLIC_SIGNAL_ORDER names
+    ✔ refuses a transfer proof — verifyTransfer takes no attestation
+    ✔ round-trips through an ethers signature (86ms)
+
+  shared/zkpHelper (Phase 3)
+    getCircuitPaths
+      ✔ resolves the circuits/build/<name>/ artifact layout
+    assertProofFresh (D26)
+      ✔ accepts a fresh timestamp (ownership)
+      ✔ rejects a stale timestamp (ownership)
+      ✔ accepts a fresh timestamp (mortgage)
+      ✔ rejects a stale timestamp (mortgage)
+      ✔ accepts a fresh timestamp (transfer)
+      ✔ rejects a stale timestamp (transfer)
+    toSolidityCalldata (Phase 4)
+      ✔ drops the projective markers and swaps each pi_b coordinate pair
+    generate + verify (integration — needs `circuits:setup` artifacts)
+      ✔ proves and verifies ownership (858ms)
+      ✔ proves and verifies mortgage (815ms)
+      ✔ proves and verifies transfer (1422ms)
+
+
+  184 passing (27s)
+

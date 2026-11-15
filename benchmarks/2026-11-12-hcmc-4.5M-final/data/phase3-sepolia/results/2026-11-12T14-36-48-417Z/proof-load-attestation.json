@@ -1,0 +1,29 @@
+{
+  "at": "2026-11-12T14:36:48.419Z",
+  "machine": {
+    "platform": "win32",
+    "arch": "x64",
+    "cpus": 16,
+    "cpuModel": "AMD Ryzen 7 6800HS with Radeon Graphics         ",
+    "totalMemGb": 15,
+    "node": "v22.15.0"
+  },
+  "kind": "proof-load",
+  "mode": "attestation",
+  "concurrency": 1,
+  "requests": 2000,
+  "distinctIds": 2000,
+  "wallMs": 14256,
+  "requestsPerSecond": 140.3,
+  "latencyMs": {
+    "p50": 7,
+    "p95": 9,
+    "p99": 9,
+    "mean": 7.1,
+    "max": 37
+  },
+  "statuses": {
+    "200": 1997,
+    "410": 3
+  }
+}

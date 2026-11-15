@@ -1,0 +1,11 @@
+$ ts-node scripts/bench-replay-month.ts
+  imported 2850 replacement plots (REISSUE)
+  replaying 8,982 transfers + 2,850 revocations over 3 working day(s), signing via sign:root
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+Error: POST /government/changesets/1/confirm → 500 {"statusCode":500,"message":"Internal server error"}
+    at call (D:\thesis\land-registry-zkp\web-app\backend\scripts\bench-replay-month.ts:160:11)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async main (D:\thesis\land-registry-zkp\web-app\backend\scripts\bench-replay-month.ts:480:7)
+D:\thesis\land-registry-zkp\web-app\backend:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @land-registry/backend@0.1.0 bench:month: `ts-node scripts/bench-replay-month.ts`
+Exit status 1

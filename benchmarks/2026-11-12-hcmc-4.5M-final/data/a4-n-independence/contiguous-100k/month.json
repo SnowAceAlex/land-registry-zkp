@@ -1,0 +1,84 @@
+{
+  "kind": "month",
+  "at": "2026-11-15T07:14:01.338Z",
+  "assumptions": [
+    "every mutation modelled as a transfer (conservative upper bound)",
+    "transfer proofs measured separately by bench:prove, not generated here",
+    "no per-procedure transaction: the lock is the open request row, enforced by the status attestation (D82)",
+    "changed plots are every step-th plot of the register, so each day is spread over the whole id range",
+    "each revoked certificate is replaced the next day by a new one at id+1 with a lineage link (D83/D90)",
+    "follow-on rounds in the same day while the revocation cap defers some (max 10)"
+  ],
+  "transfers": 8982,
+  "revocations": 2850,
+  "days": 3,
+  "publishes": 3,
+  "totalGas": "23623632",
+  "peakRssMb": 342,
+  "perDay": [
+    {
+      "day": 1,
+      "transfers": 2994,
+      "revocations": 950,
+      "deferredRevocations": 0,
+      "issuances": 0,
+      "rounds": 2,
+      "queueMs": 17696,
+      "draftMs": 9061,
+      "signMs": 15272,
+      "confirmMs": 363752,
+      "gasUsed": "12094736",
+      "rootVersion": 3,
+      "txHash": "0x4fa94fa8a8f1c724af52c05c10c0d146cd3d445bcf46eeab6b6240cd22a4184f",
+      "txHashes": [
+        "0x67279686609324107afb24ecef91825497012dafc8d07f148eece5453608b18a",
+        "0x4fa94fa8a8f1c724af52c05c10c0d146cd3d445bcf46eeab6b6240cd22a4184f"
+      ]
+    },
+    {
+      "day": 2,
+      "transfers": 2994,
+      "revocations": 950,
+      "deferredRevocations": 0,
+      "issuances": 950,
+      "rounds": 2,
+      "queueMs": 14825,
+      "draftMs": 8355,
+      "signMs": 13000,
+      "confirmMs": 456306,
+      "gasUsed": "5756348",
+      "rootVersion": 5,
+      "txHash": "0x2a321e7cbe55189dbe116105d24242c1782b02371bdd7635dfa92126c6d87cba",
+      "txHashes": [
+        "0x0afe547508936827da5ffeba59ac730db29d2d8b76e3c30d66a62d24b9370cd6",
+        "0x2a321e7cbe55189dbe116105d24242c1782b02371bdd7635dfa92126c6d87cba"
+      ]
+    },
+    {
+      "day": 3,
+      "transfers": 2994,
+      "revocations": 950,
+      "deferredRevocations": 0,
+      "issuances": 950,
+      "rounds": 2,
+      "queueMs": 14887,
+      "draftMs": 8710,
+      "signMs": 10778,
+      "confirmMs": 455762,
+      "gasUsed": "5772548",
+      "rootVersion": 7,
+      "txHash": "0x0f925f6cb67efc14d51c0ffd074c1a0779907a18efae3599584e4adec3ee0a1d",
+      "txHashes": [
+        "0xd41ea510202fc045fabb156be21091f20e74bd5dae269a60614490b4840d4176",
+        "0x0f925f6cb67efc14d51c0ffd074c1a0779907a18efae3599584e4adec3ee0a1d"
+      ]
+    }
+  ],
+  "machine": {
+    "platform": "win32",
+    "arch": "x64",
+    "cpus": 16,
+    "totalMemGb": 15,
+    "node": "v22.15.0"
+  }
+}

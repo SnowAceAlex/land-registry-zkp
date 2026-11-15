@@ -1,0 +1,27 @@
+$ ts-node scripts/tools/ownerSmoke.ts "C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\round1\\201"
+
+bundle:    C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\round1\\201
+property:  201
+
+refresh   source=nodes, root version 2
+  OK    registry tree matches the published root — version 2
+  note  the bundle Merkle proof is STALE — receipt v1 → current v2. Expected after anyone transfers; this refresh is exactly the repair.
+  FAIL  leaf is unchanged by the refresh — receipt says 10012257348646068541391158904391938696849614890011933010876865500088814735941, registry says 15490802972841630978520730464970752318724004234719216053847211997575211676094
+  OK    registry signed a status attestation — by 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+ERROR:  4 Error in template Ownership_226 line: 76
+
+Error: Error: Assert Failed. Error in template Ownership_226 line: 76
+
+    at D:\thesis\land-registry-zkp\node_modules\.pnpm\circom_runtime@0.1.28\node_modules\circom_runtime\build\main.cjs:529:27
+    at Array.forEach (<anonymous>)
+    at WitnessCalculatorCircom2._doCalculateWitness (D:\thesis\land-registry-zkp\node_modules\.pnpm\circom_runtime@0.1.28\node_modules\circom_runtime\build\main.cjs:500:14)
+    at WitnessCalculatorCircom2.calculateWTNSBin (D:\thesis\land-registry-zkp\node_modules\.pnpm\circom_runtime@0.1.28\node_modules\circom_runtime\build\main.cjs:559:20)
+    at wtnsCalculate (D:\thesis\land-registry-zkp\node_modules\.pnpm\snarkjs@0.7.6\node_modules\snarkjs\build\main.cjs:1315:28)
+    at async Object.groth16FullProve [as fullProve] (D:\thesis\land-registry-zkp\node_modules\.pnpm\snarkjs@0.7.6\node_modules\snarkjs\build\main.cjs:1348:5)
+    at async generateGroth16Proof (D:\thesis\land-registry-zkp\blockchain\shared\zkpHelper.ts:78:36)
+    at async prove (D:\thesis\land-registry-zkp\blockchain\scripts\tools\ownerSmoke.ts:285:18)
+    at async proveAndVerify (D:\thesis\land-registry-zkp\blockchain\scripts\tools\ownerSmoke.ts:302:40)
+    at async main (D:\thesis\land-registry-zkp\blockchain\scripts\tools\ownerSmoke.ts:144:21)
+D:\thesis\land-registry-zkp\blockchain:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @land-registry/blockchain@0.1.0 owner:smoke: `ts-node scripts/tools/ownerSmoke.ts "C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\round1\\201"`
+Exit status 1

@@ -1,0 +1,23 @@
+web-app/frontend/public/circuits/mortgage/:
+total 9184
+drwxr-xr-x 1 Snow_Ace 197121       0 Sep 14 14:56 .
+drwxr-xr-x 1 Snow_Ace 197121       0 Sep 14 14:56 ..
+-rw-r--r-- 1 Snow_Ace 197121 3164655 Sep 23 09:59 mortgage.wasm
+-rw-r--r-- 1 Snow_Ace 197121 6231879 Sep 23 10:00 mortgage.zkey
+-rw-r--r-- 1 Snow_Ace 197121    3936 Sep 23 10:00 verification_key.json
+
+web-app/frontend/public/circuits/ownership/:
+total 9184
+drwxr-xr-x 1 Snow_Ace 197121       0 Sep 14 14:56 .
+drwxr-xr-x 1 Snow_Ace 197121       0 Sep 14 14:56 ..
+-rw-r--r-- 1 Snow_Ace 197121 3164598 Sep 23 09:59 ownership.wasm
+-rw-r--r-- 1 Snow_Ace 197121 6231836 Sep 23 10:00 ownership.zkey
+-rw-r--r-- 1 Snow_Ace 197121    3740 Sep 23 10:00 verification_key.json
+
+web-app/frontend/public/circuits/transfer/:
+total 15216
+drwxr-xr-x 1 Snow_Ace 197121        0 Sep 14 14:56 .
+drwxr-xr-x 1 Snow_Ace 197121        0 Sep 14 14:56 ..
+-rw-r--r-- 1 Snow_Ace 197121  3230029 Sep 23 09:59 transfer.wasm
+-rw-r--r-- 1 Snow_Ace 197121 12340895 Sep 23 10:00 transfer.zkey
+-rw-r--r-- 1 Snow_Ace 197121     4334 Sep 23 10:00 verification_key.json

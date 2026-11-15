@@ -1,0 +1,2 @@
+# Bench evidence keeps its logs (the root .gitignore drops *.log)
+!*.log

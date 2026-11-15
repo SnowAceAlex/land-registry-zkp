@@ -1,0 +1,6 @@
+version   1
+BENCH_RESULT {"txHash":"0xc3521c521e027094533d78268986be9cd07596e3bc994413af2791ec7fdef008","gasUsed":"115279","blockNumber":8,"rootVersion":1}
+version   2
+BENCH_RESULT {"txHash":"0xd2161bb2063c3a440ed1f7079b663eec489569010bf7e8b0fae0d099334f605c","gasUsed":"63979","blockNumber":9,"rootVersion":2}
+version   3
+BENCH_RESULT {"txHash":"0xbed33bdc7969d5ec29ad7697167e2fc2f554a7d17aaa7b929da6519ba51fc48b","gasUsed":"63979","blockNumber":10,"rootVersion":3}

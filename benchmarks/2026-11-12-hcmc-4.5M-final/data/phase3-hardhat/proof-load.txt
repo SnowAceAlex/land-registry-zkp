@@ -1,0 +1,80 @@
+$ ts-node scripts/bench/proofLoad.ts
+  2000 distinct plot(s) sampled; 2000 request(s) at concurrency 1
+
+  req/s     : 101.6
+  latency   : p50 10 / p95 12 / p99 14 ms (max 65)
+  statuses  : {"200":1991,"410":9}
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T13-39-42-468Z\proof-load-full-200.json
+$ ts-node scripts/bench/proofLoad.ts
+  2000 distinct plot(s) sampled; 2000 request(s) at concurrency 4
+
+  req/s     : 208.2
+  latency   : p50 19 / p95 22 / p99 26 ms (max 55)
+  statuses  : {"200":1991,"410":9}
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T13-40-14-963Z\proof-load-full-200.json
+$ ts-node scripts/bench/proofLoad.ts
+  2000 distinct plot(s) sampled; 2000 request(s) at concurrency 16
+
+  req/s     : 205
+  latency   : p50 78 / p95 95 / p99 107 ms (max 171)
+  statuses  : {"200":1991,"410":9}
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T13-40-47-821Z\proof-load-full-200.json
+$ ts-node scripts/bench/proofLoad.ts
+  2000 distinct plot(s) sampled; 2000 request(s) at concurrency 50
+
+  req/s     : 202.1
+  latency   : p50 245 / p95 284 / p99 312 ms (max 380)
+  statuses  : {"200":1991,"410":9}
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T13-41-20-835Z\proof-load-full-200.json
+$ ts-node scripts/bench/proofLoad.ts
+  2000 distinct plot(s) sampled; 2000 request(s) at concurrency 1, conditional (expecting 304)
+  primed 2000 validator(s)
+
+  req/s     : 340
+  latency   : p50 3 / p95 4 / p99 5 ms (max 9)
+  statuses  : {"304":1991,"410":9}
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T13-42-08-404Z\proof-load-etag-304.json
+$ ts-node scripts/bench/proofLoad.ts
+  2000 distinct plot(s) sampled; 2000 request(s) at concurrency 4, conditional (expecting 304)
+  primed 2000 validator(s)
+
+  req/s     : 696.9
+  latency   : p50 5 / p95 8 / p99 10 ms (max 34)
+  statuses  : {"304":1991,"410":9}
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T13-42-52-855Z\proof-load-etag-304.json
+$ ts-node scripts/bench/proofLoad.ts
+  2000 distinct plot(s) sampled; 2000 request(s) at concurrency 50, conditional (expecting 304)
+  primed 2000 validator(s)
+
+  req/s     : 626.4
+  latency   : p50 78 / p95 99 / p99 136 ms (max 163)
+  statuses  : {"304":1991,"410":9}
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T13-43-37-837Z\proof-load-etag-304.json
+$ ts-node scripts/bench/proofLoad.ts
+  2000 distinct plot(s) sampled; 2000 request(s) at concurrency 1
+
+  req/s     : 60.3
+  latency   : p50 16 / p95 18 / p99 20 ms (max 69)
+  statuses  : {"200":1991,"410":9}
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T13-44-34-321Z\proof-load-attestation.json
+$ ts-node scripts/bench/proofLoad.ts
+  2000 distinct plot(s) sampled; 2000 request(s) at concurrency 4
+
+  req/s     : 189.3
+  latency   : p50 21 / p95 26 / p99 30 ms (max 59)
+  statuses  : {"200":1991,"410":9}
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T13-45-07-791Z\proof-load-attestation.json
+$ ts-node scripts/bench/proofLoad.ts
+  2000 distinct plot(s) sampled; 2000 request(s) at concurrency 16
+
+  req/s     : 216.9
+  latency   : p50 73 / p95 86 / p99 95 ms (max 141)
+  statuses  : {"200":1991,"410":9}
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T13-45-40-033Z\proof-load-attestation.json
+$ ts-node scripts/bench/proofLoad.ts
+  2000 distinct plot(s) sampled; 2000 request(s) at concurrency 50
+
+  req/s     : 208.3
+  latency   : p50 235 / p95 275 / p99 308 ms (max 380)
+  statuses  : {"200":1991,"410":9}
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T13-46-12-640Z\proof-load-attestation.json

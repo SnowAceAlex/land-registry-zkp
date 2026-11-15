@@ -1,0 +1,82 @@
+[
+ {
+  "block": 12119236,
+  "tx": "0xf651d1a7baacec0d907f640501bf0426b75d45468805db0f3d7cc30b43ea9092",
+  "to": null,
+  "contractAddress": "0xc7848d47591055d4fe93468b0e2fb0590f8c91aa",
+  "selector": "0x60806040",
+  "gasUsed": 4860941,
+  "effectiveGasPriceWei": "1000000000",
+  "feeEth": 0.004860941
+ },
+ {
+  "block": 12119237,
+  "tx": "0xe9b7d9e32fbff2bbef11cc7ce37cabca482506a9ff2975b1524a9117c4e0d642",
+  "to": null,
+  "contractAddress": "0x79acbb25e71f921bf2a5dbd3346dca770e3a3bb0",
+  "selector": "0x60806040",
+  "gasUsed": 2737714,
+  "effectiveGasPriceWei": "100000035",
+  "feeEth": 0.00027377149581999
+ },
+ {
+  "block": 12119238,
+  "tx": "0x19ed5dc6bf726dec91d533b71aeedab38d7bba3ff0c56942639a8363c74dac64",
+  "to": null,
+  "contractAddress": "0x5fa24ac90c4f83e283f7b4fd75be3a2c981ea91f",
+  "selector": "0x60806040",
+  "gasUsed": 2873768,
+  "effectiveGasPriceWei": "1000000000",
+  "feeEth": 0.002873768
+ },
+ {
+  "block": 12119239,
+  "tx": "0x590ead060e2f888d0e561aa1527d3280357a4519f311be93b43d9a6d91e8165d",
+  "to": null,
+  "contractAddress": "0x6ecd65dee3985722756721b162136623dd1db8b9",
+  "selector": "0x60806040",
+  "gasUsed": 3161338,
+  "effectiveGasPriceWei": "100000035",
+  "feeEth": 0.00031613391064683
+ },
+ {
+  "block": 12119240,
+  "tx": "0x02e5339932b09bc518fe4c07b8d887da5e8c438b1598bbe8e090f838fe85ea4c",
+  "to": null,
+  "contractAddress": "0x0be5ee780cd46d8fb5449783d43067e7e35d4cd6",
+  "selector": "0x6101e060",
+  "gasUsed": 6981030,
+  "effectiveGasPriceWei": "100000035",
+  "feeEth": 0.00069810324433605
+ },
+ {
+  "block": 12119241,
+  "tx": "0x564e7803f52087101375bc5511efae320296a6ac75dc637144c780e6e81403ee",
+  "to": "0xc7848d47591055d4fe93468b0e2fb0590f8c91aa",
+  "contractAddress": null,
+  "selector": "0xa4c65d2d",
+  "gasUsed": 243017,
+  "effectiveGasPriceWei": "1000035",
+  "feeEth": 2.43025505595e-7
+ },
+ {
+  "block": 12119242,
+  "tx": "0x6d30ed72171ad4607062d1696f750e2f066720711cc81ae28aa3cffe2952174a",
+  "to": "0xc7848d47591055d4fe93468b0e2fb0590f8c91aa",
+  "contractAddress": null,
+  "selector": "0x2f2ff15d",
+  "gasUsed": 133527,
+  "effectiveGasPriceWei": "999999999",
+  "feeEth": 0.000133526999866473
+ },
+ {
+  "block": 12119243,
+  "tx": "0x3a09b5cb42d62572eb5146c0254b902be09acd5c7ecbe3e5d94e146e4a62c785",
+  "to": "0xc7848d47591055d4fe93468b0e2fb0590f8c91aa",
+  "contractAddress": null,
+  "selector": "0xc56786d8",
+  "gasUsed": 461531,
+  "effectiveGasPriceWei": "1000034",
+  "feeEth": 4.61546692054e-7
+ }
+]

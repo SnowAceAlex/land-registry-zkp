@@ -1,0 +1,150 @@
+{
+  "kind": "draft-breakdown",
+  "at": "2026-11-15T05:57:47.827Z",
+  "runs": 3,
+  "heldForNoIssuance": 950,
+  "full": [
+    {
+      "run": 1,
+      "totalMs": 21365,
+      "items": {
+        "issuances": 950,
+        "transfers": 2994,
+        "revocations": 591,
+        "deferredRevocations": 359
+      },
+      "stepsMs": {
+        "assertNoOpenDraft": 9,
+        "readQueue": 131,
+        "conflictCheck": 3,
+        "issuanceSecretCheck": 883,
+        "lineageCheck": 198,
+        "leafUpdates": 3015,
+        "projectRoot.readNodes": 11185,
+        "projectRoot": 16826,
+        "attachItems": 269,
+        "projectRoot.hash": 5641,
+        "other (lock, insert draft, tx)": 32
+      }
+    },
+    {
+      "run": 2,
+      "totalMs": 17099,
+      "items": {
+        "issuances": 950,
+        "transfers": 2994,
+        "revocations": 591,
+        "deferredRevocations": 359
+      },
+      "stepsMs": {
+        "assertNoOpenDraft": 2,
+        "readQueue": 73,
+        "conflictCheck": 1,
+        "issuanceSecretCheck": 62,
+        "lineageCheck": 104,
+        "leafUpdates": 1506,
+        "projectRoot.readNodes": 9291,
+        "projectRoot": 14972,
+        "attachItems": 365,
+        "projectRoot.hash": 5681,
+        "other (lock, insert draft, tx)": 13
+      }
+    },
+    {
+      "run": 3,
+      "totalMs": 17308,
+      "items": {
+        "issuances": 950,
+        "transfers": 2994,
+        "revocations": 591,
+        "deferredRevocations": 359
+      },
+      "stepsMs": {
+        "assertNoOpenDraft": 2,
+        "readQueue": 80,
+        "conflictCheck": 2,
+        "issuanceSecretCheck": 59,
+        "lineageCheck": 100,
+        "leafUpdates": 1448,
+        "projectRoot.readNodes": 9458,
+        "projectRoot": 15352,
+        "attachItems": 251,
+        "projectRoot.hash": 5894,
+        "other (lock, insert draft, tx)": 14
+      }
+    }
+  ],
+  "noIssuance": [
+    {
+      "run": 1,
+      "totalMs": 11786,
+      "items": {
+        "issuances": 0,
+        "transfers": 2994,
+        "revocations": 591,
+        "deferredRevocations": 359
+      },
+      "stepsMs": {
+        "assertNoOpenDraft": 2,
+        "readQueue": 76,
+        "conflictCheck": 1,
+        "issuanceSecretCheck": 0,
+        "leafUpdates": 1182,
+        "projectRoot.readNodes": 5572,
+        "projectRoot": 10251,
+        "attachItems": 259,
+        "projectRoot.hash": 4679,
+        "other (lock, insert draft, tx)": 15
+      }
+    },
+    {
+      "run": 2,
+      "totalMs": 11604,
+      "items": {
+        "issuances": 0,
+        "transfers": 2994,
+        "revocations": 591,
+        "deferredRevocations": 359
+      },
+      "stepsMs": {
+        "assertNoOpenDraft": 2,
+        "readQueue": 63,
+        "conflictCheck": 1,
+        "issuanceSecretCheck": 0,
+        "leafUpdates": 1168,
+        "projectRoot.readNodes": 5490,
+        "projectRoot": 10077,
+        "attachItems": 281,
+        "projectRoot.hash": 4587,
+        "other (lock, insert draft, tx)": 12
+      }
+    },
+    {
+      "run": 3,
+      "totalMs": 11333,
+      "items": {
+        "issuances": 0,
+        "transfers": 2994,
+        "revocations": 591,
+        "deferredRevocations": 359
+      },
+      "stepsMs": {
+        "assertNoOpenDraft": 2,
+        "readQueue": 88,
+        "conflictCheck": 1,
+        "issuanceSecretCheck": 0,
+        "leafUpdates": 1246,
+        "projectRoot.readNodes": 5347,
+        "projectRoot": 9744,
+        "attachItems": 236,
+        "projectRoot.hash": 4397,
+        "other (lock, insert draft, tx)": 16
+      }
+    }
+  ],
+  "machine": {
+    "platform": "win32",
+    "cpus": 16,
+    "node": "v22.15.0"
+  }
+}

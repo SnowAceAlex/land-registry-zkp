@@ -1,0 +1,2 @@
+{"valid":false,"reason":"StaleTimestamp","message":"Proof timestamp is stale: claimed 1794735711 (15/11/2026 16:41) is 666s in the past, tolerance is 600s. The proof may be a replay — reject it."}
+HTTP 422

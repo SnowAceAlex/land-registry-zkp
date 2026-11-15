@@ -1,0 +1,24 @@
+$ ts-node scripts/tools/ownerSmoke.ts "C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\round2\\201"
+
+bundle:    C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\round2\\201
+property:  201
+
+refresh   source=nodes, root version 2
+  OK    registry tree matches the published root — version 2
+  OK    bundle Merkle proof is still current — v2
+  OK    leaf is unchanged by the refresh — 15490802972841630978…
+  OK    registry signed a status attestation — by 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+ownership proof generated in 1086 ms
+  OK    registry verifies the ownership proof — discloses 4 signals
+mortgage  proof generated in 670 ms
+  OK    registry verifies the mortgage proof — discloses 5 signals
+  OK    mortgage proof discloses the threshold only — merkleRoot, propertyId, ownerCommitment, currentTimestamp, minRequiredRemainingTerm
+  FAIL  LandRegistryVerifier accepts the ownership proof on chain — HTTP 422: The status attestation was not signed by an attester for this proof (D82)
+  OK    a proof dated an hour ago is rejected as stale — HTTP 422 StaleTimestamp
+  OK    a proof without its status attestation is rejected — HTTP 422 InvalidAttestation
+
+1 check(s) FAILED.
+
+D:\thesis\land-registry-zkp\blockchain:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @land-registry/blockchain@0.1.0 owner:smoke: `ts-node scripts/tools/ownerSmoke.ts "C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\round2\\201"`
+Exit status 1

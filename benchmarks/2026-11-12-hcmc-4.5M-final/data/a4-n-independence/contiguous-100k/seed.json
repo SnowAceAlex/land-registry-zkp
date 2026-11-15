@@ -1,0 +1,20 @@
+{
+  "kind": "seed",
+  "at": "2026-11-15T06:50:02.785Z",
+  "treeDepth": 24,
+  "count": 100000,
+  "layout": "contiguous",
+  "rowsMs": 20580,
+  "bootstrapMs": 37150,
+  "leaves": 100000,
+  "nodes": 200018,
+  "root": "11504697031190556734079727408961459489076436615248738819209317863170493875399",
+  "databaseSize": "72 MB",
+  "machine": {
+    "platform": "win32",
+    "arch": "x64",
+    "cpus": 16,
+    "totalMemGb": 15,
+    "node": "v22.15.0"
+  }
+}

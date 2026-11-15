@@ -1,0 +1,1 @@
+ownership: valid (block 9, timestamp 1794735721)

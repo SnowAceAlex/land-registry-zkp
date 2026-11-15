@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hướng Dẫn Việc Thủ Công - Land Registry ZKP TP.HCM</title>
+  <style>
+    :root {
+      --primary: #1e3a8a; --primary-light: #2563eb; --primary-dark: #0f172a; --secondary: #0f766e;
+      --text: #1e293b; --text-muted: #64748b; --bg: #ffffff; --bg-alt: #f8fafc; --border: #cbd5e1; --border-light: #e2e8f0;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font-sans); color: var(--text); background-color: var(--bg); line-height: 1.6; font-size: 13.5px; padding: 30px; max-width: 1220px; margin: 0 auto; }
+    header { border-bottom: 3px double var(--primary); padding-bottom: 22px; margin-bottom: 26px; }
+    .badge-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .badge-primary { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+    .badge-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .badge-warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .badge-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .badge-purple { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
+    h1 { font-size: 24px; color: var(--primary); font-weight: 800; line-height: 1.35; margin-bottom: 8px; }
+    .subtitle { font-size: 14.5px; color: var(--text-muted); font-weight: 600; margin-bottom: 18px; line-height: 1.5; }
+    .metadata-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; background: var(--bg-alt); padding: 16px; border-radius: 8px; border: 1px solid var(--border-light); font-size: 12.5px; }
+    .metadata-item > strong:first-child { color: var(--primary-dark); display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+    h2 { font-size: 18px; color: var(--primary); border-bottom: 2px solid var(--border-light); padding-bottom: 8px; margin-top: 36px; margin-bottom: 16px; font-weight: 700; }
+    h3 { font-size: 14.5px; color: var(--primary-dark); margin-top: 22px; margin-bottom: 10px; font-weight: 700; }
+    p { margin-bottom: 12px; text-align: justify; }
+    ul, ol { margin-left: 22px; margin-bottom: 14px; }
+    li { margin-bottom: 6px; }
+    a { color: var(--primary-light); text-decoration: none; font-weight: 600; }
+    a:hover { text-decoration: underline; color: var(--primary); }
+    .toc { background: var(--bg-alt); border: 1px solid var(--border-light); border-radius: 8px; padding: 14px 18px; margin: 18px 0; columns: 2; column-gap: 28px; font-size: 12.5px; list-style: none; }
+    .toc li { break-inside: avoid; }
+    .table-container { overflow-x: auto; margin: 16px 0 22px 0; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; text-align: left; }
+    th { background-color: #f1f5f9; color: var(--primary-dark); font-weight: 700; padding: 10px 12px; border-bottom: 2px solid var(--border); white-space: nowrap; }
+    th.th-before { background-color: #fef2f2; color: #991b1b; border-bottom: 2px solid #fca5a5; }
+    th.th-after { background-color: #f0fdf4; color: #166534; border-bottom: 2px solid #86efac; }
+    th.th-delta { background-color: #eff6ff; color: #1e40af; border-bottom: 2px solid #93c5fd; }
+    td { padding: 8px 12px; border-bottom: 1px solid var(--border-light); vertical-align: top; }
+    tr:nth-child(even) td { background-color: #f8fafc; }
+    td.blank { min-width: 90px; }
+    .num { font-family: var(--font-mono); font-weight: 600; white-space: nowrap; }
+    small { color: var(--text-muted); }
+    .tag { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .tag-green { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .tag-blue { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+    .tag-amber { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    .tag-red { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+    .callout { border-left: 4px solid var(--primary-light); background: #eff6ff; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+    .callout p:last-child, .callout ul:last-child, .callout ol:last-child { margin-bottom: 0; }
+    .callout-title { font-weight: 700; color: var(--primary); margin-bottom: 6px; font-size: 13.5px; }
+    .callout-warning { border-left-color: #f59e0b; background: #fffbeb; }
+    .callout-warning .callout-title { color: #b45309; }
+    .callout-success { border-left-color: #10b981; background: #ecfdf5; }
+    .callout-success .callout-title { color: #047857; }
+    .callout-purple { border-left-color: #8b5cf6; background: #f5f3ff; }
+    .callout-purple .callout-title { color: #6d28d9; }
+    code { font-family: var(--font-mono); background: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-size: 11.5px; color: #0f172a; }
+    .todo-id { font-family: var(--font-mono); font-weight: 800; color: #b91c1c; white-space: nowrap; }
+    .done-id { font-family: var(--font-mono); font-weight: 800; color: #15803d; white-space: nowrap; }
+    .flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 16px 0; }
+    .flow-step { border: 1px solid var(--border); border-top: 4px solid var(--primary-light); border-radius: 8px; padding: 10px 12px; background: #fff; font-size: 12.5px; }
+    .flow-step strong { display: block; color: var(--primary-dark); margin-bottom: 4px; }
+    .step { border: 1px solid var(--border); border-radius: 8px; margin: 16px 0; overflow: hidden; }
+    .step-head { background: #f1f5f9; padding: 10px 14px; font-weight: 700; color: var(--primary-dark); border-bottom: 1px solid var(--border); }
+    .step-row { display: grid; grid-template-columns: 130px 1fr; border-bottom: 1px solid var(--border-light); }
+    .step-row:last-child { border-bottom: none; }
+    .step-label { padding: 9px 12px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); background: var(--bg-alt); }
+    .step-body { padding: 9px 14px; }
+    .step-body ul { margin-bottom: 0; }
+    .lbl-do { color: #1d4ed8; } .lbl-see { color: #0f766e; } .lbl-note { color: #b45309; } .lbl-use { color: #6d28d9; }
+    footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--border-light); font-size: 12px; color: var(--text-muted); }
+    @media (max-width: 640px) {
+      body { padding: 16px; }
+      h1 { font-size: 20px; }
+      .toc { columns: 1; }
+      .step-row { grid-template-columns: 1fr; }
+    }
+    @media print {
+      body { padding: 0; font-size: 10pt; color: #000; max-width: 100%; }
+      h2, h3 { page-break-after: avoid; }
+      .step, .callout, .table-container, tr { break-inside: avoid; }
+      @page { size: A4; margin: 14mm 12mm; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="badge-bar">
+      <span class="badge badge-primary">Hướng Dẫn Cho Tác Giả</span>
+      <span class="badge badge-danger">Cần MetaMask Và Trình Duyệt</span>
+      <span class="badge badge-success">Hardhat Local + Sepolia</span>
+      <span class="badge badge-purple">Để Hiểu Hệ Thống Và Lấy Số Cho Chương 5</span>
+    </div>
+    <h1>VIỆC THỦ CÔNG: CHẠY HỆ THỐNG BẰNG TAY ĐỂ HIỂU NÓ VÀ LẤY SỐ CHO THESIS</h1>
+    <div class="subtitle">Những gì máy tự chạy được đã chạy (12–15/11). Tài liệu này chỉ thứ tự làm phần còn lại, ở mỗi bước đang thấy cơ chế gì của hệ thống, và cần ghi số hay ảnh nào</div>
+    <div class="metadata-grid">
+      <div class="metadata-item"><strong>Lập ngày</strong>15/11/2026</div>
+      <div class="metadata-item"><strong>Runbook gốc</strong><code>PHASE_10_MANUAL_TEST.md</code> (chính), <code>PHASE_9_MANUAL_TEST.md</code> (người dân), <code>DEMO_SEPOLIA.md</code></div>
+      <div class="metadata-item"><strong>Thời gian</strong>~3 giờ trên Hardhat, ~1 giờ trên Sepolia</div>
+      <div class="metadata-item"><strong>Số đã có</strong><code>README.md</code> và báo cáo HTML cùng thư mục</div>
+    </div>
+  </header>
+
+  <ul class="toc">
+    <li><a href="#buc-tranh">0. Bức tranh hệ thống trong một trang</a></li>
+    <li><a href="#con-lai">1. Đã có số và còn phải làm tay</a></li>
+    <li><a href="#chuan-bi">2. Chuẩn bị một lần</a></li>
+    <li><a href="#lo-trinh">3. Lộ trình từng bước</a></li>
+    <li><a href="#bam-gio">4. Bấm giờ trong trình duyệt</a></li>
+    <li><a href="#network">5. Kiểm tab Network</a></li>
+    <li><a href="#sepolia">6. Sepolia</a></li>
+    <li><a href="#anh">7. Danh sách ảnh</a></li>
+    <li><a href="#tan-cong">8. Case tấn công</a></li>
+    <li><a href="#thesis">9. Phía thesis</a></li>
+    <li><a href="#ghi-so">10. Bảng ghi số</a></li>
+    <li><a href="#don-dep">11. Dọn dẹp</a></li>
+  </ul>
+
+  <h2 id="buc-tranh">0. Bức Tranh Hệ Thống Trong Một Trang</h2>
+  <p>Đọc mục này trước. Mỗi bước thủ công phía sau là một mảnh của bức tranh này.</p>
+
+  <div class="flow">
+    <div class="flow-step"><strong>UC-2 Nhập dữ liệu</strong>CSV kiểm theo luật hiện hành; phường/xã quyết định chi nhánh</div>
+    <div class="flow-step"><strong>UC-1 Đề nghị cấp</strong>Xếp hàng, sinh secret cho chủ; chưa ký gì</div>
+    <div class="flow-step"><strong>UC-3 Quầy chuyển nhượng</strong>Transfer proof tạo ở trình duyệt cán bộ; hồ sơ mở là khoá</div>
+    <div class="flow-step"><strong>UC-4 Thu hồi</strong>Xếp hàng với mã lý do + băm văn bản</div>
+    <div class="flow-step"><strong>Chốt sổ (một đợt)</strong>Nháp root → MetaMask ký → confirm; ZIP theo chi nhánh</div>
+    <div class="flow-step"><strong>UC-5 Tạo proof</strong>Trong trình duyệt người dân; secret không rời máy</div>
+    <div class="flow-step"><strong>UC-6 Kiểm proof</strong>Bốn luật theo thứ tự + contract + chuỗi cơ quan phát hành</div>
+  </div>
+
+  <ul>
+    <li><strong>Ba thao tác ghi, không hơn (D83):</strong> cấp mới, chuyển nhượng, thu hồi. Cấp đổi, tách, hợp thửa, kết quả toà án là <em>thu hồi sổ cũ + cấp sổ mới với <code>propertyId</code> mới</em>; sổ mới khai nó thay cho sổ nào (<code>supersedesPropertyIds</code>), nên lịch sử mảnh đất không đứt (D90).</li>
+    <li><strong>Sổ nằm ở đâu:</strong> hồ sơ đầy đủ nằm trong Postgres của cơ quan. Trên chain chỉ có một số 32 byte: root của cây Merkle độ sâu 24. Mỗi giấy là một lá, vị trí lá = <code>propertyId</code> (D41). Lá = Poseidon của 7 trường, trong đó có băm phần thông tin in trên giấy (<code>offchainHash</code>, D36).</li>
+    <li><strong>Chủ sở hữu:</strong> không có tên trong cây, chỉ có <code>ownerCommitment = Poseidon(ownerSecret)</code>. Ai giữ <code>secret.json</code> thì chứng minh được mình là chủ.</li>
+    <li><strong>Đợt vào sổ:</strong> backend tính trước root của cả hàng chờ (nháp, chưa ghi gì) → ví cán bộ ký → backend đọc lại root trên chain rồi mới ghi chủ mới, lịch sử và ZIP (D43). Backend không giữ khoá nào ghi được lên chain. Mỗi lần đổi root, mọi Merkle path cũ hết hạn, nên người dân luôn xin path mới trước khi tạo proof.</li>
+    <li><strong>Ba loại proof:</strong> <em>ownership</em> (tôi là chủ của một lá trong root hiện hành); <em>mortgage / clean-title</em> (thêm: không bị thế chấp, còn ít nhất N năm; ngày hết hạn và tình trạng thật không lộ); <em>transfer</em> (ở quầy: lá mới chỉ khác lá cũ ở chủ).</li>
+    <li><strong>Bốn luật kiểm proof, đúng thứ tự (D33):</strong> tươi dưới 10 phút (<code>StaleTimestamp</code>) → đúng mật mã (<code>InvalidProof</code>) → đúng root hiện hành (<code>RootMismatch</code>) → có xác nhận tình trạng còn hạn (<code>AttestationExpired</code>/<code>InvalidAttestation</code>). Contract và UC-6 áp cùng bốn luật.</li>
+    <li><strong>Xác nhận tình trạng (D82):</strong> trước khi tạo proof, trình duyệt xin backend một chữ ký EIP-712 "thửa này không có thủ tục đang mở", hạn 10 phút. Có hồ sơ chuyển nhượng/thu hồi đang mở thì backend từ chối (409). Không cần giao dịch on-chain nào cho từng hồ sơ.</li>
+    <li><strong>Thu hồi:</strong> lá bị gỡ khỏi cây → không còn path → không proof nào tạo được. Bitmap <code>isRevoked</code> và mã lý do trên chain chỉ để công khai kiểm tra (D45, D91).</li>
+    <li><strong>41 đơn vị (D85–D86):</strong> trung tâm (HQ, CS2, CS3) nhập, cấp, chốt sổ; 38 chi nhánh chỉ chuyển nhượng và thu hồi trên địa bàn mình.</li>
+  </ul>
+
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Trên giao diện</th><th>Trong code</th><th>Trong thesis</th></tr></thead>
+      <tbody>
+        <tr><td>Đợt vào sổ, Chốt sổ</td><td><code>ChangeSet</code>, <code>createDraft</code> / <code>confirm</code></td><td>publishing round</td></tr>
+        <tr><td>Đề nghị cấp</td><td><code>IssuanceRequest</code> (READY)</td><td>issuance request</td></tr>
+        <tr><td>Quầy chuyển nhượng</td><td><code>TransfersService</code> preview / submit / approve</td><td>transfer counter</td></tr>
+        <tr><td>Xác nhận tình trạng</td><td><code>AttestationService</code>, EIP-712 <code>StatusAttestation</code></td><td>status attestation</td></tr>
+        <tr><td>Lá, gốc, phiên bản gốc</td><td>leaf, <code>latestRoot</code>, <code>rootVersion</code></td><td>leaf, root, root version</td></tr>
+        <tr><td>Hồ sơ các đợt vào sổ (ZIP)</td><td><code>ChangeSetArchive</code> theo chi nhánh</td><td>per-branch archive</td></tr>
+        <tr><td>Lịch sử mảnh đất</td><td><code>PropertyLineage</code>, <code>/records/:id/lineage</code></td><td>certificate lineage</td></tr>
+        <tr><td>Ngõ cụt "đang có thủ tục"</td><td><code>procedure-open</code></td><td>open-procedure dead end</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="con-lai">1. Đã Có Số Và Còn Phải Làm Tay</h2>
+  <div class="callout callout-success">
+    <div class="callout-title">Đã đo tự động (xem README.md và báo cáo HTML cùng thư mục)</div>
+    <p>Test, constraint, prove/verify trong Node, gas từng thao tác, một tháng ở 4,5 triệu giấy trên Hardhat, 5 ngày thật trên Sepolia, tải route proof và xác nhận tình trạng, kiểm đúng đắn cây ở 4,5 triệu (A2), tách thời gian tạo nháp (A3), archive theo 38 chi nhánh (A1), độc lập với cỡ sổ (A4), tốc độ import (A5), các case tấn công chạy được bằng CLI (A6).</p>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead><tr><th class="th-before">#</th><th>Việc</th><th>Vì sao máy không làm thay được</th><th>Mục</th></tr></thead>
+      <tbody>
+        <tr><td class="todo-id">M1</td><td>Chạy portal trên local theo <code>PHASE_10_MANUAL_TEST.md</code>, xen các bước resident của <code>PHASE_9_MANUAL_TEST.md</code></td><td>MetaMask ký từng đợt; ba profile trình duyệt</td><td>3</td></tr>
+        <tr><td class="todo-id">M2</td><td>Lặp lại phần chính trên Sepolia (<code>DEMO_SEPOLIA.md</code> §1–8)</td><td>Ví thật, ETH thật, Etherscan</td><td>6</td></tr>
+        <tr><td class="todo-id">M3</td><td>Chụp 12 ảnh cho Chương 5 + Etherscan + tab Network</td><td>Cần màn hình thật</td><td>7</td></tr>
+        <tr><td class="todo-id">M4</td><td>Bấm giờ tạo và kiểm proof trong trình duyệt</td><td>Trình duyệt thật, hai loại trình duyệt</td><td>4</td></tr>
+        <tr><td class="todo-id">M5</td><td>Kiểm tab Network: secret không rời máy</td><td>Cần DevTools</td><td>5</td></tr>
+        <tr><td class="todo-id">M6</td><td>Xem các case tấn công trên giao diện (thông báo, ngõ cụt)</td><td>Máy đã chứng minh bằng API/contract; còn thiếu ảnh và trải nghiệm</td><td>8</td></tr>
+        <tr><td class="todo-id">M7</td><td>Link báo cho ước tính TP.HCM; sửa câu "tested end to end"</td><td>Quyết định của bạn</td><td>9</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="chuan-bi">2. Chuẩn Bị Một Lần (Hardhat Local)</h2>
+  <p>Theo <code>PHASE_10_MANUAL_TEST.md</code> §1.1–1.4. Những điểm dễ vấp:</p>
+  <ul>
+    <li><strong>Dùng DB riêng cho lượt này</strong>, đừng dùng DB bench; <code>prisma migrate reset</code> ở §1.1 xoá DB <code>land_registry</code> mặc định.</li>
+    <li><strong>Không chạy <code>circuits:setup</code></strong>; chỉ <code>circuits:sync-frontend</code>.</li>
+    <li><strong>Lưu khoá CN01 và CN02</strong> khi <code>seed:land-offices</code> in ra, ở ngoài repo.</li>
+    <li><code>web-app/backend/.env</code> khi chạy local: <code>AUTHORITY_PRIVATE_KEY</code> = khoá test Hardhat #0, <code>ATTESTER_PRIVATE_KEY</code> để trống hoặc khoá Hardhat #1. Nếu <code>.env</code> đang trỏ ví Sepolia thì backend báo "identity anchor mismatch" và receipt trượt mắt xích D30, đúng lỗi đợt đo tự động đã gặp.</li>
+    <li><strong>Node để yên quá 10 phút thì <code>block.timestamp</code> đứng im</strong> → phê duyệt báo <code>StaleTimestamp</code>; đào một block (<code>evm_mine</code>, lệnh ở PHASE_10 §0c).</li>
+    <li><strong>Cùng nguyên nhân, kiểm on-chain ở UC-6 ngay sau khi tạo proof có thể báo <code>InvalidAttestation</code></strong> dù mọi thứ đúng (xem mục 8). Trên Hardhat, đào một block rồi kiểm lại; đừng hiểu nhầm là tấn công.</li>
+    <li><strong><code>.env</code> gốc có thể đặt <code>ATTESTER_ADDRESS</code> của Sepolia.</strong> Khi đó <code>deploy:localhost</code> cấp quyền attester sai địa chỉ, mọi proof ownership/mortgage bị <code>InvalidAttestation</code>, và backend báo ngay lúc khởi động "attester … does NOT hold ATTESTER_ROLE". Bỏ biến đó (hoặc đặt địa chỉ Hardhat #1) trước khi deploy local.</li>
+    <li><strong>MetaMask nhớ nonce</strong> của node cũ: Settings → Advanced → Clear activity tab data sau mỗi lần bật lại node.</li>
+    <li>Ba profile Chrome: CN01, CN02, TT (có MetaMask). Mỗi ảnh phải thấy dòng "Đơn vị: …".</li>
+    <li>ZIP chứa <code>secret.json</code>: giải nén ra ngoài repo (ví dụ <code>D:\thesis\phase10-demo\</code>).</li>
+  </ul>
+
+  <h2 id="lo-trinh">3. Lộ Trình: Một Lượt PHASE_10, Xen Phần Người Dân</h2>
+
+  <div class="step">
+    <div class="step-head">3.1 Nhập dữ liệu và đề nghị cấp (PHASE_10 Bước 1)</div>
+    <div class="step-row"><div class="step-label lbl-do">Làm</div><div class="step-body">Bước 1, profile TT, tệp <code>1-initial.csv</code>.</div></div>
+    <div class="step-row"><div class="step-label lbl-see">Đang thấy gì</div><div class="step-body"><ul><li>Dry-run kiểm từng dòng theo luật hiện hành (D35) mà không ghi gì (D52).</li><li>Phường/xã quyết định chi nhánh (D85): Sài Gòn → CN01, Thủ Đức → CN02.</li><li>"Đề nghị cấp" chỉ xếp hàng và sinh secret, chưa ký gì (D87).</li><li><code>curl … | grep -c ownerSecret</code> in 0: secret có trong DB nhưng không route nào trả ra (D50).</li></ul></div></div>
+    <div class="step-row"><div class="step-label lbl-note">Ghi lại</div><div class="step-body">Ảnh <code>fig:r-import</code> (kết quả dry-run có bảng "Theo chi nhánh").</div></div>
+    <div class="step-row"><div class="step-label lbl-use">Dùng ở</div><div class="step-body">Ch5 §5.3; Ch4 phần import.</div></div>
+  </div>
+
+  <div class="step">
+    <div class="step-head">3.2 Chốt sổ đợt #1, archive theo chi nhánh (PHASE_10 Bước 2)</div>
+    <div class="step-row"><div class="step-label lbl-do">Làm</div><div class="step-body">Bước 2.</div></div>
+    <div class="step-row"><div class="step-label lbl-see">Đang thấy gì</div><div class="step-body"><ul><li>Ba pha của một đợt: nháp (root tính trước) → MetaMask ký <code>publishRoot</code> → confirm; thanh trạng thái lên "Gốc v1".</li><li>Mỗi chi nhánh một ZIP. CN01 chỉ tải phần mình (thử tải phần CN02 → 403 <code>OutsideOfficeArea</code>); trung tâm tải được mọi phần, được ghi "thay thế".</li></ul></div></div>
+    <div class="step-row"><div class="step-label lbl-note">Ghi lại</div><div class="step-body"><ul><li>Ảnh <code>fig:r-round</code>: popup MetaMask và dòng "Đợt vào sổ #1 đã công bố (v1)".</li><li>Ảnh <code>fig:r-archive</code>: hai dòng CN01, CN02.</li><li>Số: gas đợt #1 (cột Gas ở Điều hành); thời gian bấm "Tạo đợt vào sổ" → thấy nháp.</li></ul></div></div>
+    <div class="step-row"><div class="step-label lbl-use">Dùng ở</div><div class="step-body">Ch5 §5.3; <code>tab:gas</code> (đối chiếu <code>publishRoot</code> lần đầu 115.651 gas).</div></div>
+  </div>
+
+  <div class="step">
+    <div class="step-head">3.3 Người dân tạo và kiểm proof (PHASE_9 §3.1–3.6, bundle đợt #1)</div>
+    <div class="step-row"><div class="step-label lbl-do">Làm</div><div class="step-body"><ul><li><code>/vi/resident/lookup</code> với 1001.</li><li><code>/vi/resident/proof</code> với <code>round-1/1001/</code>: ownership, rồi mortgage ngưỡng 5 năm.</li><li><code>/vi/resident/verify</code>: tab thông thường, rồi tab "Thẩm tra cơ quan phát hành" với <code>receipt.json</code>.</li></ul></div></div>
+    <div class="step-row"><div class="step-label lbl-see">Đang thấy gì</div><div class="step-body"><ul><li>Trang proof tự xin Merkle path mới và xác nhận tình trạng, rồi tạo proof trong worker của trình duyệt.</li><li>Panel kết quả chia "đã tiết lộ" và "không bao giờ tiết lộ"; với mortgage, ngày hết hạn và tình trạng thế chấp phải ở cột "không bao giờ tiết lộ".</li><li>Năm kiểm tra theo thứ tự: tươi, mật mã, khớp root, xác nhận tình trạng, contract.</li><li>Chuỗi D30 bốn mắt xích: CA gốc → chứng thư cơ quan → chữ ký địa chỉ ví → anchor on-chain.</li></ul></div></div>
+    <div class="step-row"><div class="step-label lbl-note">Ghi lại</div><div class="step-body"><ul><li>Ảnh <code>fig:r-prove</code> (loại proof, ngưỡng năm, thời gian) và <code>fig:r-verify-ok</code> (năm dấu xanh + chuỗi cơ quan).</li><li>Bấm giờ theo mục 4; kiểm Network theo mục 5.</li></ul></div></div>
+    <div class="step-row"><div class="step-label lbl-use">Dùng ở</div><div class="step-body">Ch5 §5.3–5.5; <code>tab:circuit-cost</code> cột browser.</div></div>
+  </div>
+
+  <div class="step">
+    <div class="step-head">3.4 Quầy chuyển nhượng và ràng buộc địa bàn (PHASE_10 Bước 3)</div>
+    <div class="step-row"><div class="step-label lbl-do">Làm</div><div class="step-body">Bước 3: CN02 thử chuyển nhượng 1001 (bị chặn), rồi CN01 làm thật. <strong>Chưa phê duyệt.</strong></div></div>
+    <div class="step-row"><div class="step-label lbl-see">Đang thấy gì</div><div class="step-body"><ul><li>Chi nhánh chỉ làm trên địa bàn mình (D86).</li><li>Secret của người bán chỉ dùng trong trình duyệt cán bộ để tạo transfer proof, không gửi lên backend; secret người mua do backend sinh ở preview (D77).</li><li>Không có chữ ký ví ở quầy: hồ sơ đang mở chính là cái khoá (D80, D82).</li></ul></div></div>
+    <div class="step-row"><div class="step-label lbl-note">Ghi lại</div><div class="step-body"><ul><li>Ảnh <code>fig:r-scope</code> và <code>fig:r-counter</code>.</li><li>Số: thời gian "Đang tạo bằng chứng chuyển nhượng…" (transfer proof trong browser).</li><li>Kiểm Network ở quầy (mục 5).</li></ul></div></div>
+    <div class="step-row"><div class="step-label lbl-use">Dùng ở</div><div class="step-body">Ch5 §5.3–5.4. Thesis phải nói rõ: ở quầy, secret người bán đi qua máy của cơ quan dù không tới backend.</div></div>
+  </div>
+
+  <div class="step">
+    <div class="step-head">3.5 Cửa sổ tấn công: bán hai lần trong lúc chờ (case a, sau Bước 3)</div>
+    <div class="step-row"><div class="step-label lbl-do">Làm</div><div class="step-body"><ul><li>1001 đang có hồ sơ PENDING: người bán mở <code>/vi/resident/proof</code> với <code>round-1/1001/</code>.</li><li>Chạy <code>proof:bodies</code> với bundle đó, dán <code>mortgage.verify.json</code> vào <code>/vi/resident/verify</code> (PHASE_9 §3.10.1).</li></ul></div></div>
+    <div class="step-row"><div class="step-label lbl-see">Đang thấy gì</div><div class="step-body"><ul><li>UC-5 dừng ở ngõ cụt "Giấy chứng nhận đang có thủ tục chưa hoàn tất": backend từ chối xác nhận tình trạng.</li><li>Body tạo bằng CLI không có xác nhận → UC-6 đỏ ở bước 4 (<code>InvalidAttestation</code>); contract cũng từ chối.</li></ul></div></div>
+    <div class="step-row"><div class="step-label lbl-note">Ghi lại</div><div class="step-body">Ảnh <code>fig:r-attack-window</code> (ngõ cụt ở UC-5 + bước 4 đỏ ở UC-6).</div></div>
+    <div class="step-row"><div class="step-label lbl-use">Dùng ở</div><div class="step-body">Ch5 §5.9 (<code>tab:attacks</code>); Ch3 phần xác nhận tình trạng.</div></div>
+  </div>
+
+  <div class="step">
+    <div class="step-head">3.6 Thu hồi ở chi nhánh, cảnh báo, sổ thay thế (PHASE_10 Bước 4–6)</div>
+    <div class="step-row"><div class="step-label lbl-do">Làm</div><div class="step-body">Bước 4 (CN01 thu hồi 1003, thử các lỗi địa bàn/xung đột), Bước 5 (cảnh báo rồi phê duyệt), Bước 6 (luật sổ thay thế). Case (b) làm như mục 3.5 với 1003.</div></div>
+    <div class="step-row"><div class="step-label lbl-see">Đang thấy gì</div><div class="step-body"><ul><li>Lý do thu hồi lên chain chỉ là mã 1–5 và băm văn bản; văn bản ở lại DB (D45).</li><li>Một thửa chỉ có một thủ tục mở (D80).</li><li>Điều hành cảnh báo nếu chốt sổ lúc này thì hồ sơ chờ duyệt sẽ hỏng (D89).</li><li>Sổ thay thế chỉ được đề nghị cấp khi sổ cũ đã thật sự bị thu hồi (D90).</li></ul></div></div>
+    <div class="step-row"><div class="step-label lbl-note">Ghi lại</div><div class="step-body">Ảnh <code>fig:r-operations</code> (Điều hành có cảnh báo và hàng chờ theo đơn vị).</div></div>
+    <div class="step-row"><div class="step-label lbl-use">Dùng ở</div><div class="step-body">Ch5 §5.3, §5.9.</div></div>
+  </div>
+
+  <div class="step">
+    <div class="step-head">3.7 Chốt sổ đợt #2: chuyển nhượng + thu hồi cùng một root (PHASE_10 Bước 7)</div>
+    <div class="step-row"><div class="step-label lbl-do">Làm</div><div class="step-body">Bước 7. MetaMask phải hiện <code>publishRootWithRevocations</code>. Thêm PHASE_9 §3.7: verify lại proof cũ của 1003.</div></div>
+    <div class="step-row"><div class="step-label lbl-see">Đang thấy gì</div><div class="step-body"><ul><li>Chuyển nhượng và thu hồi vào sổ dưới một root, cùng <code>rootVersion</code> (D84).</li><li>ZIP của đợt chứa bộ hồ sơ của người mua.</li><li>Người bán cũ: "Giấy chứng nhận không còn hiệu lực" (lá đã đổi chủ).</li><li>Chủ 1003: "đã bị thu hồi"; <code>GET /api/proof/1003</code> trả 410; proof cũ ra <code>RootMismatch</code>.</li><li><code>/resident/lookup</code> có sự kiện kèm phiên bản gốc và mã giao dịch, không có văn bản lý do.</li></ul></div></div>
+    <div class="step-row"><div class="step-label lbl-note">Ghi lại</div><div class="step-body">Ảnh <code>fig:r-superseded</code>, <code>fig:r-revoked</code>; gas đợt #2.</div></div>
+    <div class="step-row"><div class="step-label lbl-use">Dùng ở</div><div class="step-body">Ch5 §5.3, §5.9.</div></div>
+  </div>
+
+  <div class="step">
+    <div class="step-head">3.8 Cấp lại, tạm giữ, tách thửa, archive hết hạn (PHASE_10 Bước 8–9b)</div>
+    <div class="step-row"><div class="step-label lbl-do">Làm</div><div class="step-body">Bước 8, 9, 9b (Bước 10 tuỳ chọn).</div></div>
+    <div class="step-row"><div class="step-label lbl-see">Đang thấy gì</div><div class="step-body"><ul><li>Sổ C′ (1101) mang mã mới, thay cho 1003.</li><li>Tạm giữ loại mục khỏi đợt nhưng thửa vẫn bị khoá; nháp đã tạo thì bất biến (<code>ItemInOpenDraft</code>).</li><li>Tách thửa vẫn là thu hồi + hai lần cấp mới.</li><li>Archive hết hạn chỉ đòi tick, không khoá Chốt sổ.</li></ul></div></div>
+    <div class="step-row"><div class="step-label lbl-note">Ghi lại</div><div class="step-body">Ảnh <code>fig:r-lineage</code> (tra 1101: 1003 → 1101); gas đợt #3, #4; tổng chữ ký MetaMask (kỳ vọng 4).</div></div>
+    <div class="step-row"><div class="step-label lbl-use">Dùng ở</div><div class="step-body">Ch5 §5.3; Ch3 phần lineage.</div></div>
+  </div>
+
+  <div class="callout callout-purple">
+    <div class="callout-title">3.9 Hai case còn lại trên giao diện</div>
+    <ul>
+      <li><strong>(j) Ví không có quyền publish:</strong> ở trang Chốt sổ, đổi MetaMask sang tài khoản Hardhat khác (#2) → portal chặn trước khi mở ví (thiếu <code>STATE_AUTHORITY_ROLE</code>). Chụp ảnh.</li>
+      <li><strong>(l) Từ chối hồ sơ là mở khoá:</strong> PHASE_8 §3.8 bước 6 hoặc DEMO_SEPOLIA §8.7: nộp hồ sơ cho 1002, UC-5 báo ngõ cụt, bấm Từ chối → chủ tạo proof lại được ngay, không cần giao dịch nào.</li>
+    </ul>
+  </div>
+
+  <h2 id="bam-gio">4. Bấm Giờ Trong Trình Duyệt (M4)</h2>
+  <p>Số trong Node (12/11): ownership p50 783 ms, mortgage 680 ms, transfer 1.143 ms; verify 13–16 ms. Trình duyệt chậm hơn, và lần đầu còn tải zkey (6,2 / 6,2 / 12,3 MB).</p>
+  <ol>
+    <li>Ghi máy, trình duyệt và phiên bản.</li>
+    <li><strong>Lần đầu:</strong> DevTools → Network → bật "Disable cache", tải lại trang, tạo proof. Thời gian tải zkey đọc ở dòng <code>*.zkey</code>; thời gian proof đọc trên màn hình kết quả.</li>
+    <li><strong>Các lần sau:</strong> tắt "Disable cache", tạo thêm 4 lần, lấy trung vị.</li>
+    <li>Làm trên Chrome và Firefox (hoặc Edge).</li>
+  </ol>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Đo</th><th>Chrome: lần đầu</th><th>Chrome: trung vị</th><th>Firefox/Edge: lần đầu</th><th>Firefox/Edge: trung vị</th></tr></thead>
+      <tbody>
+        <tr><td>UC-5 ownership</td><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>
+        <tr><td>UC-5 mortgage (ngưỡng 5 năm)</td><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>
+        <tr><td>Quầy: transfer proof</td><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>
+        <tr><td>UC-6 verify off-chain (gồm tải vkey)</td><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>
+        <tr><td>UC-6 <code>eth_call</code> verify on-chain</td><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>
+        <tr><td>Tải <code>ownership.zkey</code> / <code>mortgage.zkey</code> / <code>transfer.zkey</code></td><td class="blank"></td><td>—</td><td class="blank"></td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="network">5. Kiểm Tab Network (M5)</h2>
+  <div class="callout">
+    <div class="callout-title">Đây là bằng chứng cho câu quan trọng nhất về quyền riêng tư: secret và hồ sơ không rời máy người dân</div>
+    <ol>
+      <li><strong>Trang resident</strong> (PHASE_9 §3.2 "Bước DoD"): bật Preserve log, xoá log, làm lại luồng tạo proof. Chỉ được có <code>GET /api/public/config</code>, <code>GET /api/proof/&lt;id&gt;</code>, <code>GET /api/proof/&lt;id&gt;/attestation</code>, tệp <code>/circuits/…</code> và tài nguyên Next; không POST nào. Ô lọc: giá trị <code>ownerSecret</code> → 0 kết quả; giá trị <code>area</code> và chuỗi địa chỉ → 0 kết quả.</li>
+      <li><strong>Quầy</strong> (PHASE_10 Bước 3.4, PHASE_8 §3.4.5): chỉ <code>POST /api/transfers/preview</code> và <code>POST /api/transfers</code>. <code>ownerSecret</code> người bán → 0 kết quả. Secret người mua có trong response preview và body submit: đó là thiết kế (D77).</li>
+      <li>Chụp ô lọc với 0 kết quả, cho cả hai trang.</li>
+    </ol>
+  </div>
+
+  <h2 id="sepolia">6. Sepolia (M2)</h2>
+  <p>Theo <code>DEMO_SEPOLIA.md</code> §1–8 với <code>demoImport.csv</code> (thửa 201–210). Khác local ở ba điểm:</p>
+  <ul>
+    <li><strong>Mỗi lần ký phải chờ block</strong> (~12 s; đợt đo tự động thấy 17–42 s).</li>
+    <li><strong>Có Etherscan:</strong> chụp giao dịch của đợt có thu hồi (thấy các event <code>PropertyRevoked</code>) và trang contract <code>RootRegistry</code>.</li>
+    <li><strong>Contract:</strong> nếu dùng lại contract 26/10, các id 201–210 phải chưa từng bị thu hồi trên đó (nếu không: <code>AlreadyRevoked</code>); hoặc deploy mới. Ví deployer còn ~7,1 ETH; deploy mới tốn ~21 triệu gas (~0,02 ETH ở tip 1 gwei); các đợt demo nhỏ (<code>publishRoot</code> lần đầu 461.531 gas, mỗi thu hồi ~114 nghìn).</li>
+  </ul>
+  <p>Ghi lại: tx hash từng đợt, <code>rootVersion</code>, link Etherscan, thời gian chờ block, phí từng đợt.</p>
+
+  <h2 id="anh">7. Danh Sách Ảnh (M3)</h2>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Label</th><th>Chụp ở mục</th><th>Phải thấy</th></tr></thead>
+      <tbody>
+        <tr><td><code>fig:r-import</code></td><td>3.1</td><td>số dòng hợp lệ / lỗi, bảng theo chi nhánh</td></tr>
+        <tr><td><code>fig:r-round</code></td><td>3.2</td><td>popup MetaMask <code>publishRoot</code>, "Đợt vào sổ #1 đã công bố (v1)"</td></tr>
+        <tr><td><code>fig:r-archive</code></td><td>3.2</td><td>mỗi chi nhánh một ZIP; chi nhánh chỉ thấy phần mình</td></tr>
+        <tr><td><code>fig:r-prove</code></td><td>3.3</td><td>loại proof, ngưỡng năm, thời gian tạo proof</td></tr>
+        <tr><td><code>fig:r-verify-ok</code></td><td>3.3</td><td>năm dấu xanh, chuỗi cơ quan phát hành</td></tr>
+        <tr><td><code>fig:r-counter</code></td><td>3.4</td><td>hồ sơ người bán hợp lệ, nộp, hàng chờ</td></tr>
+        <tr><td><code>fig:r-scope</code></td><td>3.4</td><td>lỗi ngoài địa bàn</td></tr>
+        <tr><td><code>fig:r-attack-window</code></td><td>3.5</td><td>ngõ cụt <code>procedure-open</code>; bước 4 đỏ (<code>InvalidAttestation</code>)</td></tr>
+        <tr><td><code>fig:r-operations</code></td><td>3.6</td><td>trạng thái sổ, cảnh báo, hàng chờ theo đơn vị</td></tr>
+        <tr><td><code>fig:r-superseded</code></td><td>3.7</td><td>"Giấy chứng nhận không còn hiệu lực"</td></tr>
+        <tr><td><code>fig:r-revoked</code></td><td>3.7</td><td>410 / "đã bị thu hồi"; sự kiện thu hồi có mã lý do, <code>rootVersion</code>, tx hash</td></tr>
+        <tr><td><code>fig:r-lineage</code></td><td>3.8</td><td>dòng thời gian sổ cũ → sổ mới</td></tr>
+        <tr><td>(thêm) Etherscan</td><td>6</td><td>giao dịch có event <code>PropertyRevoked</code>; trang <code>RootRegistry</code></td></tr>
+        <tr><td>(thêm) Network</td><td>5</td><td>ô lọc <code>ownerSecret</code> = 0 kết quả</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="tan-cong">8. Case Tấn Công: Đã Chứng Minh Tự Động Và Phần Còn Xem Trên Giao Diện</h2>
+  <p>Đợt A6 (15/11) đã chạy các case này qua API, CLI và gọi thẳng contract, trên registry 10 thửa ở Hardhat; bằng chứng ở <code>data/a6-attacks/</code>. Phần còn lại cho bạn là <strong>nhìn và chụp</strong> chúng trên giao diện.</p>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Case</th><th>Cơ chế chặn</th><th class="th-after">Đã chứng minh tự động</th><th class="th-before">Còn xem trên giao diện</th></tr></thead>
+      <tbody>
+        <tr><td><strong>(a)</strong> Bán hai lần trong lúc chờ</td><td>Hồ sơ mở → backend không ký xác nhận</td><td><code>c-transfer-smoke.txt</code>: "seller attestation refused (409 ProcedureOpen)"</td><td>Mục 3.5, <code>fig:r-attack-window</code></td></tr>
+        <tr><td><strong>(b)</strong> Chủ bị thu hồi đem sổ đi vay</td><td>Như (a)</td><td><code>b-proof-bodies-open.txt</code> (bị từ chối); <code>b-verify-open.txt</code> (422 <code>InvalidAttestation</code>); <code>b-chain-open.txt</code> (contract <code>AttestationExpired</code>)</td><td>Mục 3.6</td></tr>
+        <tr><td><strong>(c)</strong> Chủ cũ sau đợt vào sổ</td><td>Lá đổi chủ → root mới; secret cũ không mở cam kết mới</td><td>Trước đợt: hợp lệ cả 5 bước; sau đợt: <code>RootMismatch</code> ở backend và contract; chủ cũ: lá đã đổi, prover dừng; người mua prove được (<code>c-*.txt</code>)</td><td>Mục 3.7, <code>fig:r-superseded</code></td></tr>
+        <tr><td><strong>(d)</strong> Thửa đã thu hồi</td><td>Lá bị gỡ khỏi cây</td><td><code>GET /api/proof/203</code> 410; <code>isRevoked(203) = true</code>; lịch sử REVOKED ở v3, mã lý do 1 + băm, không có văn bản; đợt 1 thu hồi 92.008 gas (<code>d-*.txt</code>)</td><td>Mục 3.7, <code>fig:r-revoked</code></td></tr>
+        <tr><td><strong>(e)</strong> Phát lại proof cũ</td><td>Luật tươi 10 phút</td><td>Backend <code>StaleTimestamp</code> (666 s) cả off-chain lẫn on-chain; contract <code>StaleTimestamp</code> (674 s); cùng proof lúc mới tạo thì contract nhận</td><td>UC-6 dán proof cũ (PHASE_9 §3.8)</td></tr>
+        <tr><td><strong>(f)</strong> Sửa hồ sơ trong receipt</td><td><code>offchainHash</code> trong lá</td><td><code>receipt:verify</code> hỏng đúng một mục "ALTERED", 9 mục khác xanh; <code>owner:smoke</code> dừng ở ràng buộc circuit (<code>f-tamper.txt</code>)</td><td>UC-5 ô toàn vẹn đỏ (PHASE_9 §3.4)</td></tr>
+        <tr><td><strong>(g)</strong> Cơ quan phát hành giả cùng tên</td><td>Chuỗi D30</td><td>Test frontend <code>issuer-chain.test.ts</code></td><td>UC-6 tab Thẩm tra (PHASE_9 §3.6)</td></tr>
+        <tr><td><strong>(h)</strong> Chi nhánh ngoài địa bàn</td><td>D86</td><td>Spec backend <code>office-scope.spec.ts</code></td><td>Mục 3.4, <code>fig:r-scope</code></td></tr>
+        <tr><td><strong>(i)</strong> Chuyển nhượng đất cộng đồng</td><td>Điều 39</td><td><span class="tag tag-amber">chưa có</span></td><td>DEMO_SEPOLIA §8.4 bước 4</td></tr>
+        <tr><td><strong>(j)</strong> Ví không có quyền publish</td><td><code>STATE_AUTHORITY_ROLE</code></td><td>Test contract "rejects a caller without STATE_AUTHORITY_ROLE"</td><td>Mục 3.9</td></tr>
+        <tr><td><strong>(k)</strong> Thu hồi hai lần</td><td><code>AlreadyRevoked</code></td><td>Test contract "rejects revoking the same property twice"</td><td>Không cần</td></tr>
+        <tr><td><strong>(l)</strong> Từ chối hồ sơ là mở khoá</td><td>Hồ sơ đóng → ký lại được</td><td><span class="tag tag-amber">chưa có</span></td><td>Mục 3.9</td></tr>
+        <tr><td><strong>(m)</strong> API công khai lộ hồ sơ</td><td>D50</td><td><code>data/attacks/m-public-api.txt</code></td><td>Không cần</td></tr>
+        <tr><td><strong>(n)</strong> Quét API</td><td>60 request/phút</td><td>70 request dồn → 60 × 200, 10 × 429 (<code>n-throttle.txt</code>)</td><td>Không cần</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout callout-warning">
+    <div class="callout-title">Phát hiện khi chạy A6: xác nhận tình trạng mới ký có thể bị contract từ chối trong khoảng một block</div>
+    <p>Backend đặt <code>expiresAt = giờ máy + 600 s</code>, đúng bằng trần; contract chỉ nhận khi <code>expiresAt ≤ block.timestamp + 600</code>. Khi block mới nhất cũ hơn lúc ký, contract báo <code>InvalidAttestation</code> dù chữ ký đúng (backend nhận, contract từ chối; đào thêm một block thì contract nhận). Trên Hardhat, cửa sổ kéo dài tới giao dịch kế tiếp; trên Sepolia/mainnet tối đa khoảng một block (~12 s) cộng độ lệch đồng hồ server. Hướng sửa: ký với hạn ngắn hơn trần một chút, hoặc cho contract một khoảng lệch nhỏ. Code chưa sửa.</p>
+  </div>
+
+  <h2 id="thesis">9. Phía Thesis (M7)</h2>
+  <ul>
+    <li>Gửi link các bài báo cho hai ước tính TP.HCM (2,5 triệu thửa; 4,5 triệu giấy). Trong thesis luôn viết là ước tính.</li>
+    <li>Câu "tested end to end" trong abstract chỉ giữ sau khi xong M1 và M2.</li>
+    <li>Mỗi số trích trong Ch5 cần <code>% src:</code> trỏ vào file trong <code>benchmarks/2026-11-12-hcmc-4.5M-final/data/</code>.</li>
+  </ul>
+
+  <h2 id="ghi-so">10. Bảng Ghi Số (Điền Khi Làm)</h2>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Đo</th><th>Giá trị</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td>Gas đợt #1 (4 cấp mới, local)</td><td class="blank"></td><td></td></tr>
+        <tr><td>Gas đợt #2 (1 chuyển nhượng + 1 thu hồi)</td><td class="blank"></td><td></td></tr>
+        <tr><td>Gas đợt #3 (1 cấp mới + 1 thu hồi)</td><td class="blank"></td><td></td></tr>
+        <tr><td>Gas đợt #4 (2 cấp mới)</td><td class="blank"></td><td></td></tr>
+        <tr><td>Số chữ ký MetaMask cả kịch bản</td><td class="blank"></td><td>kỳ vọng 4 (5–6 nếu làm Bước 10)</td></tr>
+        <tr><td>Bấm "Tạo đợt vào sổ" → thấy nháp</td><td class="blank"></td><td></td></tr>
+        <tr><td>Thời gian <code>seed:land-offices</code></td><td class="blank"></td><td></td></tr>
+        <tr><td>Thời gian proof trong browser</td><td class="blank"></td><td>bảng mục 4</td></tr>
+        <tr><td>Sepolia: tx hash, <code>rootVersion</code>, phí từng đợt</td><td class="blank"></td><td>mục 6</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="don-dep">11. Dọn Dẹp Sau Khi Làm</h2>
+  <ul>
+    <li>Xoá thư mục giải nén ZIP (có <code>secret.json</code>).</li>
+    <li>Các DB bench trong Docker có thể xoá khi không cần chạy lại (README §11.3).</li>
+    <li>Trả <code>web-app/backend/.env</code> về cấu hình thường ngày nếu đã đổi khoá cho local.</li>
+  </ul>
+
+  <footer>Land Registry ZKP · Hướng dẫn việc thủ công, 15/11/2026 · Bản Markdown: <code>VIEC-THU-CONG.md</code> cùng thư mục</footer>
+
+</body>
+</html>

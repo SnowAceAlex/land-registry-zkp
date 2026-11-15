@@ -1,0 +1,19 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployedAt": "2026-11-12T13:47:25.322Z",
+  "deployer": "0xc128Eb26F177BB6a3b4374A715be350887ED7726",
+  "authority": {
+    "address": "0xc128Eb26F177BB6a3b4374A715be350887ED7726",
+    "orgName": "So Tai nguyen va Moi truong TP.HCM",
+    "instituteHash": "0x1f730914c2418f93d7466bfc23ec84f2790208f8c887355a7acaa798fa0ba603"
+  },
+  "attester": "0x55636981fA9f7b2c357025691C9a26B066dD25c8",
+  "contracts": {
+    "RootRegistry": "0xC7848D47591055d4FE93468b0e2Fb0590F8C91aa",
+    "Groth16VerifierOwnership": "0x79acBB25e71F921bF2A5Dbd3346dca770e3A3bB0",
+    "Groth16VerifierMortgage": "0x5fa24AC90c4F83e283F7B4FD75bE3a2C981eA91F",
+    "Groth16VerifierTransfer": "0x6eCD65DeE3985722756721B162136623dd1db8B9",
+    "LandRegistryVerifier": "0x0bE5EE780Cd46d8fB5449783D43067e7e35D4cD6"
+  }
+}

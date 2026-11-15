@@ -1,0 +1,12 @@
+{
+  "kind": "seed",
+  "note": "rows from the 12/11 seed run (interrupted by a machine shutdown during the tree build); tree rebuilt by tree:bootstrap on the same rows",
+  "treeDepth": 24,
+  "count": 4500000,
+  "layout": "scattered",
+  "rowsMs": 962100,
+  "bootstrapMs": 2112500,
+  "leaves": 4500000,
+  "nodes": 15750005,
+  "root": "1706580175563322711129566830727256786598295763933123925857710025217976589057"
+}

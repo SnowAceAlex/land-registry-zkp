@@ -1,0 +1,80 @@
+[
+ {
+  "day": 0,
+  "tx": "0x3a09b5cb42d62572eb5146c0254b902be09acd5c7ecbe3e5d94e146e4a62c785",
+  "block": 12119243,
+  "gasUsed": 461531,
+  "effectiveGasPriceWei": "1000034",
+  "baseFeeWei": "34",
+  "feeEth": 4.61546692054e-7,
+  "logs": 1,
+  "status": "0x1",
+  "blockGasUsed": 63560780,
+  "blockGasLimit": 200000000
+ },
+ {
+  "day": 1,
+  "tx": "0xedc28857112c0cd69205b12778592f21e0ee6df22e767f2f1dc39187bb272568",
+  "block": 12119252,
+  "gasUsed": 108460895,
+  "effectiveGasPriceWei": "1000031",
+  "baseFeeWei": "31",
+  "feeEth": 0.000108464257287745,
+  "logs": 951,
+  "status": "0x1",
+  "blockGasUsed": 154770210,
+  "blockGasLimit": 200000000
+ },
+ {
+  "day": 2,
+  "tx": "0x4b919c6c8bd8b753238f7644b8608c3ddf50c4962c46c295be0223786f4cd997",
+  "block": 12119286,
+  "gasUsed": 108449483,
+  "effectiveGasPriceWei": "999999999",
+  "baseFeeWei": "30",
+  "feeEth": 0.10844948289155051,
+  "logs": 951,
+  "status": "0x1",
+  "blockGasUsed": 144236160,
+  "blockGasLimit": 200000000
+ },
+ {
+  "day": 3,
+  "tx": "0xa09198eca07271e84512b0d47f8da91b614f64d395833ad3d3b41ff40c935fd9",
+  "block": 12119331,
+  "gasUsed": 108460883,
+  "effectiveGasPriceWei": "1000000000",
+  "baseFeeWei": "39",
+  "feeEth": 0.108460883,
+  "logs": 951,
+  "status": "0x1",
+  "blockGasUsed": 110002410,
+  "blockGasLimit": 200000000
+ },
+ {
+  "day": 4,
+  "tx": "0xd15945c70a9c91d7a0ccb1ca236b35f3c3899566b5d65f5844ec7e0491c5d529",
+  "block": 12119376,
+  "gasUsed": 108460907,
+  "effectiveGasPriceWei": "100000033",
+  "baseFeeWei": "33",
+  "feeEth": 0.010846094279209932,
+  "logs": 951,
+  "status": "0x1",
+  "blockGasUsed": 108301050,
+  "blockGasLimit": 200000000
+ },
+ {
+  "day": 5,
+  "tx": "0xd49ffd472d56b712c8774facafc052754b0a20c1ea1256518eb871d07a40a2cb",
+  "block": 12119420,
+  "gasUsed": 108460883,
+  "effectiveGasPriceWei": "1000000000",
+  "baseFeeWei": "35",
+  "feeEth": 0.108460883,
+  "logs": 951,
+  "status": "0x1",
+  "blockGasUsed": 114586290,
+  "blockGasLimit": 200000000
+ }
+]

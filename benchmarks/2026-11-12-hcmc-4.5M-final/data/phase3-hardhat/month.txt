@@ -1,0 +1,75 @@
+$ ts-node scripts/bench-replay-month.ts
+  imported 20890 replacement plots (REISSUE)
+  replaying 65,868 transfers + 20,890 revocations over 22 working day(s), signing via sign:root
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 1/22: 2994 transfer, 950 revoke, 0 issue in 2 round(s) (0 deferred) — queue 14327ms, draft 10794ms, confirm 372161ms, gas 24804536
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 2/22: 2994 transfer, 950 revoke, 950 issue in 2 round(s) (0 deferred) — queue 21425ms, draft 20276ms, confirm 479424ms, gas 24793148
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 3/22: 2994 transfer, 950 revoke, 950 issue in 2 round(s) (0 deferred) — queue 15678ms, draft 19092ms, confirm 479665ms, gas 24804560
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 4/22: 2994 transfer, 950 revoke, 950 issue in 2 round(s) (0 deferred) — queue 16868ms, draft 21248ms, confirm 487612ms, gas 24804524
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 5/22: 2994 transfer, 950 revoke, 950 issue in 2 round(s) (0 deferred) — queue 18103ms, draft 15774ms, confirm 490870ms, gas 24804524
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 6/22: 2994 transfer, 950 revoke, 950 issue in 2 round(s) (0 deferred) — queue 22900ms, draft 18491ms, confirm 487167ms, gas 24804524
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 7/22: 2994 transfer, 950 revoke, 950 issue in 2 round(s) (0 deferred) — queue 18717ms, draft 20141ms, confirm 484770ms, gas 24804548
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 8/22: 2994 transfer, 950 revoke, 950 issue in 2 round(s) (0 deferred) — queue 17742ms, draft 15611ms, confirm 477245ms, gas 24804524
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 9/22: 2994 transfer, 950 revoke, 950 issue in 2 round(s) (0 deferred) — queue 20253ms, draft 16325ms, confirm 481507ms, gas 24804536
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 10/22: 2994 transfer, 950 revoke, 950 issue in 2 round(s) (0 deferred) — queue 20429ms, draft 17283ms, confirm 485969ms, gas 24804560
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 11/22: 2994 transfer, 950 revoke, 950 issue in 2 round(s) (0 deferred) — queue 19330ms, draft 17296ms, confirm 483345ms, gas 24804548
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 12/22: 2994 transfer, 950 revoke, 950 issue in 2 round(s) (0 deferred) — queue 22626ms, draft 15877ms, confirm 485365ms, gas 24793148
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 13/22: 2994 transfer, 949 revoke, 950 issue in 2 round(s) (0 deferred) — queue 19791ms, draft 21626ms, confirm 484571ms, gas 24778565
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 14/22: 2994 transfer, 949 revoke, 949 issue in 2 round(s) (0 deferred) — queue 14704ms, draft 15680ms, confirm 494166ms, gas 24778553
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 15/22: 2994 transfer, 949 revoke, 949 issue in 2 round(s) (0 deferred) — queue 16044ms, draft 16035ms, confirm 483560ms, gas 24778565
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 16/22: 2994 transfer, 949 revoke, 949 issue in 2 round(s) (0 deferred) — queue 21941ms, draft 15960ms, confirm 483159ms, gas 24778589
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 17/22: 2994 transfer, 949 revoke, 949 issue in 2 round(s) (0 deferred) — queue 29020ms, draft 15885ms, confirm 482335ms, gas 24778553
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 18/22: 2994 transfer, 949 revoke, 949 issue in 2 round(s) (0 deferred) — queue 22013ms, draft 21321ms, confirm 488109ms, gas 24778601
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 19/22: 2994 transfer, 949 revoke, 949 issue in 2 round(s) (0 deferred) — queue 23530ms, draft 17629ms, confirm 491141ms, gas 24767189
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 20/22: 2994 transfer, 949 revoke, 949 issue in 2 round(s) (0 deferred) — queue 24055ms, draft 21332ms, confirm 491976ms, gas 24778553
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 21/22: 2994 transfer, 949 revoke, 949 issue in 2 round(s) (0 deferred) — queue 24444ms, draft 16164ms, confirm 499267ms, gas 24778589
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 22/22: 2994 transfer, 949 revoke, 949 issue in 2 round(s) (0 deferred) — queue 24387ms, draft 16039ms, confirm 481737ms, gas 24778577
+
+  publishes : 22
+  total gas : 545,406,014
+  confirm   : p50 484770ms, max 499267ms
+  peak RSS  : 401 MB
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-12T10-22-56-614Z

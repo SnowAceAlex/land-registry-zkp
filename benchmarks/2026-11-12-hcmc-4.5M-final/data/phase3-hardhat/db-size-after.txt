@@ -1,0 +1,15 @@
+_prisma_migrations|32 kB
+administrative_units|40 kB
+change_set_archives|3210 MB
+change_sets|80 kB
+db|7178 MB
+issuance_requests|6336 kB
+land_offices|48 kB
+merkle_nodes|2146 MB
+merkle_roots|80 kB
+office_credentials|32 kB
+properties|1734 MB
+property_events|41 MB
+property_lineage|3216 kB
+revocations|6832 kB
+transfer_requests|23 MB

@@ -1,0 +1,6 @@
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+root      11702296860727049138302983784517888337400862820554383193698987101668478869142
+bytes32   0x19df43eaee06a266ae1c7a215bb6deaf3c50275c64b2b1e412592c92ff28de96
+version   1
+txHash    0x3a7b0f80d1e80a2680db4b7198597b09a7aa9cc0fdddedae4b024d4f6f13f453
+BENCH_RESULT {"txHash":"0x3a7b0f80d1e80a2680db4b7198597b09a7aa9cc0fdddedae4b024d4f6f13f453","gasUsed":"115651","blockNumber":8,"rootVersion":1}

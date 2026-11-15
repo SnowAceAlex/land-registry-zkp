@@ -1,0 +1,13 @@
+$ ts-node scripts/bench-replay-month.ts
+  imported 20890 replacement plots (REISSUE)
+  replaying 65,868 transfers + 20,890 revocations over 22 working day(s), signing via sign:root
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+$ hardhat run scripts/tools/signRoot.ts --network localhost
+  day 1/22: 2994 transfer, 950 revoke, 0 issue in 2 round(s) (0 deferred) — queue 20746ms, draft 22288ms, confirm 508692ms, gas 24804536
+  day 2: queued in 19891ms; stopping before the draft (STOP_BEFORE_DRAFT_DAY)
+
+  publishes : 1
+  total gas : 24,804,536
+  confirm   : p50 508692ms, max 508692ms
+  peak RSS  : 375 MB
+  report    : D:\thesis\land-registry-zkp\blockchain\bench\results\2026-11-15T05-46-12-471Z

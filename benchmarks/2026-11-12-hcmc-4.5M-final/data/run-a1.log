@@ -1,0 +1,7 @@
+[17:46:57] clone land_registry_bench_final -> land_registry_bench_final_a1
+[17:48:23] seed admin units + land offices
+[17:48:54] spread plots over the 38 branches
+[17:52:40] chain up, genesis 1706580175563322711129566830727256786598295763933123925857710025217976589057 (the office is not in the leaf, so the root is unchanged)
+[17:53:17] 3 working days
+[18:21:03] archive sizes
+[18:21:05] A1 DONE

@@ -1,0 +1,13 @@
+$ vitest run
+
+ RUN  v5.0.0 D:/thesis/land-registry-zkp/web-app/frontend
+
+
+ Test Files  43 passed (43)
+      Tests  401 passed (401)
+   Start at  13:47:21
+   Duration  10.10s (import 59%, tests 30%, transform 10%, worker 2%)
+
+    Isolate  43 workers spawned · ~813ms startup each (spawn + environment, per file)
+             at least ~1.52s faster with isolate: false — reuses workers across files instead of one per file
+

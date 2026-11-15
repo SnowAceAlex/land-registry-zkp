@@ -1,0 +1,11 @@
+[16:40:19] start a6
+[16:54:11] done a6
+[16:54:11] start a5
+[16:58:39] done a5
+[16:58:39] start a1
+[17:13:41] FAILED a1
+[17:13:41] RERUNS DONE
+[17:14:07] start a1 (attempt 3)
+[17:45:42] done a1
+[17:46:57] start a1 (attempt 4, hashed branches)
+[18:21:06] done a1

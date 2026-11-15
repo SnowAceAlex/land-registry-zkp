@@ -1,0 +1,4 @@
+$ ts-node scripts/seed-land-offices.ts
+Upserted 41 offices; assigned 168 communes.
+Properties without an office (address did not resolve): 4500000
+Store these keys now — only their hashes are kept.

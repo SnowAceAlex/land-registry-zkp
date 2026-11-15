@@ -1,0 +1,11 @@
+[16:54:12] template database: migrations + communes + offices
+rows=1000 mode=dry http_seconds=201 0.311013
+rows=1000 mode=commit http_seconds=201 0.707017
+rows=1000 in_db=1000 with_office=1000
+rows=10000 mode=dry http_seconds=201 3.519980
+rows=10000 mode=commit http_seconds=201 10.375876
+rows=10000 in_db=10000 with_office=10000
+rows=50000 mode=dry http_seconds=201 10.050580
+rows=50000 mode=commit http_seconds=201 108.651517
+rows=50000 in_db=50000 with_office=50000
+[16:58:38] A5 DONE

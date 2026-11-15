@@ -1,0 +1,2 @@
+{"valid":false,"reason":"InvalidAttestation","message":"A ownership proof must carry a well-formed status attestation (D82)"}
+HTTP 422

@@ -1,0 +1,15 @@
+$ ts-node scripts/tools/proofBodies.ts "C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\round1\\203" "C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\b-203"
+
+bundle:    C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\round1\\203
+property:  203
+refresh    source=nodes, root version 2 (receipt was v1)
+attestation REFUSED — the plot has an open procedure; bodies carry none (D82)
+ownership  proof generated in 1122 ms
+mortgage   proof generated in 714 ms
+
+Paste either file into POST /api/proof/verify → Try it out → Request body.
+Set "onChain": true in the body to also ask LandRegistryVerifier.
+⚠️  Valid for ~10 minutes (D26 freshness) — re-run this after that.
+
+  C:\Users\Snow_Ace\AppData\Local\Temp\claude\da715caac0ed30a3\30144b56-2a09-47bc-84cb-ca2980706a39\scratchpad\a6b\b-203\ownership.verify.json
+  C:\Users\Snow_Ace\AppData\Local\Temp\claude\da715caac0ed30a3\30144b56-2a09-47bc-84cb-ca2980706a39\scratchpad\a6b\b-203\mortgage.verify.json

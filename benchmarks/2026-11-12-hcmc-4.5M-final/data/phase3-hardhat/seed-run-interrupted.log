@@ -1,0 +1,7 @@
+[14:06:09] start node
+[14:06:20] create db + migrate
+[14:06:25] seed 4.5M scattered
+      0 [main] bash 646 dofork: child -1 - forked process 22320 died unexpectedly, retry 0, exit code 0xC000026B, errno 11
+thesis/evidence/run-bench-hardhat.sh: fork: retry: Resource temporarily unavailable
+1026458 [main] bash 646 dofork: child -1 - forked process 13004 died unexpectedly, retry 0, exit code 0xC000026B, errno 11
+thesis/evidence/run-bench-hardhat.sh: fork: retry: Resource temporarily unavailable

@@ -1,0 +1,2 @@
+{"valid":false,"reason":"RootMismatch","message":"The proof was generated against a root that is no longer current — the owner must refresh their Merkle proof (GET /api/proof/:propertyId) and re-prove","details":{"expected":"4408915636861555822621359847538351085547159550228184630291926729960979269151","actual":"13184623186568514804109520104043042446620855488507496955123344274207954886424"}}
+HTTP 422

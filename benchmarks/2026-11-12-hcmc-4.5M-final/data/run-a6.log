@@ -1,0 +1,9 @@
+[16:40:20] fresh registry land_registry_bench_a6: migrations, communes, offices
+[16:41:13] UC-2 import + UC-1 issue 201-210 (round 1)
+[16:41:24] baseline: a genuine bundle passes
+[16:41:37] (f) tampered receipt: area + 1
+[16:41:47] (e) replay: bodies for 206, verified fresh, then again after 11 minutes (no root change between)
+[16:53:01] (c) old owner after the round: proof for 201 made before its transfer, then the transfer is published
+[16:53:26] (d) + (b) revoke 203: refused while open, gone after the round
+[16:53:44] (n) default throttle: 70 requests in a burst
+[16:54:10] A6 DONE

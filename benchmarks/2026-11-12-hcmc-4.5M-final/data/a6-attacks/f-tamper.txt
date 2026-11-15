@@ -1,0 +1,51 @@
+record.area 980 -> 981
+$ ts-node scripts/tools/verifyReceipt.ts "C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\f-206\\receipt.json"
+
+receipt:   C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\f-206\\receipt.json
+property:  206
+network:   localhost (http://127.0.0.1:8545)
+
+  OK    receipt targets the deployed RootRegistry — 0x5FbDB2315678afecb367f032d93F642f64180aa3
+  OK    root matches the current on-chain root — version 1
+  FAIL  record matches the certified leaf — the receipt has been ALTERED — a field such as area, address or landUseCode was edited after issuance
+  OK    Merkle proof verifies the leaf against the receipt root
+  OK    proof has the fixed circuit depth — 24 levels
+  OK    publishRoot transaction found on chain — block 8
+  OK    issuer holds STATE_AUTHORITY_ROLE — 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+  OK    certificate organization matches the on-chain anchor — O="So Tai nguyen va Moi truong TP.HCM"
+  OK    ethereumAccountSignature verifies against the certificate key
+  OK    issuer certificate chains to the pinned root CA — issued by "Demo Government Root CA"
+
+1 check(s) FAILED.
+
+D:\thesis\land-registry-zkp\blockchain:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @land-registry/blockchain@0.1.0 receipt:verify: `ts-node scripts/tools/verifyReceipt.ts "C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\f-206\\receipt.json"`
+Exit status 1
+--- owner:smoke on the tampered bundle
+$ ts-node scripts/tools/ownerSmoke.ts "C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\f-206"
+
+bundle:    C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\f-206
+property:  206
+
+refresh   source=nodes, root version 1
+  OK    registry tree matches the published root — version 1
+  OK    bundle Merkle proof is still current — v1
+  OK    leaf is unchanged by the refresh — 17001062309283618732…
+  OK    registry signed a status attestation — by 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+ERROR:  4 Error in template Ownership_226 line: 76
+
+Error: Error: Assert Failed. Error in template Ownership_226 line: 76
+
+    at D:\thesis\land-registry-zkp\node_modules\.pnpm\circom_runtime@0.1.28\node_modules\circom_runtime\build\main.cjs:529:27
+    at Array.forEach (<anonymous>)
+    at WitnessCalculatorCircom2._doCalculateWitness (D:\thesis\land-registry-zkp\node_modules\.pnpm\circom_runtime@0.1.28\node_modules\circom_runtime\build\main.cjs:500:14)
+    at WitnessCalculatorCircom2.calculateWTNSBin (D:\thesis\land-registry-zkp\node_modules\.pnpm\circom_runtime@0.1.28\node_modules\circom_runtime\build\main.cjs:559:20)
+    at wtnsCalculate (D:\thesis\land-registry-zkp\node_modules\.pnpm\snarkjs@0.7.6\node_modules\snarkjs\build\main.cjs:1315:28)
+    at async Object.groth16FullProve [as fullProve] (D:\thesis\land-registry-zkp\node_modules\.pnpm\snarkjs@0.7.6\node_modules\snarkjs\build\main.cjs:1348:5)
+    at async generateGroth16Proof (D:\thesis\land-registry-zkp\blockchain\shared\zkpHelper.ts:78:36)
+    at async prove (D:\thesis\land-registry-zkp\blockchain\scripts\tools\ownerSmoke.ts:285:18)
+    at async proveAndVerify (D:\thesis\land-registry-zkp\blockchain\scripts\tools\ownerSmoke.ts:302:40)
+    at async main (D:\thesis\land-registry-zkp\blockchain\scripts\tools\ownerSmoke.ts:144:21)
+D:\thesis\land-registry-zkp\blockchain:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @land-registry/blockchain@0.1.0 owner:smoke: `ts-node scripts/tools/ownerSmoke.ts "C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\f-206"`
+Exit status 1

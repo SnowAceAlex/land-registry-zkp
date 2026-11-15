@@ -1,0 +1,27 @@
+$ hardhat run scripts/chain/deploy.ts --network sepolia
+network:   sepolia
+deployer:  0xc128Eb26F177BB6a3b4374A715be350887ED7726
+balance:   7.444357485997587515 ETH
+authority: 0xc128Eb26F177BB6a3b4374A715be350887ED7726
+attester:  0x55636981fA9f7b2c357025691C9a26B066dD25c8
+org name:  "So Tai nguyen va Moi truong TP.HCM"
+           → 0x1f730914c2418f93d7466bfc23ec84f2790208f8c887355a7acaa798fa0ba603
+
+RootRegistry             0xC7848D47591055d4FE93468b0e2Fb0590F8C91aa
+Groth16VerifierOwnership 0x79acBB25e71F921bF2A5Dbd3346dca770e3A3bB0
+Groth16VerifierMortgage  0x5fa24AC90c4F83e283F7B4FD75bE3a2C981eA91F
+Groth16VerifierTransfer  0x6eCD65DeE3985722756721B162136623dd1db8B9
+LandRegistryVerifier     0x0bE5EE780Cd46d8fB5449783D43067e7e35D4cD6
+
+STATE_AUTHORITY_ROLE + authorityInstitute anchored for 0xc128Eb26F177BB6a3b4374A715be350887ED7726
+ATTESTER_ROLE granted to 0x55636981fA9f7b2c357025691C9a26B066dD25c8
+
+deployment record → deployments\sepolia.json
+set NEXT_PUBLIC_CONTRACT_ADDRESS=0xC7848D47591055d4FE93468b0e2Fb0590F8C91aa (RootRegistry) in .env for the frontend
+
+Optional Etherscan verification:
+  npx hardhat verify --network sepolia 0xC7848D47591055d4FE93468b0e2Fb0590F8C91aa 0xc128Eb26F177BB6a3b4374A715be350887ED7726
+  npx hardhat verify --network sepolia 0x79acBB25e71F921bF2A5Dbd3346dca770e3A3bB0  # Groth16VerifierOwnership
+  npx hardhat verify --network sepolia 0x5fa24AC90c4F83e283F7B4FD75bE3a2C981eA91F  # Groth16VerifierMortgage
+  npx hardhat verify --network sepolia 0x6eCD65DeE3985722756721B162136623dd1db8B9  # Groth16VerifierTransfer
+  npx hardhat verify --network sepolia 0x0bE5EE780Cd46d8fB5449783D43067e7e35D4cD6 0xC7848D47591055d4FE93468b0e2Fb0590F8C91aa 0x79acBB25e71F921bF2A5Dbd3346dca770e3A3bB0 0x5fa24AC90c4F83e283F7B4FD75bE3a2C981eA91F 0x6eCD65DeE3985722756721B162136623dd1db8B9

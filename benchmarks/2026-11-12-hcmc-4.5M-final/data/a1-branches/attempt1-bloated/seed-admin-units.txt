@@ -1,0 +1,16 @@
+$ ts-node scripts/seed-admin-units.ts "DVHC_TPHCM.csv" "--province" "TP.HCM"
+Header found on line 3; skipping the 2 line(s) above it.
+Column mapping:
+  name     ← Tên
+  type     ← (inferred from the name prefix)
+  province ← (from --province)
+  code     ← Mã số ĐVHC (theo Quyết định 19/2025/QĐ-TTg)
+Parsed 168 unit(s) from DVHC_TPHCM.csv
+First 5 as understood:
+  PHUONG   "An Hội Tây" — TP.HCM
+  PHUONG   "An Hội Đông" — TP.HCM
+  PHUONG   "An Khánh" — TP.HCM
+  PHUONG   "An Lạc" — TP.HCM
+  PHUONG   "An Nhơn" — TP.HCM
+Per province: { 'TP.HCM': 168 }
+Inserted 168 new row(s); catalog now holds 168.

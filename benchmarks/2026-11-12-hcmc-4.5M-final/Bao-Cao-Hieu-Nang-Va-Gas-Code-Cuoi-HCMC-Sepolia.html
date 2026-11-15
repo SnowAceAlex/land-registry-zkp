@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Báo Cáo Hiệu Năng Và Gas Trên Code Cuối (D84–D91) - Land Registry ZKP TP.HCM</title>
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #2563eb;
+      --primary-dark: #0f172a;
+      --secondary: #0f766e;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --bg: #ffffff;
+      --bg-alt: #f8fafc;
+      --border: #cbd5e1;
+      --border-light: #e2e8f0;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-sans); color: var(--text); background-color: var(--bg);
+      line-height: 1.6; font-size: 13.5px; padding: 30px; max-width: 1220px; margin: 0 auto;
+    }
+    header { border-bottom: 3px double var(--primary); padding-bottom: 22px; margin-bottom: 26px; }
+    .badge-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .badge-primary { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+    .badge-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .badge-warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .badge-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .badge-purple { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
+    .badge-info { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
+    h1 { font-size: 24px; color: var(--primary); font-weight: 800; line-height: 1.35; margin-bottom: 8px; }
+    .subtitle { font-size: 14.5px; color: var(--text-muted); font-weight: 600; margin-bottom: 18px; line-height: 1.5; }
+    .metadata-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;
+      background: var(--bg-alt); padding: 16px; border-radius: 8px; border: 1px solid var(--border-light); font-size: 12.5px;
+    }
+    .metadata-item > strong:first-child { color: var(--primary-dark); display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+    h2 { font-size: 18px; color: var(--primary); border-bottom: 2px solid var(--border-light); padding-bottom: 8px; margin-top: 36px; margin-bottom: 16px; font-weight: 700; }
+    h3 { font-size: 14.5px; color: var(--primary-dark); margin-top: 22px; margin-bottom: 10px; font-weight: 700; }
+    p { margin-bottom: 12px; text-align: justify; }
+    ul, ol { margin-left: 22px; margin-bottom: 14px; }
+    li { margin-bottom: 6px; }
+    a { color: var(--primary-light); text-decoration: none; font-weight: 600; }
+    a:hover { text-decoration: underline; color: var(--primary); }
+    .toc { background: var(--bg-alt); border: 1px solid var(--border-light); border-radius: 8px; padding: 14px 18px; margin: 18px 0; columns: 2; column-gap: 28px; font-size: 12.5px; }
+    .toc { list-style: none; }
+    .toc li { break-inside: avoid; }
+    .table-container { overflow-x: auto; margin: 16px 0 22px 0; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; text-align: left; }
+    th { background-color: #f1f5f9; color: var(--primary-dark); font-weight: 700; padding: 10px 12px; border-bottom: 2px solid var(--border); white-space: nowrap; }
+    th.th-before { background-color: #fef2f2; color: #991b1b; border-bottom: 2px solid #fca5a5; }
+    th.th-after { background-color: #f0fdf4; color: #166534; border-bottom: 2px solid #86efac; }
+    th.th-delta { background-color: #eff6ff; color: #1e40af; border-bottom: 2px solid #93c5fd; }
+    th.th-warn { background-color: #fef3c7; color: #92400e; border-bottom: 2px solid #fde68a; }
+    td { padding: 8px 12px; border-bottom: 1px solid var(--border-light); vertical-align: top; }
+    tr:nth-child(even) td { background-color: #f8fafc; }
+    tr:hover td { background-color: #f1f5f9; }
+    .num { font-family: var(--font-mono); font-weight: 600; white-space: nowrap; }
+    small { color: var(--text-muted); }
+    .tag { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .tag-green { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .tag-blue { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+    .tag-amber { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    .tag-red { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+    .tag-purple { background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; }
+    .callout { border-left: 4px solid var(--primary-light); background: #eff6ff; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+    .callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
+    .callout-title { font-weight: 700; color: var(--primary); margin-bottom: 6px; font-size: 13.5px; }
+    .callout-warning { border-left-color: #f59e0b; background: #fffbeb; }
+    .callout-warning .callout-title { color: #b45309; }
+    .callout-success { border-left-color: #10b981; background: #ecfdf5; }
+    .callout-success .callout-title { color: #047857; }
+    .callout-danger { border-left-color: #ef4444; background: #fef2f2; }
+    .callout-danger .callout-title { color: #b91c1c; }
+    .callout-purple { border-left-color: #8b5cf6; background: #f5f3ff; }
+    .callout-purple .callout-title { color: #6d28d9; }
+    code { font-family: var(--font-mono); background: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-size: 11.5px; color: #0f172a; }
+    pre { font-family: var(--font-mono); background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: 11.5px; line-height: 1.55; margin: 12px 0 18px 0; }
+    .compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin: 18px 0; }
+    .compare-card { border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+    .compare-card.after { border-top: 4px solid #16a34a; }
+    .compare-card.highlight { border-top: 4px solid #2563eb; background: #f8fafc; }
+    .compare-card.warn { border-top: 4px solid #f59e0b; }
+    .compare-card.fork-alert { border-top: 4px solid #7c3aed; background: #faf5ff; }
+    .card-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .card-stat { font-size: 22px; font-family: var(--font-mono); font-weight: 800; margin: 6px 0; }
+    .card-note { font-size: 12px; color: var(--text-muted); }
+    .stat-green { color: #15803d; } .stat-blue { color: #1d4ed8; } .stat-red { color: #b91c1c; } .stat-amber { color: #b45309; } .stat-purple { color: #6d28d9; }
+    .bar-comparison-container { margin: 14px 0 20px 0; background: #ffffff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .bar-row { margin-bottom: 12px; }
+    .bar-row:last-child { margin-bottom: 0; }
+    .bar-label-group { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+    .bar-track { height: 20px; background: #e2e8f0; border-radius: 4px; overflow: hidden; display: flex; }
+    .bar-fill { height: 100%; display: flex; align-items: center; padding-left: 6px; font-size: 11px; font-weight: 700; color: #ffffff; font-family: var(--font-mono); white-space: nowrap; overflow: hidden; }
+    .bar-fill-red { background: #ef4444; } .bar-fill-green { background: #10b981; } .bar-fill-blue { background: #3b82f6; } .bar-fill-amber { background: #f59e0b; } .bar-fill-purple { background: #8b5cf6; } .bar-fill-slate { background: #64748b; }
+    .todo-id { font-family: var(--font-mono); font-weight: 800; color: #b91c1c; white-space: nowrap; }
+    .done-id { font-family: var(--font-mono); font-weight: 800; color: #15803d; white-space: nowrap; }
+    .opt-id { font-family: var(--font-mono); font-weight: 800; color: #1d4ed8; white-space: nowrap; }
+    footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--border-light); font-size: 12px; color: var(--text-muted); }
+    @media (max-width: 640px) {
+      body { padding: 16px; }
+      h1 { font-size: 20px; }
+      .toc { columns: 1; }
+    }
+    @media print {
+      body { padding: 0; font-size: 10pt; color: #000; background: #fff; max-width: 100%; }
+      header { border-bottom: 2pt solid #000; margin-bottom: 14pt; }
+      h2 { page-break-after: avoid; border-bottom: 1pt solid #ccc; margin-top: 18pt; }
+      h3 { page-break-after: avoid; }
+      .table-container { box-shadow: none; border: 1pt solid #ccc; margin: 10pt 0; }
+      table { font-size: 8.5pt; }
+      th, td { padding: 4pt 6pt; }
+      .callout, .compare-card, .bar-comparison-container { break-inside: avoid; }
+      tr { break-inside: avoid; }
+      pre { background: #f1f5f9; color: #000; }
+      @page { size: A4; margin: 14mm 12mm 14mm 12mm; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="badge-bar">
+      <span class="badge badge-primary">Báo Cáo Kỹ Thuật Khóa Luận</span>
+      <span class="badge badge-success">Code Cuối: D84–D91</span>
+      <span class="badge badge-info">Sổ Thu Hồi Bitmap (D91)</span>
+      <span class="badge badge-purple">Sepolia Sau Glamsterdam</span>
+      <span class="badge badge-warning">Quy Mô: 4.500.000 GCN TP.HCM</span>
+    </div>
+    <h1>BÁO CÁO HIỆU NĂNG VÀ CHI PHÍ GAS TRÊN CODE CUỐI Ở QUY MÔ 4,5 TRIỆU GIẤY CHỨNG NHẬN</h1>
+    <div class="subtitle">Một tháng làm việc (22 ngày) trên Hardhat, 5 ngày giao dịch thật trên Sepolia sau hard fork Glamsterdam, đo tải các route công khai, và danh sách việc còn lại phải làm bằng tay</div>
+    <div class="metadata-grid">
+      <div class="metadata-item"><strong>Thời Gian Đo</strong>12/11/2026 (bổ sung 13/11); đối chiếu với lần đo 06/10/2026</div>
+      <div class="metadata-item"><strong>Phiên Bản</strong>Commit <code>2b23bf0</code>, nhánh <code>bench/thesis-evidence</code>; chỉ sửa harness</div>
+      <div class="metadata-item"><strong>Quy Mô</strong><strong>4.500.000 GCN</strong> (15.750.005 node, cây thưa depth 24)</div>
+      <div class="metadata-item"><strong>Phần Cứng</strong>AMD Ryzen 7 6800HS (16 luồng), 15 GB RAM, Windows 11, Node 22.15, Postgres 16</div>
+      <div class="metadata-item"><strong>Mạng</strong>Hardhat (31337, luật trước fork) &amp; <strong>Sepolia</strong> (đã Glamsterdam, contract bench <code>0xC7848D47…91aa</code>)</div>
+      <div class="metadata-item"><strong>Workload Mỗi Ngày</strong>2.994 chuyển nhượng + 950 thu hồi + 950 giấy cấp lại</div>
+    </div>
+  </header>
+
+  <ul class="toc">
+    <li><a href="#tom-tat">Tóm tắt</a></li>
+    <li><a href="#chua-lam">Việc chưa làm và việc phải làm tay</a></li>
+    <li><a href="#gia-dinh">1. Giả định và cách đo</a></li>
+    <li><a href="#circuit">2. Kiểm tự động và chi phí circuit</a></li>
+    <li><a href="#du-lieu">3. Quy mô dữ liệu</a></li>
+    <li><a href="#mot-ngay">4. Một ngày làm việc</a></li>
+    <li><a href="#gas">5. Chi phí on-chain</a></li>
+    <li><a href="#tai">6. Cấp proof và xác nhận dưới tải</a></li>
+    <li><a href="#tien">7. Chi phí bằng tiền</a></li>
+    <li><a href="#phat-hien">8. Phát hiện và đề xuất</a></li>
+    <li><a href="#gioi-han">9. Giới hạn của phép đo</a></li>
+    <li><a href="#tai-lap">10. Dữ liệu thô và tái lập</a></li>
+    <li><a href="#bo-sung">11. Đo bổ sung 15/11 (A1–A6)</a></li>
+  </ul>
+
+  <!-- TÓM TẮT -->
+  <h2 id="tom-tat">Tóm Tắt</h2>
+  <p>
+    Lần đo này chạy trên <strong>code cuối của hệ thống</strong>: đợt vào sổ hợp nhất (D84), 41 đơn vị đăng ký đất đai (D85–D86), hàng chờ chung (D87), archive theo chi nhánh (D88), lineage (D90) và <strong>sổ thu hồi dạng bitmap (D91)</strong>. Khác lần 06/10, workload lần này <strong>đưa toàn bộ 950 thu hồi mỗi ngày vào sổ</strong> và có thêm <strong>950 giấy cấp lại</strong> mỗi ngày, nên các con số đối chiếu không cùng lượng việc. Bảng dưới ghi rõ điều đó ở từng dòng.
+  </p>
+
+  <div class="compare-grid">
+    <div class="compare-card after">
+      <div class="card-title">Thu hồi vào sổ mỗi tháng</div>
+      <div class="card-stat stat-green">20.890</div>
+      <div class="card-note">06/10: 3.300 (cap 150); hàng chờ cuối tháng 17.590 → <strong>0</strong></div>
+    </div>
+    <div class="compare-card after">
+      <div class="card-title">Gas một thu hồi (luật mainnet hiện tại)</div>
+      <div class="card-stat stat-green">~25.970</div>
+      <div class="card-note">06/10: 92.202 (−72%). Sau Glamsterdam: 447.950 → ~114.000 (−75%)</div>
+    </div>
+    <div class="compare-card highlight">
+      <div class="card-title">Ước tính mainnet một tháng (giá 12/11)</div>
+      <div class="card-stat stat-blue">0,027 ETH</div>
+      <div class="card-note">≈ 56 USD ≈ 1,43 triệu đồng ở 0,0499 gwei; suy ra, không phải số đo</div>
+    </div>
+    <div class="compare-card warn">
+      <div class="card-title"><code>confirm</code> mỗi ngày (nút cổ chai)</div>
+      <div class="card-stat stat-amber">485 s</div>
+      <div class="card-note">~93% là dựng bundle (PDF); RAM backend vọt tới 4,2 GiB một lần</div>
+    </div>
+  </div>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Chỉ số</th>
+          <th class="th-before">06/10 (struct thu hồi, cap 150)</th>
+          <th class="th-after">12/11 (bitmap D91, code cuối)</th>
+          <th class="th-delta">Biến động</th>
+          <th>Ghi chú</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Thu hồi vào sổ / tháng</strong> (yêu cầu 20.890)</td><td class="num">3.300</td><td class="num"><strong>20.890</strong></td><td><span class="tag tag-green">×6,3</span></td><td>Hàng chờ cuối tháng 17.590 → 0</td></tr>
+        <tr><td><strong>Giấy cấp lại / tháng</strong></td><td>không mô hình</td><td class="num"><strong>19.941</strong></td><td><span class="tag tag-blue">mới</span></td><td>Cấp lại = thu hồi + cấp mới với id mới (D83/D90)</td></tr>
+        <tr><td><strong>Gas một thu hồi, luật trước fork</strong></td><td class="num">92.202</td><td class="num"><strong>~25.970</strong></td><td><span class="tag tag-green">−72%</span></td><td>Mỗi thu hồi mở một word bitmap mới (id rải)</td></tr>
+        <tr><td><strong>Gas một thu hồi, luật sau fork</strong></td><td class="num">447.950 <small>(estimateGas)</small></td><td class="num"><strong>~114.000</strong> <small>(đo thật)</small></td><td><span class="tag tag-green">−75%</span></td><td>Khớp <code>estimateGas</code> 114.896 của D91</td></tr>
+        <tr><td><strong>Gas một tháng, Hardhat</strong></td><td class="num">306,8 triệu</td><td class="num"><strong>545,4 triệu</strong></td><td><span class="tag tag-amber">×1,78</span></td><td>Cho 6,3 lần số thu hồi</td></tr>
+        <tr><td><strong>Đợt / ngày</strong> (chữ ký ví cán bộ)</td><td class="num">1</td><td class="num"><strong>2</strong> Hardhat / <strong>1</strong> Sepolia</td><td><span class="tag tag-amber">+1 trên mạng chưa fork</span></td><td>Cap 591 &lt; 950 thu hồi/ngày; Sepolia cap 989</td></tr>
+        <tr><td><strong>Một ngày đầy đủ</strong> (Hardhat / Sepolia, p50)</td><td class="num">372 s / 393 s</td><td class="num"><strong>538 s / 535 s</strong></td><td><span class="tag tag-amber">+44% / +36%</span></td><td>Thêm 950 bundle cấp lại mỗi ngày</td></tr>
+        <tr><td><strong><code>confirm</code> / ngày</strong></td><td class="num">345 s</td><td class="num"><strong>485 s</strong></td><td><span class="tag tag-amber">+40%</span></td><td>2.994 → ~3.944 bundle; vẫn là PDF</td></tr>
+        <tr><td><strong>RAM backend cao nhất</strong></td><td class="num">3,14 GiB</td><td class="num"><strong>4,20 GiB</strong></td><td><span class="tag tag-red">+34%</span></td><td>Một lần vọt; trung bình 1,9 GB</td></tr>
+        <tr><td><strong>Chi phí Sepolia / ngày</strong></td><td class="num">0,0148 ETH <small>(trước fork)</small></td><td class="num"><strong>0,067 ETH</strong> <small>(đo)</small></td><td><span class="tag tag-purple">khác luật, khác workload</span></td><td>~0,108 ETH nếu tip 1 gwei</td></tr>
+        <tr><td><strong>Ước tính mainnet / tháng</strong></td><td class="num">0,194 ETH <small>@0,633 gwei</small></td><td class="num"><strong>0,027 ETH</strong> <small>@0,0499 gwei</small></td><td><span class="tag tag-blue">giá gas ×1/13</span></td><td>Cùng 0,633 gwei: 0,345 ETH</td></tr>
+        <tr><td><strong>Cấp Merkle proof, c ≥ 4</strong></td><td class="num">~190–208 req/s</td><td class="num"><strong>~200–216 req/s</strong></td><td><span class="tag tag-green">ngang</span></td><td>p50 10 ms ở c=1</td></tr>
+        <tr><td><strong>Cấp xác nhận tình trạng, c ≥ 4</strong></td><td class="num">~182–233 req/s</td><td class="num"><strong>~189–237 req/s</strong></td><td><span class="tag tag-green">ngang</span></td><td>Không cache được (đúng thiết kế)</td></tr>
+        <tr><td><strong>Prove p50 trong Node</strong> (own / mort / transfer)</td><td class="num">662 / 646 / 1.074 ms</td><td class="num">783 / 680 / 1.143 ms</td><td><span class="tag tag-amber">+5–18%</span></td><td>Circuit không đổi; nhiều khả năng do máy</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout callout-success">
+    <div class="callout-title">Phát hiện chính</div>
+    <ol>
+      <li><strong>Sổ thu hồi bitmap đưa được toàn bộ 950 thu hồi mỗi ngày vào sổ.</strong> Hàng chờ cuối tháng về 0; gas cả tháng chỉ tăng 1,78 lần trong khi số thu hồi vào sổ tăng 6,3 lần.</li>
+      <li><strong>Theo luật gas hiện tại của mainnet, mỗi ngày cần hai đợt</strong> (591 + 359 thu hồi), tức cán bộ ký ví hai lần. Trên Sepolia một đợt là đủ.</li>
+      <li><strong>Trên Sepolia, một đợt 950 thu hồi tốn ~108,46 triệu gas (~54% block 200 triệu) và chạy thật được.</strong> Ngày 06/10, đợt 150 thu hồi đã không gửi được sau fork.</li>
+      <li><strong><code>confirm</code> vẫn là nút cổ chai</strong>: 485 s mỗi ngày, ~93% là dựng bundle (PDF). Giấy cấp lại làm nó dài thêm ~110–120 s.</li>
+      <li><strong>Tạo nháp đợt chậm lên ~4,7 lần</strong> (3,7 → 17,4 s) trong khi số lá đổi chỉ tăng 1,56 lần. Nguyên nhân chưa kiểm chứng.</li>
+      <li><strong>Phí Sepolia gần như toàn bộ là tip</strong> (base fee ~35 wei), nên phí thật dao động 1.000 lần giữa các ngày.</li>
+    </ol>
+  </div>
+
+  <!-- VIỆC CHƯA LÀM -->
+  <h2 id="chua-lam">Việc Chưa Làm Và Việc Bạn Phải Làm Bằng Tay</h2>
+
+  <div class="callout callout-danger">
+    <div class="callout-title">Bạn phải làm bằng tay (cần MetaMask, trình duyệt hoặc quyết định của bạn)</div>
+    <p>Phần bench trong báo cáo này chạy tự động hoàn toàn: ví MetaMask được thay bằng script <code>sign:root</code> ký bằng khoá deployer. Các mục dưới đây cần một người thật bấm ví, nhìn màn hình hoặc chụp ảnh, nên chưa làm.</p>
+    <p><strong>Lộ trình chi tiết, giải thích từng cơ chế và bảng ghi số:</strong> <a href="Huong-Dan-Viec-Thu-Cong.html">Huong-Dan-Viec-Thu-Cong.html</a> (bản Markdown <code>VIEC-THU-CONG.md</code>).</p>
+  </div>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr><th class="th-before">#</th><th>Việc</th><th>Vì sao không tự động được</th><th>Làm thế nào</th><th>Kết quả cần ghi</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="todo-id">M1</td><td><strong>Demo portal trên local</strong>: <code>PHASE_8_MANUAL_TEST.md</code>, <code>PHASE_9_MANUAL_TEST.md</code>, <code>PHASE_10_MANUAL_TEST.md</code> (ba profile: CN01, CN02, trung tâm)</td><td>Mỗi đợt vào sổ cần MetaMask ký <code>publishRoot</code> / <code>publishRootWithRevocations</code></td><td>Chạy theo từng runbook; điền mục "Số đo cần ghi"; sửa dòng "Trạng thái: chưa chạy thật"</td><td>Gas từng đợt, số chữ ký MetaMask, thời gian tạo đợt, proof chuyển nhượng trong browser, thời gian <code>seed:land-offices</code></td></tr>
+        <tr><td class="todo-id">M2</td><td><strong>Demo trên Sepolia</strong>: <code>DEMO_SEPOLIA.md</code> §1–8</td><td>Như M1, và tốn Sepolia ETH</td><td>Nếu dùng lại contract 26/10 thì các id 201–210 phải chưa từng bị thu hồi (nếu không: <code>AlreadyRevoked</code>), hoặc deploy mới</td><td>Tx hash, <code>rootVersion</code>, link Etherscan</td></tr>
+        <tr><td class="todo-id">M3</td><td><strong>Ảnh chụp cho Chương 5</strong></td><td>Cần màn hình thật</td><td>Trong lúc làm M1, M2</td><td><code>fig:r-import</code>, <code>fig:r-round</code> (có popup MetaMask), <code>fig:r-archive</code>, <code>fig:r-prove</code>, <code>fig:r-verify-ok</code>, <code>fig:r-counter</code>, <code>fig:r-attack-window</code>, <code>fig:r-superseded</code>, <code>fig:r-revoked</code>, <code>fig:r-lineage</code>, <code>fig:r-scope</code>, <code>fig:r-operations</code>; thêm Etherscan và tab Network</td></tr>
+        <tr><td class="todo-id">M4</td><td><strong>Thời gian proof trong browser</strong>: UC-5 ownership và clean-title, proof chuyển nhượng ở quầy, UC-6 verify off-chain và on-chain</td><td>Cần bundle thật từ M1/M2 và trình duyệt</td><td>5 lần mỗi loại, Chrome và Firefox (hoặc Edge); tách lần đầu ("Disable cache", có tải zkey) khỏi các lần sau; báo trung vị</td><td>Thời gian trên màn hình kết quả; thời gian tải zkey 6,2 / 6,2 / 12,3 MB</td></tr>
+        <tr><td class="todo-id">M5</td><td><strong>Kiểm tab Network</strong></td><td>Cần DevTools</td><td>Trang resident: lọc <code>ownerSecret</code>, chuỗi địa chỉ, giá trị <code>area</code> lấy từ <code>receipt.json</code></td><td>Phải ra 0 kết quả; ở quầy chỉ có <code>POST /api/transfers/preview</code> và <code>POST /api/transfers</code>. Chụp màn hình</td></tr>
+        <tr><td class="todo-id">M6</td><td><strong>Các case tấn công cần trạng thái demo</strong></td><td>Dựa vào bundle, đợt vào sổ và hồ sơ đang mở của M1/M2</td><td>Bảng ngay dưới</td><td>Lệnh, input, output hoặc ảnh cho từng case</td></tr>
+        <tr><td class="todo-id">M7</td><td><strong>Phía thesis</strong></td><td>Quyết định của bạn</td><td>Gửi link các bài báo cho ước tính TP.HCM (2,5 triệu thửa, 4,5 triệu GCN); chỉ giữ câu "tested end to end" trong abstract sau khi M1, M2 xong</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Case tấn công: đã chứng minh tự động và phần còn xem trên giao diện</h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Case</th><th class="th-after">Đã chứng minh tự động</th><th class="th-before">Còn làm trên giao diện</th></tr></thead>
+      <tbody>
+        <tr><td class="done-id">(a)</td><td>A6: hồ sơ mở → xác nhận tình trạng bị từ chối (409)</td><td>UC-5 ngõ cụt, UC-6 bước 4 đỏ, ảnh <code>fig:r-attack-window</code></td></tr>
+        <tr><td class="done-id">(b)</td><td>A6: xác nhận bị từ chối; backend <code>InvalidAttestation</code>, contract <code>AttestationExpired</code></td><td>UC-5 với thửa đang chờ thu hồi</td></tr>
+        <tr><td class="done-id">(c)</td><td>A6: trước đợt hợp lệ; sau đợt <code>RootMismatch</code> ở backend và contract; chủ cũ không prove được</td><td>UC-5 "không còn hiệu lực", ảnh <code>fig:r-superseded</code></td></tr>
+        <tr><td class="done-id">(d)</td><td>A6: 410; <code>isRevoked</code> true; lịch sử chỉ mã lý do + băm</td><td>UC-5 "đã bị thu hồi" + tra cứu, ảnh <code>fig:r-revoked</code></td></tr>
+        <tr><td class="done-id">(e)</td><td>A6: <code>StaleTimestamp</code> ở backend và contract (666–674 s)</td><td>UC-6 dán proof cũ</td></tr>
+        <tr><td class="done-id">(f)</td><td>A6: <code>receipt:verify</code> báo ALTERED đúng một mục; prover dừng</td><td>UC-5 ô toàn vẹn đỏ</td></tr>
+        <tr><td class="done-id">(g)</td><td>Test <code>issuer-chain.test.ts</code></td><td>UC-6 tab Thẩm tra</td></tr>
+        <tr><td class="done-id">(h)</td><td>Spec <code>office-scope.spec.ts</code></td><td>Ảnh <code>fig:r-scope</code></td></tr>
+        <tr><td class="todo-id">(i)</td><td><span class="tag tag-amber">chưa có</span></td><td>DEMO_SEPOLIA §8.4 bước 4</td></tr>
+        <tr><td class="done-id">(j)</td><td>Test contract "rejects a caller without STATE_AUTHORITY_ROLE"</td><td>Đổi tài khoản MetaMask ở Chốt sổ</td></tr>
+        <tr><td class="done-id">(k)</td><td>Test contract "rejects revoking the same property twice"</td><td>Không cần</td></tr>
+        <tr><td class="todo-id">(l)</td><td><span class="tag tag-amber">chưa có</span></td><td>DEMO_SEPOLIA §8.7</td></tr>
+        <tr><td class="done-id">(m)</td><td><code>data/attacks/m-public-api.txt</code></td><td>Không cần</td></tr>
+        <tr><td class="done-id">(n)</td><td>A6: 70 request dồn → 60 × 200, 10 × 429</td><td>Không cần</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Bảng gốc (12/11), giữ để đối chiếu</h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Case</th><th>Cách làm</th><th>Kết quả mong đợi</th></tr></thead>
+      <tbody>
+        <tr><td class="todo-id">(a)</td><td>Bán hai lần trong lúc chờ đợt vào sổ: <code>DEMO_SEPOLIA.md</code> §8.4 bước 3 (<code>proof:bodies</code>, rồi UC-6 và <code>curl</code> với <code>onChain: true</code>)</td><td>UC-5 dừng ở <code>procedure-open</code>; UC-6 đỏ; API trả 422 <code>InvalidAttestation</code></td></tr>
+        <tr><td class="todo-id">(b)</td><td>Chủ bị thu hồi đem sổ đi vay: §8.5 bước 2</td><td>như (a)</td></tr>
+        <tr><td class="todo-id">(c)</td><td>Chủ cũ sau đợt vào sổ: §8.6 bước 3; thêm: verify một proof tạo <strong>trước</strong> đợt, sau khi đợt đã publish</td><td>UC-5 báo sổ không còn hiệu lực; proof cũ <code>RootMismatch</code></td></tr>
+        <tr><td class="todo-id">(d)</td><td>Thửa đã thu hồi: §8.6 bước 3</td><td><code>GET /api/proof/&lt;id&gt;</code> trả 410; <code>isRevoked</code> true; UC-6 từ chối kèm mã lý do</td></tr>
+        <tr><td class="todo-id">(e)</td><td>Phát lại proof cũ: giữ <code>proof.json</code> quá 10 phút rồi verify ở UC-6 và qua API với <code>onChain: true</code></td><td><code>StaleTimestamp</code> ở cả hai</td></tr>
+        <tr><td class="todo-id">(f)</td><td>Sửa <code>record.area</code> trong bản sao <code>receipt.json</code>, chạy <code>pnpm --filter blockchain run receipt:verify &lt;file&gt;</code>, nạp vào UC-5</td><td>Leaf tính lại không khớp; UC-5 báo tệp không toàn vẹn</td></tr>
+        <tr><td class="todo-id">(h)</td><td>Chi nhánh làm ngoài địa bàn: <code>PHASE_10_MANUAL_TEST.md</code> bước 3</td><td>403 <code>OutsideOfficeArea</code></td></tr>
+        <tr><td class="todo-id">(i)</td><td>Chuyển nhượng đất cộng đồng: <code>DEMO_SEPOLIA.md</code> §8.4 bước 4</td><td>Quầy từ chối</td></tr>
+        <tr><td class="todo-id">(j)</td><td>Ví không có quyền publish: đổi tài khoản MetaMask ở trang Chốt sổ</td><td>Portal chặn trước khi mở ví; contract revert</td></tr>
+        <tr><td class="todo-id">(l)</td><td>Từ chối hồ sơ là mở khoá: <code>DEMO_SEPOLIA.md</code> §8.7</td><td>Sau khi từ chối, chủ tạo proof lại được ngay</td></tr>
+        <tr><td class="todo-id">(n)</td><td>Quét API: hơn 60 request trong một phút từ một IP, backend chạy throttle mặc định (không phải <code>THROTTLE_LIMIT=1000000</code> của bench)</td><td>429</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Đã có bằng chứng (không cần làm lại)</h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th class="th-after">Case</th><th>Bằng chứng</th></tr></thead>
+      <tbody>
+        <tr><td class="done-id">(m)</td><td>API công khai lộ hồ sơ: <code>data/attacks/m-public-api.txt</code>. <code>GET /api/records?take=3</code> chỉ trả <code>propertyId</code>, <code>ownerCommitment</code>, <code>status</code>, <code>leaf</code>, <code>rootVersion</code>; <code>GET /api/government/properties/1</code> không có key trả 401</td></tr>
+        <tr><td class="done-id">(k)</td><td>Thu hồi một thửa hai lần: test "rejects revoking the same property twice" (<code>data/phase1/tests-blockchain.txt</code>, dòng 123)</td></tr>
+        <tr><td class="done-id">(g)</td><td>Cơ quan phát hành giả cùng tên: <code>issuer-chain.test.ts</code> "fails a certificate from a look-alike root with the same name", "fails a self-signed certificate"; 401/401 test frontend pass, không test nào tự bỏ qua</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Chưa làm nhưng agent chạy được (tuỳ chọn) — đã chạy 15/11, kết quả ở <a href="#bo-sung">mục 11</a></h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th class="th-delta">#</th><th>Việc</th><th>Cách làm</th></tr></thead>
+      <tbody>
+        <tr><td class="opt-id">A1</td><td><strong>Archive theo 38 chi nhánh</strong> (G3)</td><td>Gán <code>landOfficeId</code> khi seed, chạy lại vài ngày, đo <code>confirm</code> và dung lượng khi một đợt ra 38 ZIP</td></tr>
+        <tr><td class="opt-id">A2</td><td><strong>Kiểm đúng đắn cây ở 4,5 triệu</strong> (G4)</td><td>Lấy N id, gọi <code>GET /api/proof/:id</code>, dựng lại root bằng <code>verifyMerkleProof</code>, so với <code>latestRoot</code></td></tr>
+        <tr><td class="opt-id">A3</td><td>Tách các bước của <code>createDraft</code></td><td>Giải thích phát hiện tạo nháp chậm lên 4,7 lần</td></tr>
+        <tr><td class="opt-id">A4</td><td>Publish không phụ thuộc N trên code cuối</td><td>100 nghìn thửa <code>contiguous</code> và <code>scattered</code>, so <code>confirm</code> với registry lớn</td></tr>
+        <tr><td class="opt-id">A5</td><td>Tốc độ import CSV</td><td>Dry-run rồi import ~10 nghìn dòng qua <code>POST /api/government/import</code></td></tr>
+        <tr><td class="opt-id">A6</td><td>Case (c), (d), (e), (f) trên Hardhat không cần MetaMask</td><td>Dùng <code>sign:root</code> thay ví, <code>owner:smoke</code>, <code>receipt:verify</code>; không thay được ảnh của M3</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout callout-warning">
+    <div class="callout-title">Dọn máy khi không cần nữa</div>
+    <p>Các DB bench chiếm nhiều chỗ trong volume Postgres của Docker: <code>land_registry_bench_final</code> (3,8 GB, bản gốc sau seed), <code>land_registry_bench_final_hh</code> (7,2 GB), <code>land_registry_bench_final_sepolia</code>, và các DB của lần trước (<code>land_registry_bench45*</code>, <code>land_registry_bench82*</code>, <code>land_registry_bench</code>). Xoá bằng <code>docker exec land_registry_postgres dropdb -U postgres &lt;tên&gt;</code>. Giữ <code>land_registry_bench_final</code> nếu muốn chạy lại mà không phải seed.</p>
+  </div>
+
+  <!-- GIẢ ĐỊNH -->
+  <h2 id="gia-dinh">1. Giả Định Và Cách Đo</h2>
+  <h3>1.1. Giả định phải đọc trước mọi bảng số</h3>
+  <ol>
+    <li><strong>4,5 triệu GCN = 4,5 triệu lá</strong>, id rải đều (<code>propertyId = 3i + 1</code>). Đây là ước tính số giấy chứng nhận của TP.HCM từ báo chí, không phải số thửa.</li>
+    <li><strong>Mỗi ngày:</strong> 2.994 chuyển nhượng + 950 thu hồi (22 ngày: 65.868 + 20.890). Thu hồi được trải đều trong tháng, nên vài ngày có 949.</li>
+    <li><strong>Mỗi giấy bị thu hồi được cấp lại ngày hôm sau</strong> ở id + 1, kèm liên kết lineage. Ngày 1 chưa có giấy cấp lại.</li>
+    <li><strong>Không có giao dịch cho từng hồ sơ</strong> (D82): on-chain chỉ có các giao dịch publish của đợt vào sổ.</li>
+    <li><strong>Proof chuyển nhượng không được sinh trong replay</strong>; chi phí phía client đo riêng (§2).</li>
+    <li><strong>Seed không gán chi nhánh</strong>, nên mỗi đợt chỉ ra một archive (HQ).</li>
+    <li><strong>22 ngày được nén vào 3 giờ</strong>, nên chưa archive nào quá hạn 7 ngày.</li>
+  </ol>
+
+  <h3>1.2. Quy trình</h3>
+<pre> ① bench:seed          4.500.000 GCN → DB land_registry_bench_final (bản gốc, không bao giờ bị sửa)
+                       máy tắt giữa lúc dựng cây → tree:bootstrap dựng lại cây trên cùng các dòng
+        ▼
+ ② run-bench-hardhat   nhân bản _hh → Hardhat node mới → deploy → publish genesis
+        ▼
+ ③ bench:month         22 ngày; mỗi ngày: xếp hàng → [POST /changesets → sign:root → confirm]
+                       lặp lại khi còn thu hồi bị hoãn vì cap (tối đa 10 đợt/ngày)
+        ▼
+ ④ bench:confirm-breakdown (200 thửa) → bench:proof-load (200, 304, attestation; c = 1/4/16/50)
+        ▼
+ ⑤ run-bench-sepolia   nhân bản _sepolia → deploy bench → genesis → ③ 5 ngày → ④ tải
+                       → trả lại blockchain/deployments/sepolia.json bản gốc</pre>
+  <p>Toàn bộ chạy <strong>tuần tự</strong> bằng <code>scripts/run-all.sh</code>; không phép đo nào chạy song song. Backend chạy bằng <code>nest start</code>, RAM lấy mẫu mỗi 2 s theo PID.</p>
+
+  <h3>1.3. Thay đổi ở harness (không đổi code sản phẩm)</h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Thay đổi trong <code>bench-replay-month.ts</code></th><th>Vì sao</th></tr></thead>
+      <tbody>
+        <tr><td><strong>G1: đợt nối tiếp trong ngày</strong>: còn <code>deferredRevocations &gt; 0</code> thì tạo, ký, confirm đợt tiếp (tối đa 10)</td><td>Trên Hardhat cap 591 &lt; 950; không có vòng này thì 359 thu hồi/ngày bị hoãn và hàng chờ dâng dần</td></tr>
+        <tr><td><strong>G2: giấy cấp lại</strong>: thửa IMPORTED ở id + 1 kèm <code>property_lineage</code>; hôm sau tạo issuance request (tối đa 500 mỗi lần gọi)</td><td>Harness cũ xoá mọi issuance request, nên thiếu ~950 giấy mới mỗi ngày</td></tr>
+        <tr><td>Chọn thửa bằng SQL: mỗi thửa thứ <code>step</code> theo <code>row_number()</code>, bỏ thửa kế nhiệm</td><td>Các thửa đổi trải đều trên toàn dải id</td></tr>
+        <tr><td><code>month.json</code> thêm <code>issuances</code>, <code>rounds</code>, <code>txHashes</code></td><td>Đọc lại gas từng đợt từ receipt. Lưu ý: <code>publishes</code> vẫn đếm ngày (Hardhat ghi 22, thực tế 44 đợt)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout callout-purple">
+    <div class="callout-title">Sự cố trong lúc đo và cách loại trừ</div>
+    <ul>
+      <li><strong>Máy tắt giữa lúc seed dựng cây.</strong> Các dòng đã nạp đủ (4.500.000 <code>ISSUED</code>, 962,1 s), nên chỉ cây được dựng lại bằng <code>tree:bootstrap</code>. Kết quả 15.750.005 node, đúng bằng hai lần đo trước.</li>
+      <li><strong><code>tree:bootstrap</code> không tự thoát</strong> khi không có node chain (ChainService cứ thử nối RPC); phải dừng tay.</li>
+      <li><strong>Lần chạy đầu đọc root genesis ra chuỗi rỗng</strong> (node trên Windows không mở được đường dẫn <code>/d/...</code>). Script dừng ở bước ký genesis trên Hardhat, chưa chạm Sepolia; sửa rồi chạy lại từ bản nhân bản sạch.</li>
+      <li><strong>URL RPC Sepolia (có API key) bị in vào <code>backend.log</code></strong>: đã thay bằng <code>&lt;SEPOLIA_RPC_URL&gt;</code>; mọi file trong <code>data/</code> đã được quét lại, không còn giá trị bí mật nào.</li>
+    </ul>
+  </div>
+
+  <!-- CIRCUIT -->
+  <h2 id="circuit">2. Kiểm Tự Động Và Chi Phí Circuit</h2>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Mục</th><th>Kết quả</th></tr></thead>
+      <tbody>
+        <tr><td>Test blockchain (Hardhat/Mocha)</td><td class="num">184 passing, 0 pending, 27 s</td></tr>
+        <tr><td>Test backend (Jest)</td><td class="num">505 passed, 49 suite</td></tr>
+        <tr><td>Test frontend (Vitest)</td><td class="num">401 passed, 43 file, không test nào tự bỏ qua</td></tr>
+        <tr><td><code>nest build</code>, <code>next build</code>, lint frontend</td><td>sạch</td></tr>
+        <tr><td>Lint gốc</td><td>1 lỗi ở dòng harness vừa sửa; đã sửa, lint lại sạch</td></tr>
+        <tr><td>Constraint ownership = mortgage</td><td class="num">6.741 + 7.529 = 14.270, ptau 2^14</td></tr>
+        <tr><td>Constraint transfer</td><td class="num">13.221 + 15.050 = 28.271, ptau 2^15</td></tr>
+        <tr><td>Artifact cho browser</td><td>zkey 6,2 / 6,2 / 12,3 MB; wasm ~3,2 MB mỗi circuit</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Circuit (Node, depth 24, 10 vòng)</th><th>prove p50</th><th>prove p95</th><th>verify</th><th>proof</th><th class="th-before">prove p50 06/10</th></tr></thead>
+      <tbody>
+        <tr><td><code>ownership</code></td><td class="num">783 ms</td><td class="num">1.265 ms</td><td class="num">16 ms</td><td class="num">724 B</td><td class="num">662 ms</td></tr>
+        <tr><td><code>mortgage</code></td><td class="num">680 ms</td><td class="num">837 ms</td><td class="num">15 ms</td><td class="num">723 B</td><td class="num">646 ms</td></tr>
+        <tr><td><code>transfer</code></td><td class="num">1.143 ms</td><td class="num">1.227 ms</td><td class="num">13 ms</td><td class="num">722 B</td><td class="num">1.074 ms</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Circuit không đổi từ 06/10, nhưng prove p50 cao hơn 5–18%. Lượt đo chạy ngay sau khi máy build frontend và compile circuit, nên nhiều khả năng đây là dao động của máy. Đây vẫn là <strong>biên dưới</strong>: trong browser chậm hơn và chưa đo (M4).</p>
+
+  <!-- DỮ LIỆU -->
+  <h2 id="du-lieu">3. Quy Mô Dữ Liệu</h2>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Hạng mục</th><th class="th-before">06/10</th><th class="th-after">12/11</th></tr></thead>
+      <tbody>
+        <tr><td>Node trong cây sau seed</td><td class="num">15.750.005</td><td class="num">15.750.005</td></tr>
+        <tr><td>Nạp dòng</td><td class="num">970 s</td><td class="num">962,1 s</td></tr>
+        <tr><td>Dựng cây (<code>tree:bootstrap</code>)</td><td class="num">2.110 s</td><td class="num">2.112,5 s</td></tr>
+        <tr><td>Tổng DB sau seed</td><td class="num">3.765 MB</td><td class="num">3.793 MB</td></tr>
+        <tr><td>Tổng DB sau một tháng</td><td class="num">6.359 MB</td><td class="num"><strong>7.178 MB</strong></td></tr>
+        <tr><td>Archive sau một tháng</td><td class="num">2.481 MB</td><td class="num"><strong>3.210 MB</strong> (44 đợt)</td></tr>
+        <tr><td><code>merkle_nodes</code> / <code>properties</code></td><td>—</td><td class="num">2.146 / 1.734 MB</td></tr>
+        <tr><td><code>property_events</code> / <code>transfer_requests</code> / <code>property_lineage</code></td><td>—</td><td class="num">41 / 23 / 3,2 MB</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Archive tăng ~146 MB mỗi ngày làm việc. Với TTL 7 ngày, chạy thật sẽ giữ khoảng 1 GB archive cùng lúc.</p>
+
+  <!-- MỘT NGÀY -->
+  <h2 id="mot-ngay">4. Một Ngày Làm Việc</h2>
+  <h3>4.1. Thời gian (giây; trung vị, kèm min–max)</h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Giai đoạn mỗi ngày</th><th class="th-after">Hardhat 12/11 (2 đợt)</th><th class="th-after">Sepolia 12/11 (1 đợt)</th><th class="th-before">Hardhat 06/10</th><th class="th-before">Sepolia 06/10</th></tr></thead>
+      <tbody>
+        <tr><td>Xếp hàng (2.994 chuyển nhượng + 950 thu hồi + 950 đề nghị cấp)</td><td class="num">20,4 <small>(14,3–29,0)</small></td><td class="num">20,0 <small>(14,2–22,7)</small></td><td class="num">16,4</td><td class="num">13,2</td></tr>
+        <tr><td>Tạo nháp đợt</td><td class="num">17,3 <small>(10,8–21,6)</small></td><td class="num">17,4 <small>(16,9–20,9)</small></td><td class="num">3,6</td><td class="num">3,7</td></tr>
+        <tr><td>Ký + chờ block</td><td class="num">12,0 <small>(10,0–17,3)</small></td><td class="num">23,8 <small>(17,3–41,7)</small></td><td class="num">5,4</td><td class="num">25,8</td></tr>
+        <tr><td><strong><code>confirm</code></strong></td><td class="num"><strong>484,8</strong> <small>(372,2–499,3)</small></td><td class="num"><strong>475,8</strong> <small>(361,9–483,8)</small></td><td class="num">345</td><td class="num">349</td></tr>
+        <tr style="background:#f0fdf4"><td><strong>Cả ngày</strong></td><td class="num"><strong>537,6</strong> <small>(408,5–552,1)</small></td><td class="num"><strong>535,4</strong> <small>(436,1–546,9)</small></td><td class="num">372</td><td class="num">393</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bar-comparison-container">
+    <div class="bar-row">
+      <div class="bar-label-group"><span>Cơ cấu một ngày trên Hardhat (trung vị từng bước)</span><span>~535 s</span></div>
+      <div class="bar-track">
+        <div class="bar-fill bar-fill-blue" style="width:3.8%" title="Xếp hàng 20,4 s"></div>
+        <div class="bar-fill bar-fill-purple" style="width:3.2%" title="Tạo nháp 17,3 s"></div>
+        <div class="bar-fill bar-fill-slate" style="width:2.2%" title="Ký 12,0 s"></div>
+        <div class="bar-fill bar-fill-amber" style="width:90.8%">confirm 484,8 s (90,7%)</div>
+      </div>
+      <div class="bar-label-group" style="margin-top:4px; font-weight:400; color:#64748b"><span>xanh: xếp hàng 3,8% · tím: tạo nháp 3,2% · xám: ký 2,2%</span><span></span></div>
+    </div>
+  </div>
+  <ul>
+    <li>Trên Hardhat số của một ngày là <strong>tổng hai đợt</strong>. Hai đợt Hardhat cộng lại tốn đúng bằng một đợt Sepolia ở bước tạo nháp và <code>confirm</code>: thời gian theo số hồ sơ trong ngày, không theo số đợt.</li>
+    <li><strong>Ngày 1 không có giấy cấp lại</strong> (372,2 s Hardhat, 361,9 s Sepolia); các ngày sau thêm 950 bundle và <code>confirm</code> tăng ~110–120 s.</li>
+    <li><strong>Sepolia chỉ chậm hơn Hardhat ở bước ký</strong> (chờ giao dịch vào block 17–42 s).</li>
+  </ul>
+
+  <h3>4.2. Gas từng đợt (đọc receipt từng giao dịch)</h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th></th><th>Hardhat (luật trước fork)</th><th class="th-warn">Sepolia (Glamsterdam)</th></tr></thead>
+      <tbody>
+        <tr><td>Đợt đầu mỗi ngày</td><td class="num">591 thu hồi: 15.407.782–15.414.886</td><td class="num">950 thu hồi: 108.449.483–108.460.907</td></tr>
+        <tr><td>Đợt nối tiếp</td><td class="num">359 (hoặc 358): 9.359.407–9.389.698</td><td>không cần</td></tr>
+        <tr><td>Event mỗi đợt</td><td class="num">592 / 359–360</td><td class="num">951</td></tr>
+        <tr><td>Một ngày</td><td class="num">~24,8 triệu</td><td class="num">~108,46 triệu (~54% block 200 triệu)</td></tr>
+        <tr><td><strong>Cả kỳ đo</strong></td><td class="num"><strong>545.406.014</strong> (22 ngày, 44 đợt)</td><td class="num"><strong>542.293.051</strong> (5 ngày, 5 đợt)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Từ hai cỡ đợt Hardhat: (15.414.862 − 9.389.674) / (591 − 359) = <strong>25.971 gas mỗi thu hồi</strong>, cộng ~66 nghìn gas cố định mỗi đợt. Số này khớp 25.960 gas "mở word mới" của D91, vì các thửa bị thu hồi nằm rải trên dải id. Trên Sepolia chỉ có một cỡ đợt nên chỉ ước được ~114.000 gas mỗi thu hồi (tổng đợt chia 950), khớp <code>estimateGas</code> 114.896 của D91.</p>
+
+  <h3>4.3. <code>confirm</code> đang tiêu thời gian vào đâu (200 thửa)</h3>
+  <div class="bar-comparison-container">
+    <div class="bar-row">
+      <div class="bar-label-group"><span>Một thửa: 107,8 ms (06/10: 110,4 ms)</span><span>× 3.944 thửa ≈ 425 s, đo thật ~485 s</span></div>
+      <div class="bar-track">
+        <div class="bar-fill bar-fill-slate" style="width:5.3%" title="proofInOverlay 5,8 ms"></div>
+        <div class="bar-fill bar-fill-amber" style="width:92.5%">dựng bundle (PDF) 99,7 ms · 92,5%</div>
+        <div class="bar-fill bar-fill-blue" style="width:2.2%" title="ZIP 2,4 ms"></div>
+      </div>
+      <div class="bar-label-group" style="margin-top:4px; font-weight:400; color:#64748b"><span>xám: path trong overlay 5,8 ms (5,3%) · xanh: nén ZIP 2,4 ms (2,2%) · PDF đo riêng 105,0 ms</span><span>~38 KB/thửa trong ZIP</span></div>
+    </div>
+  </div>
+  <p>Phần chênh giữa ước tính và số đo (~50–60 s mỗi ngày) nhiều khả năng là ghi DB và ghi archive; chưa tách.</p>
+
+  <h3>4.4. RAM backend</h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th></th><th>Hardhat (22 ngày, 5.009 mẫu)</th><th>Sepolia (5 ngày, 1.083 mẫu)</th></tr></thead>
+      <tbody>
+        <tr><td>Trung bình</td><td class="num">1.924 MB</td><td class="num">1.568 MB</td></tr>
+        <tr><td>Đỉnh</td><td class="num"><strong>4.297 MB</strong> <small>(một lần, ngày 3, trong confirm)</small></td><td class="num">3.528 MB</td></tr>
+        <tr><td>Trên 2 GiB / trên 3 GiB</td><td class="num">20% thời gian / 12 mẫu (~24 s)</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- GAS -->
+  <h2 id="gas">5. Chi Phí On-Chain</h2>
+  <h3>5.1. Gas từng thao tác</h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Thao tác</th><th>Hardhat (trước fork)</th><th class="th-warn">Sepolia (Glamsterdam)</th><th>Ai trả, bao lâu một lần</th></tr></thead>
+      <tbody>
+        <tr><td>Deploy <code>RootRegistry</code></td><td class="num">716.879</td><td class="num">4.860.941</td><td>một lần</td></tr>
+        <tr><td>Deploy 3 verifier</td><td class="num">406.922 / 425.924 / 466.078</td><td class="num">2.737.714 / 2.873.768 / 3.161.338</td><td>một lần</td></tr>
+        <tr><td>Deploy <code>LandRegistryVerifier</code></td><td class="num">1.014.838</td><td class="num">6.981.030</td><td>một lần</td></tr>
+        <tr><td><code>registerAuthority</code> / <code>grantRole</code> (attester)</td><td class="num">73.077 / 51.507</td><td class="num">243.017 / 133.527</td><td>một lần</td></tr>
+        <tr><td><code>publishRoot</code> lần đầu</td><td class="num">115.651</td><td class="num">461.531</td><td>một lần</td></tr>
+        <tr><td><code>publishRoot</code> các lần sau, không thu hồi</td><td class="num"><strong>64.339</strong></td><td>chưa đo riêng</td><td>ví cán bộ, mỗi đợt</td></tr>
+        <tr><td>Thu hồi một thửa, word mới / word đã có</td><td class="num">~25.970 / 8.860</td><td class="num">~114.000 / 16.230</td><td>ví cán bộ, trong đợt</td></tr>
+        <tr><td>Verify ownership / mortgage / transfer</td><td class="num">255.216 / 262.029 / 267.077</td><td><code>eth_call</code>, không ai trả</td><td>người kiểm tra</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Gas deploy trên Sepolia ngày 12/11 trùng từng đơn vị với lần deploy 26/10. Sau Glamsterdam, deploy contract đắt hơn 6,7–6,9 lần, hai lệnh cấp quyền 2,6–3,3 lần, <code>publishRoot</code> lần đầu 4 lần, vì mọi slot mới đều tốn thêm state gas (EIP-8037).</p>
+
+  <div class="bar-comparison-container">
+    <div class="bar-row">
+      <div class="bar-label-group"><span>Struct thu hồi, sau fork (06/10, estimateGas)</span><span class="num">447.950</span></div>
+      <div class="bar-track"><div class="bar-fill bar-fill-red" style="width:100%">447.950 gas</div></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label-group"><span>Bitmap, sau fork (12/11, Sepolia, đo thật)</span><span class="num">~114.000</span></div>
+      <div class="bar-track"><div class="bar-fill bar-fill-purple" style="width:25.4%">~114k</div></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label-group"><span>Struct thu hồi, trước fork (06/10)</span><span class="num">92.202</span></div>
+      <div class="bar-track"><div class="bar-fill bar-fill-amber" style="width:20.6%">92k</div></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label-group"><span>Bitmap, trước fork (12/11, Hardhat = mainnet hôm nay)</span><span class="num">~25.970</span></div>
+      <div class="bar-track"><div class="bar-fill bar-fill-green" style="width:5.8%" title="~26k"></div></div>
+    </div>
+  </div>
+
+  <h3>5.2. Trạng thái fork và trần thu hồi (12/11, ~06:46 UTC)</h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th></th><th>Mainnet</th><th class="th-warn">Sepolia</th></tr></thead>
+      <tbody>
+        <tr><td>Glamsterdam (block có <code>blockAccessListHash</code>)</td><td><span class="tag tag-blue">chưa</span></td><td><span class="tag tag-purple">đã</span></td></tr>
+        <tr><td>Block gas limit</td><td class="num">60.000.000</td><td class="num">199.609.379 (block đợt: 200.000.000)</td></tr>
+        <tr><td>Base fee p50 / priority fee p50</td><td class="num">0,0464 / 0,0035 gwei</td><td class="num">17–39 wei / 1 gwei</td></tr>
+        <tr><td>Trần thu hồi mỗi giao dịch → cap</td><td class="num">641 → 591 (Hardhat)</td><td class="num">1.039 → 989 (estimateGas, PASS)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout">
+    <div class="callout-title">Dùng số nào cho mainnet</div>
+    <p>Mainnet chưa fork, nên <strong>số gas Hardhat là số đúng cho mainnet hôm nay</strong>. Khi mainnet lên Glamsterdam thì dùng số Sepolia.</p>
+  </div>
+
+  <!-- TẢI -->
+  <h2 id="tai">6. Cấp Proof Và Cấp Xác Nhận Dưới Tải (4,5 Triệu Lá, Sau Một Tháng)</h2>
+  <p>Mỗi ô: req/s; p50 / p99 (ms). Mỗi mức gồm 2.000 request trên 2.000 thửa khác nhau. Không có 429 hay 5xx; vài thửa đã thu hồi trong mẫu (9 Hardhat, 3 Sepolia) trả 410 đúng thiết kế.</p>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Route</th><th>Mạng</th><th>c=1</th><th>c=4</th><th>c=16</th><th>c=50</th></tr></thead>
+      <tbody>
+        <tr><td rowspan="2"><code>GET /api/proof/:id</code> (200)</td><td>Hardhat</td><td class="num">101,6; 10 / 14</td><td class="num">208,2; 19 / 26</td><td class="num">205,0; 78 / 107</td><td class="num">202,1; 245 / 312</td></tr>
+        <tr><td>Sepolia</td><td class="num">91,7; 10 / 14 <small>(max 1.602)</small></td><td class="num">215,6; 18 / 27</td><td class="num">208,0; 77 / 106</td><td class="num">200,6; 248 / 309</td></tr>
+        <tr><td rowspan="2">Có ETag (304)</td><td>Hardhat</td><td class="num">340,0; 3 / 5</td><td class="num">696,9; 5 / 10</td><td>—</td><td class="num">626,4; 78 / 136</td></tr>
+        <tr><td>Sepolia</td><td class="num">330,9; 3 / 5</td><td class="num">659,0; 6 / 11</td><td>—</td><td class="num">646,4; 74 / 161</td></tr>
+        <tr><td rowspan="2"><code>GET /api/proof/:id/attestation</code></td><td>Hardhat</td><td class="num">60,3; 16 / 20</td><td class="num">189,3; 21 / 30</td><td class="num">216,9; 73 / 95</td><td class="num">208,3; 235 / 308</td></tr>
+        <tr><td>Sepolia</td><td class="num">140,3; 7 / 9</td><td class="num">237,0; 16 / 27</td><td class="num">231,6; 68 / 102</td><td class="num">229,4; 215 / 272</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <ul>
+    <li><strong>Từ c=4 thông lượng chững lại</strong>: route proof và route xác nhận ở ~190–240 req/s, route 304 ở ~630–700 req/s; tăng concurrency chỉ làm latency tăng.</li>
+    <li><strong>Hardhat và Sepolia gần như bằng nhau</strong> nhờ cache root có dải stale (D74); chỉ lần đọc root nguội đầu tiên trên Sepolia mất 1,6 s.</li>
+    <li><strong>Xác nhận tình trạng trên Hardhat ở c=1 chậm hơn Sepolia</strong> (16 so với 7 ms), giống 06/10. Lượt đo Hardhat chạy ngay sau 22 ngày <code>confirm</code>; giả thuyết áp lực GC <strong>chưa kiểm chứng</strong>.</li>
+  </ul>
+
+  <!-- TIỀN -->
+  <h2 id="tien">7. Chi Phí Bằng Tiền</h2>
+  <h3>7.1. Đo thật trên Sepolia</h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Khoản</th><th>Số tiền</th></tr></thead>
+      <tbody>
+        <tr><td>Deploy bench (5 contract + <code>registerAuthority</code> + <code>grantRole</code> + genesis)</td><td class="num">0,009157 ETH</td></tr>
+        <tr><td>5 đợt (ngày 1–5)</td><td class="num"><strong>0,336326 ETH</strong>: 0,000108 / 0,108449 / 0,108461 / 0,010846 / 0,108461</td></tr>
+        <tr style="background:#f0fdf4"><td><strong>Tổng chi</strong></td><td class="num"><strong>0,345483 ETH</strong>, khớp số dư ví (7,444357 → 7,098875 ETH)</td></tr>
+        <tr><td>Base fee / giá thực trả</td><td class="num">30–39 wei / 0,001 · 1 · 1 · 0,1 · 1 gwei (ethers tự chọn tip)</td></tr>
+        <tr><td>Trung bình một ngày</td><td class="num">0,067 ETH; ~0,108 ETH nếu tip 1 gwei</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>7.2. Ước tính mainnet (suy ra, không phải số đo)</h3>
+  <p>Gas một tháng (22 ngày): <strong>545.406.014</strong> theo luật hiện tại của mainnet; <strong>2.386.089.424</strong> nếu mainnet dùng luật như Sepolia. Giá gas: base p50 0,0464 + tip p50 0,0035 = <strong>0,0499 gwei</strong> (1.024 block, 12/11). Tỉ giá: ETH = 2.042,98 USD (12/11); 1 USD = 25.656 VND (13/11).</p>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr><th>Kịch bản giá gas</th><th>gwei</th><th class="th-after">Luật hiện tại: ETH</th><th class="th-after">USD</th><th class="th-after">VND</th><th class="th-warn">Luật như Sepolia: ETH</th><th class="th-warn">USD</th><th class="th-warn">VND</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eff6ff; font-weight:700"><td>Mainnet p50 ngày 12/11</td><td class="num">0,0499</td><td class="num">0,0272</td><td class="num">56</td><td class="num">1,43 tr</td><td class="num">0,1191</td><td class="num">243</td><td class="num">6,24 tr</td></tr>
+        <tr><td>Mainnet p50 ngày 06/10</td><td class="num">0,633</td><td class="num">0,3452</td><td class="num">705</td><td class="num">18,10 tr</td><td class="num">1,5104</td><td class="num">3.086</td><td class="num">79,17 tr</td></tr>
+        <tr><td>1 gwei</td><td class="num">1</td><td class="num">0,5454</td><td class="num">1.114</td><td class="num">28,59 tr</td><td class="num">2,3861</td><td class="num">4.875</td><td class="num">125,07 tr</td></tr>
+        <tr><td>Mạng bận</td><td class="num">5</td><td class="num">2,7270</td><td class="num">5.571</td><td class="num">142,94 tr</td><td class="num">11,9304</td><td class="num">24.374</td><td class="num">625,34 tr</td></tr>
+        <tr><td>Mạng rất bận (2021–2022)</td><td class="num">20</td><td class="num">10,9081</td><td class="num">22.285</td><td class="num">571,75 tr</td><td class="num">47,7218</td><td class="num">97.494</td><td class="num">2.501 tr</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Thao tác (ở 0,0499 gwei)</th><th>Gas</th><th>USD</th><th>VND</th></tr></thead>
+      <tbody>
+        <tr><td>Một đợt 591 thu hồi (luật hiện tại)</td><td class="num">15.414.862</td><td class="num">1,57</td><td class="num">~40.300</td></tr>
+        <tr><td>Một thu hồi (luật hiện tại)</td><td class="num">~25.970</td><td class="num">0,0027</td><td class="num">~68</td></tr>
+        <tr><td><code>publishRoot</code> không thu hồi</td><td class="num">64.339</td><td class="num">0,0066</td><td class="num">~168</td></tr>
+        <tr><td>Một đợt 950 thu hồi (luật như Sepolia)</td><td class="num">108.460.883</td><td class="num">11,06</td><td class="num">~283.700</td></tr>
+        <tr><td>Một thu hồi (luật như Sepolia)</td><td class="num">~114.000</td><td class="num">0,0116</td><td class="num">~298</td></tr>
+        <tr><td>Chuyển nhượng, cấp lại (biên trong đợt)</td><td class="num">~0</td><td>—</td><td>—</td></tr>
+        <tr><td>Verify (<code>eth_call</code>), xác nhận tình trạng (ký off-chain)</td><td class="num">0</td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout callout-warning">
+    <div class="callout-title">Hai lưu ý khi trích dẫn</div>
+    <ul>
+      <li><strong>Giá gas mainnet ngày 12/11 thấp hơn ngày 06/10 khoảng 13 lần.</strong> Muốn so với 06/10 thì dùng cùng mức giá: ở 0,633 gwei, tháng này tốn 0,345 ETH cho 20.890 thu hồi, so với 0,194 ETH cho 3.300 thu hồi ngày 06/10.</li>
+      <li><strong>Cột "luật như Sepolia" là ước tính có điều kiện</strong>: giả định mainnet dùng cùng tham số EIP-8037 và block đủ lớn cho một giao dịch 108 triệu gas.</li>
+    </ul>
+  </div>
+
+  <!-- PHÁT HIỆN -->
+  <h2 id="phat-hien">8. Phát Hiện Và Đề Xuất</h2>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>#</th><th>Vấn đề</th><th>Bằng chứng</th><th>Đề xuất</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td><strong><code>confirm</code> 485 s/ngày, ~93% là dựng bundle (PDF); RAM vọt 4,2 GiB</strong></td><td>§4.3, §4.4</td><td>Không render PDF trong <code>confirm</code>: lưu receipt và secret, render khi tải archive; hoặc dùng worker pool. Lần này giữ nguyên và ghi thành phát hiện, như đã quyết</td></tr>
+        <tr><td class="num">2</td><td><strong>Hai đợt mỗi ngày theo luật gas hiện tại của mainnet</strong></td><td>§4.2: 591 + 359</td><td>Không cần sửa code; ghi vào thesis: cán bộ ký 2 lần/ngày trên mạng chưa fork, 1 lần trên mạng đã fork</td></tr>
+        <tr><td class="num">3</td><td><strong>Phí Sepolia do tip quyết định</strong></td><td>§7.1</td><td>Khi cần so chi phí giữa các lần đo, đặt <code>maxPriorityFeePerGas</code> cố định trong <code>sign:root</code>; khi báo cáo thì dùng gas rồi nhân với giá</td></tr>
+        <tr><td class="num">4</td><td><strong>Tạo nháp đợt chậm lên ~4,7 lần</strong></td><td>§4.1: 3,7 → 17,4 s; số lá ×1,56</td><td><strong>Đã giải thích (A3, mục 11):</strong> 88% là chiếu root. Code của cây không đổi từ 06/10; harness cũ lấy 86.758 thửa đầu tiên theo id nên thửa đổi dồn một góc cây. Số 06/10 lạc quan</td></tr>
+        <tr><td class="num">5</td><td><strong><code>tree:bootstrap</code> không thoát khi không có node chain</strong></td><td>§1, sự cố</td><td>Gọi <code>process.exit()</code> sau khi in kết quả, hoặc không khởi tạo ChainModule trong script này</td></tr>
+        <tr><td class="num">6</td><td><code>month.json</code> ghi <code>publishes</code> theo ngày</td><td>§1.3</td><td>Đếm theo đợt trong harness</td></tr>
+        <tr><td class="num">7</td><td>Archive ~146 MB/ngày</td><td>§3</td><td>Đường xoá archive hết hạn chưa được bench chạy tới (22 ngày nén trong 3 giờ)</td></tr>
+        <tr><td class="num">8</td><td><strong>Xác nhận tình trạng mới ký bị contract từ chối trong khoảng một block</strong></td><td>A6: backend nhận, contract <code>InvalidAttestation</code>; đào một block thì contract nhận</td><td>Backend ký <code>expiresAt</code> = giờ máy + 600, đúng trần của contract. Ký với hạn ngắn hơn trần, hoặc cho contract khoảng lệch nhỏ</td></tr>
+        <tr><td class="num">9</td><td><strong>Import 50 nghìn dòng mất 108,7 s, sát trần 120 s của transaction</strong></td><td>A5: 10 nghìn dòng 10,4 s; 50 nghìn 108,7 s</td><td>Chia tệp ≤ 20 nghìn dòng, hoặc ghi theo lô</td></tr>
+        <tr><td class="num">10</td><td><strong>Transaction ghi của <code>confirm</code> có ít dư địa so với trần 120 s</strong></td><td>A1: bảng phình gấp đôi → 325,9 s, bị huỷ sau khi root đã lên chain</td><td>Giữ autovacuum, theo dõi thời gian transaction, cân nhắc ghi theo lô hoặc nâng trần; chạy thử đường phục hồi</td></tr>
+        <tr><td class="num">11</td><td>Archive theo 38 chi nhánh làm <code>confirm</code> dài thêm ~12–14%</td><td>A1</td><td>Chấp nhận được; dung lượng không đổi</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout callout-success">
+    <div class="callout-title">Đã giải quyết so với 06/10</div>
+    <p>Cap thu hồi không còn vượt block sau Glamsterdam (D91), và hàng chờ thu hồi không còn dâng.</p>
+  </div>
+
+  <!-- GIỚI HẠN -->
+  <h2 id="gioi-han">9. Giới Hạn Của Phép Đo</h2>
+  <ul>
+    <li><strong>Một máy, Postgres mặc định, RPC Alchemy gói free.</strong> Gas đúng với EVM; thời gian đúng với cấu hình ở đầu báo cáo.</li>
+    <li><strong>Sepolia chỉ có 5 ngày</strong>, tip thay đổi theo ngày; thời gian chờ block chỉ có 5 mẫu.</li>
+    <li><strong>Hardhat 2.28 chưa mô phỏng Glamsterdam</strong>: số Hardhat là luật trước fork, tức luật của mainnet hôm nay.</li>
+    <li><strong>Proof chuyển nhượng không được sinh trong replay</strong>; prove trong browser chưa đo (M4).</li>
+    <li><strong>Một archive mỗi đợt</strong> trong tháng đo vì seed không gán chi nhánh; trường hợp 38 chi nhánh đo riêng ở A1 (mục 11).</li>
+    <li><strong>Cây được dựng lại sau sự cố tắt máy.</strong> A2 (mục 11) đã kiểm lại: dựng lại cả cây từ dữ liệu sau tháng ra đúng root đã publish, 2.991/2.991 proof lấy mẫu khớp <code>latestRoot</code>.</li>
+    <li><strong>Chi phí mainnet là số suy ra</strong> từ gas đo được và giá gas một ngày.</li>
+  </ul>
+
+  <!-- DỮ LIỆU THÔ -->
+  <h2 id="tai-lap">10. Dữ Liệu Thô Và Tái Lập</h2>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Số liệu</th><th>File (trong thư mục của báo cáo này)</th></tr></thead>
+      <tbody>
+        <tr><td>Test, build, lint, constraint, prove trong Node, artifact</td><td><code>data/phase1/</code></td></tr>
+        <tr><td>Gas deploy Hardhat, publish, trạng thái mạng, giá gas, tỉ giá</td><td><code>data/phase2/</code></td></tr>
+        <tr><td>Seed 4,5 triệu</td><td><code>data/phase3-hardhat/seed.json</code>, <code>seed.txt</code>, <code>bootstrap.txt</code>, <code>seed-run-interrupted.log</code></td></tr>
+        <tr><td>Tháng Hardhat</td><td><code>data/phase3-hardhat/month.json</code>, <code>round-gas.json</code>, <code>backend-rss.csv</code>, <code>db-size-after.txt</code></td></tr>
+        <tr><td>Tách chi phí <code>confirm</code></td><td><code>data/phase3-hardhat/confirm-breakdown.txt</code></td></tr>
+        <tr><td>Tải proof / 304 / attestation</td><td><code>data/phase3-{hardhat,sepolia}/proof-load.txt</code>; JSON gốc trong <code>results/</code></td></tr>
+        <tr><td>5 ngày Sepolia</td><td><code>data/phase3-sepolia/month.json</code>, <code>round-gas.json</code>, <code>deploy-gas.json</code>, <code>balance.txt</code>, <code>sepolia.json.bench</code></td></tr>
+        <tr><td>Case tấn công / log điều phối</td><td><code>data/attacks/</code> / <code>data/run-all.log</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+<pre>pnpm install &amp;&amp; pnpm run compile &amp;&amp; pnpm run db:up
+bash benchmarks/2026-11-12-hcmc-4.5M-final/scripts/run-phase1.sh
+bash benchmarks/2026-11-12-hcmc-4.5M-final/scripts/run-network.sh
+# seed một lần (~50 phút) vào land_registry_bench_final, đặt seed.json vào data/phase3-hardhat/
+bash benchmarks/2026-11-12-hcmc-4.5M-final/scripts/run-all.sh &gt; benchmarks/2026-11-12-hcmc-4.5M-final/data/run-all.log 2&gt;&amp;1
+# ~4,5 giờ; tốn ~0,35 ETH Sepolia; script tự sao lưu và trả lại blockchain/deployments/sepolia.json</pre>
+  <p>Chi tiết lệnh seed và biến môi trường ở <code>README.md</code> cùng thư mục, mục 13. <strong>Không chạy <code>circuits:setup</code></strong>: zkey mới sẽ không khớp verifier đã deploy.</p>
+
+  <!-- ĐO BỔ SUNG -->
+  <h2 id="bo-sung">11. Đo Bổ Sung 15/11 (A1–A6)</h2>
+  <p>Cùng máy, cùng commit, cùng harness, cộng ba tuỳ chọn mới (<code>SUCCESSOR_OFFSET</code>, <code>STOP_BEFORE_DRAFT_DAY</code>, giấy cấp lại thừa hưởng chi nhánh). Script mới: <code>bench-draft-breakdown.ts</code>, <code>treeCheck.ts</code>, <code>verifyOnChain.ts</code>. Chi tiết và file nguồn ở <code>README.md</code> §14.</p>
+
+  <h3>11.1. A1: mỗi chi nhánh một archive</h3>
+  <p>Bản nhân bản 4,5 triệu giấy, gán mỗi thửa cho một trong 38 chi nhánh theo băm của <code>propertyId</code> (117.885–119.023 thửa mỗi chi nhánh), rồi <code>VACUUM FULL</code> để bảng về cỡ bản gốc. Ba ngày như tháng đo.</p>
+  <div class="table-container">
+    <table>
+      <thead><tr><th></th><th class="th-after">38 chi nhánh (A1)</th><th class="th-before">Một archive HQ (tháng đo, ngày 1–3)</th></tr></thead>
+      <tbody>
+        <tr><td>Archive mỗi đợt có hồ sơ</td><td><strong>38 ZIP</strong>, 60–104 thửa và 2,2–3,8 MB mỗi ZIP</td><td>1 ZIP</td></tr>
+        <tr><td>Tổng dung lượng ngày 1 / 2 / 3</td><td class="num">110,0 / 143,5 / 144,0 MB</td><td class="num">108,0 / 143,0 / 145,3 MB</td></tr>
+        <tr><td><code>confirm</code> ngày 1 / 2 / 3</td><td class="num"><strong>423,7 / 537,9 / 537,7 s</strong></td><td class="num">372,2 / 479,4 / 479,7 s</td></tr>
+        <tr><td>Tạo nháp ngày 1 / 2 / 3</td><td class="num">21,4 / 26,1 / 17,8 s</td><td class="num">10,8 / 20,3 / 19,1 s</td></tr>
+        <tr><td>Gas mỗi ngày</td><td class="num">24,79–24,80 triệu</td><td class="num">24,79–24,80 triệu</td></tr>
+        <tr><td>RAM backend: đỉnh / trung bình</td><td class="num">2.043 / 998 MB</td><td class="num">4.297 / 1.924 MB (cả tháng)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <ul>
+    <li><strong>Tách theo chi nhánh làm <code>confirm</code> dài thêm ~12–14%</strong>; tổng dung lượng không đổi. Mỗi chi nhánh chỉ tải 2–4 MB mỗi đợt.</li>
+  </ul>
+  <div class="callout callout-warning">
+    <div class="callout-title">Phát hiện #10: transaction ghi của <code>confirm</code> có ít dư địa so với trần 120 s</div>
+    <p>Lần chạy A1 đầu tiên dùng bảng <code>properties</code> phình gấp đôi (UPDATE 4,5 triệu dòng mà chưa nén). Transaction ghi của <code>confirm</code> chạy <strong>325,9 s</strong>, vượt trần 120 s và bị huỷ <strong>sau khi root đã lên chain</strong>: đúng tình huống "chain đi trước DB". Sau khi nén bảng, cùng phép đo chạy bình thường. Trên DB khoẻ transaction vừa trần (ước ~50–60 s mỗi ngày), nhưng DB phình hay đang vacuum đủ đẩy nó quá trần. Đường phục hồi (gọi lại <code>confirm</code>) chưa được chạy thử.</p>
+  </div>
+
+  <h3>11.2. A2: cây ở 4,5 triệu có đúng không</h3>
+  <div class="compare-grid">
+    <div class="compare-card after">
+      <div class="card-title">Dựng lại từ đầu = cập nhật dần</div>
+      <div class="card-stat stat-green">MATCH</div>
+      <div class="card-note">Sau 44 đợt: dựng lại 4.499.051 lá, 15.747.635 node trong 2.311,8 s; root trùng từng chữ số với root đợt #44 trên chain</div>
+    </div>
+    <div class="compare-card after">
+      <div class="card-title">Proof lấy mẫu dựng lại đúng <code>latestRoot</code></div>
+      <div class="card-stat stat-green">2.991 / 2.991</div>
+      <div class="card-note">3.200 thửa: 2.000 rải đều + 500 đã chuyển nhượng + 500 cấp lại + 200 đã thu hồi; 209/209 thu hồi trả 410; id không tồn tại trả 404; 0 lỗi</div>
+    </div>
+  </div>
+
+  <h3>11.3. A3: thời gian tạo nháp đi đâu (ngày 2 thật, trung bình lượt 2–3)</h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Bước (ms)</th><th>950 cấp lại + 2.994 chuyển nhượng + 591 thu hồi</th><th>Không cấp lại: 2.994 + 591</th></tr></thead>
+      <tbody>
+        <tr><td>Đọc hàng chờ, kiểm xung đột, khoá</td><td class="num">81</td><td class="num">79</td></tr>
+        <tr><td>Kiểm secret đề nghị cấp (950 Poseidon)</td><td class="num">61</td><td class="num">0</td></tr>
+        <tr><td>Kiểm lineage</td><td class="num">102</td><td class="num">0</td></tr>
+        <tr><td>Đọc dòng, tính lá mới</td><td class="num">1.477</td><td class="num">1.207</td></tr>
+        <tr style="background:#fffbeb"><td><strong>Chiếu root: đọc node anh em từ DB</strong></td><td class="num">9.375</td><td class="num">5.419</td></tr>
+        <tr style="background:#fffbeb"><td><strong>Chiếu root: băm Poseidon</strong></td><td class="num">5.788</td><td class="num">4.492</td></tr>
+        <tr><td>Gắn item vào đợt</td><td class="num">308</td><td class="num">259</td></tr>
+        <tr><td>Còn lại</td><td class="num">14</td><td class="num">14</td></tr>
+        <tr style="background:#f0fdf4"><td><strong>Tổng</strong></td><td class="num"><strong>17.204</strong></td><td class="num"><strong>11.469</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="bar-comparison-container">
+    <div class="bar-row">
+      <div class="bar-label-group"><span>Một lần tạo nháp ngày 2 (17,2 s)</span><span>chiếu root 88%</span></div>
+      <div class="bar-track">
+        <div class="bar-fill bar-fill-blue" style="width:54.5%">đọc node 9,4 s</div>
+        <div class="bar-fill bar-fill-purple" style="width:33.6%">băm 5,8 s</div>
+        <div class="bar-fill bar-fill-slate" style="width:11.9%" title="các bước khác 2,0 s"></div>
+      </div>
+    </div>
+  </div>
+  <p>Code của cây không đổi từ 06/10. Harness đã commit lấy 86.758 thửa <strong>đầu tiên theo id</strong>, nên thửa đổi dồn một góc cây và dùng chung node; harness bây giờ rải thửa đổi khắp sổ, đúng với một thành phố thật. Số 06/10 (3,6 s) lạc quan; số 12/11 mới là số nên trích.</p>
+
+  <h3>11.4. A4: chi phí một ngày có phụ thuộc cỡ sổ không</h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th></th><th>100k id rải</th><th>100k id liền kề</th><th>4,5 triệu id rải</th></tr></thead>
+      <tbody>
+        <tr><td>Seed: nạp dòng / dựng cây / node</td><td class="num">21,1 s / 102,8 s / 930.472</td><td class="num">20,6 s / 37,1 s / 200.018</td><td class="num">962,1 s / 2.112,5 s / 15.750.005</td></tr>
+        <tr><td>Tạo nháp ngày 1 / 2 / 3 (s)</td><td class="num">12,4 / 11,3 / 11,5</td><td class="num">9,1 / 8,4 / 8,7</td><td class="num">10,8 / 20,3 / 19,1</td></tr>
+        <tr><td><code>confirm</code> ngày 1 / 2 / 3 (s)</td><td class="num">363,0 / 463,0 / 461,4</td><td class="num">363,8 / 456,3 / 455,8</td><td class="num">372,2 / 479,4 / 479,7</td></tr>
+        <tr><td>Gas ngày 1 / 2 / 3 (triệu)</td><td class="num">24,80 / 24,79 / 24,80</td><td class="num">12,09 / 5,76 / 5,77</td><td class="num">24,80 / 24,79 / 24,80</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <ul>
+    <li><strong><code>confirm</code> và gas không phụ thuộc cỡ sổ</strong> (lệch ≤ 3,6% và dưới 100 gas mỗi ngày giữa 100 nghìn và 4,5 triệu cùng layout).</li>
+    <li><strong>Id liền kề rẻ hơn 2–4 lần về gas</strong>: các thu hồi gần nhau dùng chung word 256 bit của bitmap (D91).</li>
+    <li><strong>Tạo nháp ở 4,5 triệu chậm hơn ~1,7 lần ở các ngày có cấp lại</strong> dù số node đọc và băm như nhau; giả thuyết là bảng node 2,1 GB không vừa bộ đệm Postgres. Chưa tách được.</li>
+  </ul>
+
+  <h3>11.5. A5: tốc độ import CSV</h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Số dòng</th><th>Kích thước</th><th>Dry-run</th><th>Nhập thật</th><th>Kết quả</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1.000</td><td class="num">0,24 MB</td><td class="num">0,31 s</td><td class="num">0,71 s</td><td>0 lỗi, mọi dòng gán đúng chi nhánh</td></tr>
+        <tr><td class="num">10.000</td><td class="num">2,4 MB</td><td class="num">3,52 s</td><td class="num">10,38 s</td><td>0 lỗi</td></tr>
+        <tr><td class="num">50.000</td><td class="num">12,0 MB</td><td class="num">10,05 s</td><td class="num"><strong>108,65 s</strong></td><td>0 lỗi; sát trần 120 s của transaction</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>11.6. A6: case tấn công trên Hardhat, không cần MetaMask</h3>
+  <div class="table-container">
+    <table>
+      <thead><tr><th>Case</th><th>Kết quả</th></tr></thead>
+      <tbody>
+        <tr><td>Đối chứng: bundle thật của 206</td><td><code>receipt:verify</code> đạt cả 10 mục (kể cả chuỗi D30); proof hợp lệ được backend chấp nhận</td></tr>
+        <tr><td>(a) Bán hai lần trong lúc chờ</td><td>Xác nhận tình trạng bị từ chối, 409 <code>ProcedureOpen</code></td></tr>
+        <tr><td>(b) Chủ bị thu hồi đem sổ đi vay</td><td>Xác nhận bị từ chối; backend 422 <code>InvalidAttestation</code>; contract <code>AttestationExpired</code></td></tr>
+        <tr><td>(c) Chủ cũ sau đợt vào sổ</td><td>Trước đợt hợp lệ cả 5 bước; sau đợt <code>RootMismatch</code> ở backend và contract; chủ cũ không prove được; người mua prove được</td></tr>
+        <tr><td>(d) Thửa đã thu hồi</td><td>410; <code>isRevoked(203)</code> true; lịch sử chỉ mã lý do + băm; đợt 1 thu hồi 92.008 gas</td></tr>
+        <tr><td>(e) Phát lại proof cũ</td><td><code>StaleTimestamp</code> ở backend (666 s) và contract (674 s)</td></tr>
+        <tr><td>(f) Sửa diện tích trong receipt</td><td>Hỏng đúng mục "record matches the certified leaf — ALTERED", 9 mục khác xanh; prover dừng</td></tr>
+        <tr><td>(n) Quét API</td><td>70 request dồn: 60 × 200, 10 × 429</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout callout-warning">
+    <div class="callout-title">Phát hiện #8: xác nhận tình trạng mới ký bị contract từ chối trong khoảng một block</div>
+    <p>Cùng một proof hợp lệ vừa tạo: backend chấp nhận, contract báo <code>InvalidAttestation</code>; đào thêm một block rồi gọi lại thì contract chấp nhận (<code>expiresAt</code> cách <code>block.timestamp</code> 590 s). Nguyên nhân: backend ký <code>expiresAt</code> = giờ máy + 600, đúng trần <code>block.timestamp</code> + 600 của contract.</p>
+  </div>
+
+  <footer>
+    Land Registry ZKP · Báo cáo đo ngày 12/11/2026 (bổ sung 15/11) · Bản Markdown: <code>README.md</code> cùng thư mục · Đối chiếu: báo cáo 06/10/2026 (<code>docs/bench/</code>, local)
+  </footer>
+
+</body>
+</html>

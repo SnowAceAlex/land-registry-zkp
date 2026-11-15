@@ -59,6 +59,14 @@ const API_KEY = process.env.GOV_API_KEY ?? '';
 const INSERT_CHUNK = 1_000;
 // Resume a run stopped mid-month (1-based): keeps the queue, signs the open draft first.
 const RESUME_FROM_DAY = Number(process.env.RESUME_FROM_DAY ?? 0);
+// D83: a re-issue is revoke + issue under a new id; day d issues the replacements of day d-1's revocations.
+const REISSUE = process.env.REISSUE !== '0';
+// Follow-on rounds per day while revocations are deferred by the cap (D84 "Tạo đợt tiếp").
+const MAX_ROUNDS_PER_DAY = 10;
+// A replacement sits at revoked id + offset; contiguous layouts need an offset past the last id.
+const SUCCESSOR_OFFSET = BigInt(process.env.SUCCESSOR_OFFSET ?? 1);
+// Queue day N (1-based) and exit before its draft, leaving a real queue for bench:draft-breakdown.
+const STOP_BEFORE_DRAFT_DAY = Number(process.env.STOP_BEFORE_DRAFT_DAY ?? 0);
 
 /**
  * Which `sign:root` variant to run.
@@ -78,12 +86,16 @@ interface DayResult {
   transfers: number;
   revocations: number;
   deferredRevocations: number;
+  issuances: number;
+  /** Rounds published this day: more than one when the revocation cap deferred some. */
+  rounds: number;
   queueMs: number;
   draftMs: number;
   signMs: number;
   confirmMs: number;
   gasUsed: string;
   rootVersion: number;
+  txHashes: string[];
   /**
    * Needed to reconstruct the real cost afterwards: `gasUsed × effectiveGasPrice`
    * only exists on the receipt, and on a public chain the receipt is the only
@@ -232,15 +244,25 @@ async function main(): Promise<void> {
   if (!RESUME_FROM_DAY) await resetQueue(prisma);
 
   const needed = TRANSFERS + REVOCATIONS;
-  const pool_ = await prisma.property.findMany({
-    // On resume, plots revoked earlier this run still belong to the genesis pool.
-    where: { status: RESUME_FROM_DAY ? { in: ['ISSUED', 'REVOKED'] } : 'ISSUED' },
-    // The current commitment is needed: the next owner is chained from it, so
-    // that replaying against an already-replayed database still moves each leaf.
-    select: { propertyId: true, ownerCommitment: true, landOfficeId: true },
-    orderBy: { id: 'asc' },
-    take: needed,
-  });
+  // On resume, plots revoked earlier this run still belong to the genesis pool.
+  const statuses = RESUME_FROM_DAY ? ['ISSUED', 'REVOKED'] : ['ISSUED'];
+  const [{ total }] = await prisma.$queryRaw<{ total: bigint }[]>(
+    Prisma.sql`SELECT count(*) AS total FROM properties
+      WHERE status::text = ANY(${statuses}) AND "propertyId" NOT IN (SELECT "successorPropertyId" FROM property_lineage)`,
+  );
+  // Every step-th plot, so a day's changes are spread over the whole register as in a real city.
+  // The current commitment is needed: the next owner is chained from it, so
+  // that replaying against an already-replayed database still moves each leaf.
+  const step = Math.max(1, Math.floor(Number(total) / needed));
+  const pool_ = await prisma.$queryRaw<
+    { propertyId: string; ownerCommitment: string | null; landOfficeId: number | null }[]
+  >(
+    Prisma.sql`SELECT "propertyId", "ownerCommitment", "landOfficeId" FROM (
+      SELECT "propertyId", "ownerCommitment", "landOfficeId", row_number() OVER (ORDER BY id) - 1 AS rn
+      FROM properties
+      WHERE status::text = ANY(${statuses}) AND "propertyId" NOT IN (SELECT "successorPropertyId" FROM property_lineage)
+    ) t WHERE rn % ${step} = 0 ORDER BY rn LIMIT ${needed}`,
+  );
   if (pool_.length < needed) {
     throw new Error(
       `need ${needed} issued plots, found ${pool_.length} — run bench:seed against this database first`,
@@ -251,10 +273,51 @@ async function main(): Promise<void> {
   const hq = await prisma.landOffice.findUnique({ where: { code: 'HQ' }, select: { id: true } });
   if (!hq) throw new Error('land office HQ is missing — apply the Phase 10 migrations first');
 
-  const transferPool = pool_.slice(0, TRANSFERS);
-  const revocationPool = pool_.slice(TRANSFERS);
-  const perDayTransfers = Math.ceil(TRANSFERS / DAYS);
-  const perDayRevocations = Math.ceil(REVOCATIONS / DAYS);
+  // Revocations evenly interleaved with transfers; day d takes every DAYS-th item of each pool.
+  const isRevocation = (i: number) =>
+    Math.floor(((i + 1) * REVOCATIONS) / needed) > Math.floor((i * REVOCATIONS) / needed);
+  const transferPool = pool_.filter((_, i) => !isRevocation(i));
+  const revocationPool = pool_.filter((_, i) => isRevocation(i));
+  const ofDay = <T>(pool: T[], day: number) => pool.filter((_, i) => i % DAYS === day);
+
+  // Replacement certificates (D83/D90): a new IMPORTED plot at id+1 superseding each revoked one.
+  // id+1 is free only with LAYOUT=scattered (else set SUCCESSOR_OFFSET); the guard below fails loudly.
+  const successorOf = (propertyId: string) => (BigInt(propertyId) + SUCCESSOR_OFFSET).toString();
+  if (REISSUE && !RESUME_FROM_DAY) {
+    const successors = revocationPool.map((p) => successorOf(p.propertyId));
+    const taken = await prisma.property.count({
+      where: { propertyId: { in: successors }, status: { not: 'IMPORTED' } },
+    });
+    if (taken > 0) throw new Error(`REISSUE needs free ids at revoked id + ${SUCCESSOR_OFFSET}; ${taken} taken`);
+    const nowIso = new Date().toISOString();
+    for (let i = 0; i < revocationPool.length; i += INSERT_CHUNK) {
+      const chunk = revocationPool.slice(i, i + INSERT_CHUNK);
+      await prisma.$executeRaw(
+        Prisma.sql`INSERT INTO properties (
+          "propertyId", "useType", "validityPeriod", "encumbranceStatus", "tenureType", "landUseCode",
+          "certificateSerial", "bookEntryNumber", "address", "area", "issuingAuthority", "issueDate",
+          "status", "createdAt", "updatedAt", "landOfficeId"
+        ) VALUES ${Prisma.join(
+          chunk.map(({ propertyId, landOfficeId }) => {
+            const id = successorOf(propertyId);
+            // Same land, same branch: the replacement inherits the predecessor's office (D85/D88).
+            return Prisma.sql`(${id}, ${'RESIDENTIAL'}::"UseType", ${'0'}, ${'FREE'}::"EncumbranceStatus",
+              ${'PERPETUAL'}::"TenureType", ${'ONT'}, ${`BENCH-${id}`}, ${`BK-${id}`},
+              ${`So ${id}, Phuong Sai Gon, Thanh pho Ho Chi Minh`}, ${'100.00'}::decimal,
+              ${'Van phong Dang ky dat dai Thanh pho Ho Chi Minh'}, ${nowIso}::date,
+              ${'IMPORTED'}::"PropertyStatus", ${nowIso}::timestamp, ${nowIso}::timestamp,
+              ${landOfficeId}::integer)`;
+          }),
+        )} ON CONFLICT ("propertyId") DO NOTHING`,
+      );
+      await prisma.$executeRaw(
+        Prisma.sql`INSERT INTO property_lineage ("predecessorPropertyId", "successorPropertyId") VALUES ${Prisma.join(
+          chunk.map(({ propertyId }) => Prisma.sql`(${propertyId}, ${successorOf(propertyId)})`),
+        )} ON CONFLICT DO NOTHING`,
+      );
+    }
+    console.log(`  imported ${revocationPool.length} replacement plots (REISSUE)`);
+  }
 
   console.log(
     `  replaying ${TRANSFERS.toLocaleString('en-US')} transfers + ` +
@@ -287,6 +350,11 @@ async function main(): Promise<void> {
         'every mutation modelled as a transfer (conservative upper bound)',
         'transfer proofs measured separately by bench:prove, not generated here',
         'no per-procedure transaction: the lock is the open request row, enforced by the status attestation (D82)',
+        'changed plots are every step-th plot of the register, so each day is spread over the whole id range',
+        ...(REISSUE
+          ? ['each revoked certificate is replaced the next day by a new one at id+1 with a lineage link (D83/D90)']
+          : []),
+        `follow-on rounds in the same day while the revocation cap defers some (max ${MAX_ROUNDS_PER_DAY})`,
       ],
       transfers: TRANSFERS,
       revocations: REVOCATIONS,
@@ -326,11 +394,10 @@ async function main(): Promise<void> {
           ).draft
         : null;
 
-    const todayTransfers = transferPool.slice(day * perDayTransfers, (day + 1) * perDayTransfers);
-    const todayRevocations = revocationPool.slice(
-      day * perDayRevocations,
-      (day + 1) * perDayRevocations,
-    );
+    const todayTransfers = ofDay(transferPool, day);
+    const todayRevocations = ofDay(revocationPool, day);
+    const todayIssuances =
+      REISSUE && day > 0 ? ofDay(revocationPool, day - 1).map((p) => successorOf(p.propertyId)) : [];
     if (todayTransfers.length === 0 && todayRevocations.length === 0) break;
 
     // ── Queue the day's paperwork ────────────────────────────────────────────
@@ -370,59 +437,78 @@ async function main(): Promise<void> {
           detailText: `bench replay, day ${day + 1}`,
         });
       }
+
+      // Replacement issuances through the real central-office route (max 500 per call).
+      for (let i = 0; i < todayIssuances.length; i += 500) {
+        await api('/government/issuance-requests', { propertyIds: todayIssuances.slice(i, i + 500) });
+      }
     }
     const queueMs = resumeDraft ? 0 : Date.now() - queueStart;
+    if (day + 1 === STOP_BEFORE_DRAFT_DAY) {
+      console.log(`  day ${day + 1}: queued in ${queueMs}ms; stopping before the draft (STOP_BEFORE_DRAFT_DAY)`);
+      break;
+    }
 
     // ── The real flow, with no shortcuts from here on ────────────────────────
-    const draftStart = Date.now();
-    const draft =
-      resumeDraft ??
-      (await api<{
-        id: number;
-        newRoot: string;
-        revocationCalldata: {
-          propertyIds: string[];
-          reasonCodes: number[];
-          detailHashes: string[];
-        };
-        deferredRevocations: number;
-      }>('/government/changesets'));
-    const draftMs = resumeDraft ? 0 : Date.now() - draftStart;
+    // One closing session: rounds follow each other while the cap defers revocations.
+    type Draft = {
+      id: number;
+      newRoot: string;
+      revocationCalldata: { propertyIds: string[]; reasonCodes: number[]; detailHashes: string[] };
+      deferredRevocations: number;
+    };
+    let draft: Draft | null = resumeDraft;
+    let draftMs = 0, signMs = 0, confirmMs = 0, revoked = 0, rounds = 0, gas = 0n;
+    let signed!: ReturnType<typeof signRoot>;
+    const txHashes: string[] = [];
+    do {
+      const draftStart = Date.now();
+      if (!draft || rounds > 0) draft = await api<Draft>('/government/changesets');
+      draftMs += Date.now() - draftStart;
 
-    const calldata = draft.revocationCalldata.propertyIds.map((propertyId, i) => ({
-      propertyId,
-      reasonCode: draft.revocationCalldata.reasonCodes[i],
-      detailHash: draft.revocationCalldata.detailHashes[i],
-    }));
+      const calldata = draft.revocationCalldata.propertyIds.map((propertyId, i) => ({
+        propertyId,
+        reasonCode: draft!.revocationCalldata.reasonCodes[i],
+        detailHash: draft!.revocationCalldata.detailHashes[i],
+      }));
 
-    const signStart = Date.now();
-    const signed = signRoot(draft.newRoot, calldata.length > 0 ? calldata : undefined);
-    const signMs = Date.now() - signStart;
+      const signStart = Date.now();
+      signed = signRoot(draft.newRoot, calldata.length > 0 ? calldata : undefined);
+      signMs += Date.now() - signStart;
 
-    const confirmStart = Date.now();
-    await api(`/government/changesets/${draft.id}/confirm`, { txHash: signed.txHash });
-    const confirmMs = Date.now() - confirmStart;
+      const confirmStart = Date.now();
+      await api(`/government/changesets/${draft.id}/confirm`, { txHash: signed.txHash });
+      confirmMs += Date.now() - confirmStart;
+
+      revoked += calldata.length;
+      gas += BigInt(signed.gasUsed);
+      txHashes.push(signed.txHash);
+      rounds++;
+    } while (draft.deferredRevocations > 0 && rounds < MAX_ROUNDS_PER_DAY);
 
     peakRssMb = Math.max(peakRssMb, process.memoryUsage().rss / 1024 / 1024);
 
     days.push({
       day: day + 1,
       transfers: todayTransfers.length,
-      revocations: calldata.length,
+      revocations: revoked,
       deferredRevocations: draft.deferredRevocations,
+      issuances: todayIssuances.length,
+      rounds,
       queueMs,
       draftMs,
       signMs,
       confirmMs,
-      gasUsed: signed.gasUsed,
+      gasUsed: gas.toString(),
       rootVersion: signed.rootVersion,
       txHash: signed.txHash,
+      txHashes,
     });
 
     console.log(
-      `  day ${day + 1}/${DAYS}: ${todayTransfers.length} transfer, ${calldata.length} revoke ` +
-        `(${draft.deferredRevocations} deferred) — draft ${draftMs}ms, confirm ${confirmMs}ms, ` +
-        `gas ${signed.gasUsed}`,
+      `  day ${day + 1}/${DAYS}: ${todayTransfers.length} transfer, ${revoked} revoke, ` +
+        `${todayIssuances.length} issue in ${rounds} round(s) (${draft.deferredRevocations} deferred) — ` +
+        `queue ${queueMs}ms, draft ${draftMs}ms, confirm ${confirmMs}ms, gas ${gas}`,
     );
     writeReport();
   }

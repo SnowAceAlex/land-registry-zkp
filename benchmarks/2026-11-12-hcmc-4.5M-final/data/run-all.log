@@ -1,0 +1,21 @@
+[17:20:43] hardhat stage
+[17:20:43] fresh clones from land_registry_bench_final
+[17:21:56] start node + deploy + genesis 1706580175563322711129566830727256786598295763933123925857710025217976589057
+[17:22:13] start backend
+[17:22:30] backend pid 27072
+[17:22:30] month replay (22 days)
+[20:37:44] month done
+[20:37:44] confirm breakdown
+[20:38:40] proof load
+[20:46:14] ALL DONE
+[20:46:14] sepolia stage
+[20:46:17] balance before: 7.444357485997587 ETH
+[20:46:17] deploy bench contracts
+[20:47:49] publish genesis 1706580175563322711129566830727256786598295763933123925857710025217976589057
+[20:48:01] start backend
+[20:48:23] month replay (5 days)
+[21:31:45] proof load
+[21:38:15] balance after: 7.098874729346672 ETH
+[21:38:15] restored user sepolia.json
+[21:38:16] ALL DONE
+[21:38:16] ALL STAGES DONE

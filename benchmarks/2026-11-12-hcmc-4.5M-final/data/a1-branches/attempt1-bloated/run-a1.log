@@ -1,0 +1,7 @@
+[12:57:50] clone land_registry_bench_final -> land_registry_bench_final_a1
+NOTICE:  database "land_registry_bench_final_a1" does not exist, skipping
+[12:59:13] seed admin units + land offices
+[12:59:51] spread plots over the 38 branches
+[13:04:53] chain up, genesis 1706580175563322711129566830727256786598295763933123925857710025217976589057 (the office is not in the leaf, so the root is unchanged)
+[13:05:45] 3 working days
+[13:21:50] FAILED: bench:month

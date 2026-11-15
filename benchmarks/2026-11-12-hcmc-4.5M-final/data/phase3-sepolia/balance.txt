@@ -1,0 +1,2 @@
+[20:46:17] balance before: 7.444357485997587 ETH
+[21:38:15] balance after: 7.098874729346672 ETH

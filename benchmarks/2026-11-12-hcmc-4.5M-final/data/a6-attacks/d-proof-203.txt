@@ -1,0 +1,2 @@
+{"message":"The certificate for property 203 has been revoked. Its leaf is no longer in the tree, so no Merkle proof exists — its PropertyRevoked event on chain gives the reason.","error":"Gone","statusCode":410}
+HTTP 410

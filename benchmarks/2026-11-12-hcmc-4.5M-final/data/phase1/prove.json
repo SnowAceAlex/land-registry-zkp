@@ -1,0 +1,71 @@
+{
+  "at": "2026-11-12T06:50:57.361Z",
+  "machine": {
+    "platform": "win32",
+    "arch": "x64",
+    "cpus": 16,
+    "cpuModel": "AMD Ryzen 7 6800HS with Radeon Graphics         ",
+    "totalMemGb": 15,
+    "node": "v22.15.0"
+  },
+  "kind": "prove",
+  "treeDepth": 24,
+  "iterations": 10,
+  "note": "Node, not browser — a lower bound; a browser is typically 1.5-2x slower",
+  "circuits": {
+    "ownership": {
+      "proveMs": {
+        "p50": 783,
+        "p95": 1265,
+        "p99": 1265,
+        "mean": 813.7,
+        "max": 1265
+      },
+      "verifyMs": {
+        "p50": 16,
+        "p95": 20,
+        "p99": 20,
+        "mean": 16.8,
+        "max": 20
+      },
+      "proofBytes": 724,
+      "publicSignalCount": 4
+    },
+    "mortgage": {
+      "proveMs": {
+        "p50": 680,
+        "p95": 837,
+        "p99": 837,
+        "mean": 705.5,
+        "max": 837
+      },
+      "verifyMs": {
+        "p50": 15,
+        "p95": 20,
+        "p99": 20,
+        "mean": 15.5,
+        "max": 20
+      },
+      "proofBytes": 723,
+      "publicSignalCount": 5
+    },
+    "transfer": {
+      "proveMs": {
+        "p50": 1143,
+        "p95": 1227,
+        "p99": 1227,
+        "mean": 1144.7,
+        "max": 1227
+      },
+      "verifyMs": {
+        "p50": 13,
+        "p95": 31,
+        "p99": 31,
+        "mean": 14.8,
+        "max": 31
+      },
+      "proofBytes": 722,
+      "publicSignalCount": 7
+    }
+  }
+}

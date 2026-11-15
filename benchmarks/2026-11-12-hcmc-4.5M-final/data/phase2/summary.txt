@@ -1,0 +1,2 @@
+mainnet block 26397153 2026-11-12T06:45:59.000Z glamsterdam false gasLimit 60000000 baseFee p10/p50/p90 gwei 0.0420 0.0464 0.0512 tip p50 0.0035
+sepolia block 12117154 2026-11-12T06:46:00.000Z glamsterdam true gasLimit 199609379 baseFee p10/p50/p90 gwei 0.0000 0.0000 0.0000 tip p50 1.0000

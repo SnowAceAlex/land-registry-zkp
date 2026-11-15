@@ -1,0 +1,20 @@
+{
+  "generatedAt": "2026-11-12T06:46:13.222Z",
+  "metrics": [
+    {
+      "circuit": "ownership",
+      "publishRootGas": "115651",
+      "verifyGas": "255216"
+    },
+    {
+      "circuit": "mortgage",
+      "publishRootGas": "115651",
+      "verifyGas": "262041"
+    },
+    {
+      "circuit": "transfer",
+      "publishRootGas": "115651",
+      "verifyGas": "267065"
+    }
+  ]
+}

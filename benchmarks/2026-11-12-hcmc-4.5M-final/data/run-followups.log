@@ -1,0 +1,13 @@
+[12:01:36] start a2
+[12:43:38] done a2
+[12:43:38] start a3
+[12:57:49] done a3
+[12:57:49] start a1
+[13:21:52] FAILED a1 (see run-a1.log)
+[13:21:52] start a4
+[14:14:04] done a4
+[14:14:04] start a5
+[14:16:17] done a5
+[14:16:17] start a6
+[14:42:37] FAILED a6 (see run-a6.log)
+[14:42:37] FOLLOW-UPS DONE

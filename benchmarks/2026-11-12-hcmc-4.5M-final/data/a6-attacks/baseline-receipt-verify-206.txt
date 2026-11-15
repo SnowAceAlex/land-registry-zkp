@@ -1,0 +1,19 @@
+$ ts-node scripts/tools/verifyReceipt.ts "C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\round1\\206\\receipt.json"
+
+receipt:   C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\round1\\206\\receipt.json
+property:  206
+network:   localhost (http://127.0.0.1:8545)
+
+  OK    receipt targets the deployed RootRegistry — 0x5FbDB2315678afecb367f032d93F642f64180aa3
+  OK    root matches the current on-chain root — version 1
+  OK    record matches the certified leaf — no field has been altered
+  OK    Merkle proof verifies the leaf against the receipt root
+  OK    proof has the fixed circuit depth — 24 levels
+  OK    publishRoot transaction found on chain — block 8
+  OK    issuer holds STATE_AUTHORITY_ROLE — 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+  OK    certificate organization matches the on-chain anchor — O="So Tai nguyen va Moi truong TP.HCM"
+  OK    ethereumAccountSignature verifies against the certificate key
+  OK    issuer certificate chains to the pinned root CA — issued by "Demo Government Root CA"
+
+All checks passed.
+

@@ -1,0 +1,90 @@
+$ nest start
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPrismaModule dependencies initialized[39m[38;5;3m +32ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mChainModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mThrottlerModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mLandLawModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mLineageModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mRootModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDraftLockModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTreeModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mRecordsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPublicConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mImportModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mHistoryModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mIssuanceModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProofModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOperationsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTransfersModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mGovernmentModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[Swagger] [39m[32mOpenAPI docs mounted at /api/docs[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mGovernmentController {/api/government}:[39m[38;5;3m +5ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/me, GET} route[39m[38;5;3m +6ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/status, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/properties, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/properties/:propertyId, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/import, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/drafts/open, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/issuance-requests, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/issuance-requests, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/revocations, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/pending-changes, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/changesets, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/changesets/:id/confirm, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/changesets/:id, DELETE} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/changesets, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/changesets/:id/archives, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/changesets/:id/archives/:officeCode, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/archives, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mHistoryController {/api/records}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/records/:propertyId/history, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/records/:propertyId/lineage, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mTransfersController {/api/transfers}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/transfers/preview, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/transfers, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/transfers, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/transfers/:id/approve, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/transfers/:id/reject, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mRecordsController {/api/records}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/records, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/records/:propertyId, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/records, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/records/:propertyId, PUT} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/records/:propertyId, DELETE} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mProofController {/api/proof}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/proof/:propertyId, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/proof/:propertyId/attestation, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/proof/verify, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mPublicConfigController {/api/public}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/public/config, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mOperationsController {/api/government}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/operations/overview, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/operations/offices, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/queue, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/queue/:kind/:id/hold, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/queue/:kind/:id/release, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:02 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/government/queue/:kind/:id/withdraw, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:03 [32m    LOG[39m [38;5;3m[ChainService] [39m[32mconnected to localhost (http://127.0.0.1:8545) as 0xc128Eb26F177BB6a3b4374A715be350887ED7726; RootRegistry=0x5FbDB2315678afecb367f032d93F642f64180aa3[39m
+[31m[Nest] 22704  - [39m15/11/2026, 13:25:03 [31m  ERROR[39m [38;5;3m[ChainService] [39m[31msigner 0xc128Eb26F177BB6a3b4374A715be350887ED7726 does NOT hold STATE_AUTHORITY_ROLE on 0x5FbDB2315678afecb367f032d93F642f64180aa3 — any on-chain write signed with this role will be rejected. Run registerAuthority() for this account (see DEPLOYMENT.md).[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:03 [32m    LOG[39m [38;5;3m[IssuerService] [39m[32missuer certificate loaded — O="So Tai nguyen va Moi truong TP.HCM"[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:03 [32m    LOG[39m [38;5;3m[IssuerService] [39m[32missuer certificate chains to "Demo Government Root CA"[39m
+[31m[Nest] 22704  - [39m15/11/2026, 13:25:03 [31m  ERROR[39m [38;5;3m[IssuerService] [39m[31midentity anchor mismatch for 0xc128Eb26F177BB6a3b4374A715be350887ED7726: certificate O="So Tai nguyen va Moi truong TP.HCM" hashes to 0x1f730914c2418f93d7466bfc23ec84f2790208f8c887355a7acaa798fa0ba603, but the contract stores 0x0000000000000000000000000000000000000000000000000000000000000000. Issued bundles will FAIL the Phase 9 issuer check — regenerate the certificate with the AUTHORITY_ORG_NAME used at deploy time.[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:03 [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +34ms[39m
+[Bootstrap] Backend running at: http://localhost:3001/api
+[Bootstrap] API docs at:        http://localhost:3001/api/docs
+[32m[Nest] 22704  - [39m15/11/2026, 13:25:43 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #1: 0 issuance(s), 2994 transfer(s), 591 revocation(s), projected root 11450558230674250203312411770574743970835112523427610255923340194173860881555[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:31:50 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #1 confirmed at root version 2: 0 issuance(s), 2994 transfer(s), 591 revocation(s)[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:31:52 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #2: 0 issuance(s), 0 transfer(s), 359 revocation(s), projected root 18390282982289096086210602251687841826942682112017813395343879378935781586660[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:32:00 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #2 confirmed at root version 3: 0 issuance(s), 0 transfer(s), 359 revocation(s)[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:32:25 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #3: 950 issuance(s), 2994 transfer(s), 591 revocation(s), projected root 11913292040509081271608658637708520720266541119829510753528490975323009922641[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:40:11 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #3 confirmed at root version 4: 950 issuance(s), 2994 transfer(s), 591 revocation(s)[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:40:12 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #4: 0 issuance(s), 0 transfer(s), 359 revocation(s), projected root 8452782011660929195801198611624518074426470884937284293984036502035195141620[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:40:20 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #4 confirmed at root version 5: 0 issuance(s), 0 transfer(s), 359 revocation(s)[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:40:44 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #5: 950 issuance(s), 2994 transfer(s), 591 revocation(s), projected root 18519213076454843215696705296928176925024277720359904500290367822695297857949[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:48:30 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #5 confirmed at root version 6: 950 issuance(s), 2994 transfer(s), 591 revocation(s)[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:48:32 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set draft #6: 0 issuance(s), 0 transfer(s), 359 revocation(s), projected root 8720200621309932413984741628520343530717149587158668253923869748152612322396[39m
+[32m[Nest] 22704  - [39m15/11/2026, 13:48:40 [32m    LOG[39m [38;5;3m[ChangeSetService] [39m[32mchange set #6 confirmed at root version 7: 0 issuance(s), 0 transfer(s), 359 revocation(s)[39m
+D:\thesis\land-registry-zkp\web-app\backend:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @land-registry/backend@0.1.0 start: `nest start`
+Exit status 1

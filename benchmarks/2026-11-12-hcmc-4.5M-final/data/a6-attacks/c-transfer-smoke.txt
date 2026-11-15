@@ -1,0 +1,19 @@
+$ ts-node scripts/tools/transferSmoke.ts "C:\\Users\\Snow_Ace\\AppData\\Local\\Temp\\claude\\da715caac0ed30a3\\30144b56-2a09-47bc-84cb-ca2980706a39\\scratchpad\\a6b\\round1\\201"
+
+property 201
+  seller commitment  947681927369521951274065…
+  buyer  commitment  270149001901481768281175… (issued, D77)
+preview   old root 13184623186568514804…
+          new root 44089156368615558226…
+proof     generated in 1574 ms
+submit    queued as request #1 (status PENDING)
+lock      seller attestation refused (409 ProcedureOpen) ✓
+approve   status APPROVED — queued for the next change set (D46)
+changeset #2: 1 transfer(s), 0 revocation(s), projected root 44089156368615558226…
+publish   tx 0x9a40b46c82f1d80772659701c6fd81f11286e8a411c82f4558725c704bad1117 (signed directly here — stands in for Metamask, D43)
+confirm   root version 2
+archive   GET /api/government/changesets/2/archives lists the round's archives; GET .../archives/<officeCode> downloads the buyer's bundle, secret.json included (D77, D88)
+replay    HTTP 422 — correctly rejected: The proof was generated against a root that is no longer current. Request a fresh transfer preview and re-generate the proof.
+
+Transfer flow complete.
+
