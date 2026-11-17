@@ -9,14 +9,14 @@ export default async function Page({ params }: PageProps<'/[lang]'>) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
   const dict = await getDictionary(lang);
-  const { alerts, alertNoOffice } = dict.govOperations;
+  const { alerts, alertsGrouped, alertNoOffice } = dict.govOperations;
 
   return (
     <ChangesView
       lang={lang}
       t={dict.govChanges}
       draftT={dict.govDraft}
-      alertT={{ alerts, alertNoOffice }}
+      alertT={{ alerts, alertsGrouped, alertNoOffice }}
       errors={dict.govErrors}
     />
   );

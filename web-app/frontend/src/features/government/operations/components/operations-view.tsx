@@ -1,5 +1,7 @@
 'use client';
 
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
 import type { Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { format } from '@/i18n/format';
@@ -8,8 +10,9 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { apiFailure } from '../../api/error-message';
-import { useMe, useOfficeRows, useOverview } from '../../api/hooks';
+import { govKeys, useMe, useOfficeRows, useOverview } from '../../api/hooks';
 import type { Me, Overview, OfficeRow } from '../../api/types';
+import { acknowledgeArchiveExpiry } from '../api';
 import { AlertList } from './alert-list';
 import { OfficeTable } from './office-table';
 import { RecentRounds } from './recent-rounds';
@@ -29,6 +32,16 @@ export function OperationsView({
   const me = useMe();
   const isCentral = me.data?.scope === 'CENTRAL';
   const offices = useOfficeRows(isCentral);
+  const queryClient = useQueryClient();
+  const acknowledge = useMutation({
+    mutationFn: acknowledgeArchiveExpiry,
+    onSettled: () => queryClient.invalidateQueries({ queryKey: govKeys.overview }),
+  });
+
+  function onAcknowledge(ref: number) {
+    if (!window.confirm(format(t.archiveAckConfirm, { ref }))) return;
+    acknowledge.mutate(ref);
+  }
 
   const failure = overview.error ?? me.error;
 
@@ -47,7 +60,15 @@ export function OperationsView({
       ) : (
         <>
           <RegistryCard overview={overview.data} isCentral={isCentral} lang={lang} t={t} />
-          <AlertList alerts={overview.data.alerts} t={t} />
+          {acknowledge.error ? (
+            <Notice tone="danger" title={apiFailure(acknowledge.error, errors).title} />
+          ) : null}
+          <AlertList
+            alerts={overview.data.alerts}
+            t={t}
+            onAcknowledge={isCentral ? onAcknowledge : undefined}
+            acknowledging={acknowledge.isPending ? (acknowledge.variables ?? null) : null}
+          />
 
           <section aria-labelledby="ops-queue" className="space-y-3">
             <h2 id="ops-queue" className="font-medium text-ink">
