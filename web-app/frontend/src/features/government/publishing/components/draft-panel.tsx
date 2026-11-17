@@ -27,6 +27,7 @@ import { useSwitchChain } from 'wagmi';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { format } from '@/i18n/format';
 import { buttonStyles } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { HashText } from '@/components/ui/hash-text';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -82,6 +83,7 @@ export function DraftPanel({
   const { switchChain, isPending: switching } = useSwitchChain();
 
   const [phase, setPhase] = useState<Phase>('idle');
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [txHash, setTxHash] = useState<string | null>(() =>
     typeof window === 'undefined' ? null : recallDraftTx(session, draft.id),
@@ -144,7 +146,7 @@ export function DraftPanel({
   }
 
   async function discard() {
-    if (!window.confirm(t.discardConfirm)) return;
+    setConfirmingDiscard(false);
     setPhase('discarding');
     setFailure(null);
     try {
@@ -263,10 +265,20 @@ export function DraftPanel({
               type="button"
               className={`${buttonStyles.secondary} hover:border-red-300 hover:text-red-700`}
               disabled={busy}
-              onClick={discard}
+              onClick={() => setConfirmingDiscard(true)}
             >
               {phase === 'discarding' ? t.discarding : t.discard}
             </button>
+            <ConfirmDialog
+              open={confirmingDiscard}
+              title={t.discardConfirm}
+              confirmLabel={t.discard}
+              cancelLabel={t.discardKeep}
+              onConfirm={discard}
+              onCancel={() => setConfirmingDiscard(false)}
+            >
+              {t.discardConfirmBody}
+            </ConfirmDialog>
           </div>
         ) : null}
       </div>

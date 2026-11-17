@@ -260,4 +260,49 @@ describe('RoundArchiveService (D88)', () => {
       expect(prisma.changeSetArchive.updateMany).not.toHaveBeenCalled();
     });
   });
+
+  describe('acknowledgeExpired (D92)', () => {
+    const now = new Date('2026-11-16T03:00:00Z');
+
+    it('404s on an unknown change set and marks nothing', async () => {
+      const { service, prisma } = setup();
+      prisma.changeSet.findUnique.mockResolvedValue(null);
+
+      await expect(service.acknowledgeExpired(99, CENTRAL_ACTOR, now)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.changeSetArchive.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('marks only the round’s expired, never-downloaded, unacknowledged archives and drops their zip', async () => {
+      const { service, prisma } = setup();
+      prisma.changeSetArchive.updateMany.mockResolvedValue({ count: 38 });
+
+      await expect(service.acknowledgeExpired(12, CENTRAL_ACTOR, now)).resolves.toEqual({
+        acknowledged: 38,
+      });
+      expect(prisma.changeSetArchive.updateMany).toHaveBeenCalledWith({
+        where: {
+          changeSetId: 12,
+          firstDownloadedAt: null,
+          expiresAt: { lte: now },
+          expiryAcknowledgedAt: null,
+        },
+        data: {
+          zip: null,
+          expiryAcknowledgedAt: now,
+          expiryAcknowledgedByOfficeId: CENTRAL_ACTOR.officeId,
+        },
+      });
+    });
+
+    it('is idempotent: nothing left to mark answers 0', async () => {
+      const { service, prisma } = setup();
+      prisma.changeSetArchive.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.acknowledgeExpired(12, CENTRAL_ACTOR, now)).resolves.toEqual({
+        acknowledged: 0,
+      });
+    });
+  });
 });

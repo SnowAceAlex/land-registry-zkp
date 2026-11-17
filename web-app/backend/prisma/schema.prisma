@@ -321,17 +321,20 @@ model ChangeSet {
 
 /// One archive per (change set, office): each office downloads only its own plots' bundles (D88).
 model ChangeSetArchive {
-  id                        Int        @id @default(autoincrement())
-  changeSetId               Int
-  changeSet                 ChangeSet  @relation(fields: [changeSetId], references: [id])
-  officeId                  Int
-  office                    LandOffice @relation(fields: [officeId], references: [id])
+  id                           Int        @id @default(autoincrement())
+  changeSetId                  Int
+  changeSet                    ChangeSet  @relation(fields: [changeSetId], references: [id])
+  officeId                     Int
+  office                       LandOffice @relation(fields: [officeId], references: [id])
   /// null once expired and purged
-  zip                       Bytes?
-  propertyCount             Int
-  expiresAt                 DateTime
-  firstDownloadedAt         DateTime?
-  firstDownloadedByOfficeId Int?
+  zip                          Bytes?
+  propertyCount                Int
+  expiresAt                    DateTime
+  firstDownloadedAt            DateTime?
+  firstDownloadedByOfficeId    Int?
+  /// D92: the central office marked this expired, never-downloaded archive as handled
+  expiryAcknowledgedAt         DateTime?
+  expiryAcknowledgedByOfficeId Int?
 
   @@unique([changeSetId, officeId])
   @@index([officeId])

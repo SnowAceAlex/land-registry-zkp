@@ -608,7 +608,9 @@
     "confirming": "Applying draft to registry...",
     "discard": "Discard draft",
     "discarding": "Discarding...",
-    "discardConfirm": "Discard this draft? Unsaved changes will return to the queue.",
+    "discardConfirm": "Discard this draft?",
+    "discardConfirmBody": "Unsaved changes will return to the queue.",
+    "discardKeep": "Keep draft",
     "invalidatesProofs": "Publishing updates the system root. User proofs will sync automatically.",
     "pendingTransfers": "{count} pending transfer(s) were proven on the previous state. Once published, they will need re-submission."
   },
@@ -725,6 +727,17 @@
     "alertsTitle": "Alerts",
     "alertsNone": "Nothing needs attention.",
     "alertNoOffice": "unassigned plots",
+    "alertsGrouped": {
+      "ArchiveNotDownloaded": "The archives of round #{ref} for {count} offices have not been downloaded and expire soon.",
+      "ArchiveExpiredUndownloaded": "The archives of round #{ref} for {count} offices expired without being downloaded; those certificates must be re-issued."
+    },
+    "archiveAck": "Acknowledge",
+    "archiveAckPending": "Acknowledging…",
+    "archiveAckTitle": "Mark the expired archives of round #{ref} as handled?",
+    "archiveAckConfirm": "The alert disappears for every office. The archives cannot be recovered; their plots must still be revoked and re-issued.",
+    "archiveAckSubmit": "Mark as handled",
+    "archiveAckCancel": "Not now",
+    "archiveAckLabel": "Acknowledge the expired archives of round #{ref}",
     "staleMarker": "Items here have waited longer than expected",
     "alerts": {
       "ChainAheadOfDatabase": "The blockchain holds a Merkle root not yet recorded in the database. Resolve this before closing another round.",

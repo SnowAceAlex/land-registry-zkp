@@ -18,7 +18,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Notice } from '@/components/ui/notice';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { type AlertStrings, alertText } from '../../api/alert-text';
+import { type AlertStrings, alertGroupText, groupAlerts } from '../../api/alert-text';
 import { type Failure, apiFailure } from '../../api/error-message';
 import {
   govKeys,
@@ -275,11 +275,14 @@ function RoundCreator({
             title={gate.state === 'blocked' ? t.gateBlockedTitle : t.gateAckTitle}
           />
           <ul className="space-y-2">
-            {gate.reasons.map((alert) => {
-              const { tone, title } = alertText(alert, alertT);
+            {groupAlerts(gate.reasons).map((group) => {
+              const { alert } = group;
+              const { tone, title, detail } = alertGroupText(group, alertT);
               return (
                 <li key={`${alert.code}:${alert.officeCode ?? ''}:${alert.ref ?? ''}`}>
-                  <Notice tone={tone} title={title} />
+                  <Notice tone={tone} title={title}>
+                    {detail}
+                  </Notice>
                 </li>
               );
             })}

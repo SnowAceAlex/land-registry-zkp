@@ -34,3 +34,10 @@ export class ArchiveSummaryDto {
   @ApiProperty({ example: 'CN01', nullable: true, type: String })
   firstDownloadedByOfficeCode!: string | null;
 }
+
+/** What POST changesets/:id/archives/acknowledge-expiry marked (D92). */
+export class AcknowledgeExpiryResponseDto {
+  /** Archives newly marked; 0 when none was expired, undownloaded and unacknowledged */
+  @ApiProperty({ example: 38 })
+  acknowledged!: number;
+}

@@ -313,7 +313,8 @@ export class OperationsService {
         select,
       }),
       this.prisma.changeSetArchive.findMany({
-        where: { firstDownloadedAt: null, expiresAt: { lte: now } },
+        // D92: an acknowledged archive no longer alerts.
+        where: { firstDownloadedAt: null, expiresAt: { lte: now }, expiryAcknowledgedAt: null },
         select,
       }),
     ]);

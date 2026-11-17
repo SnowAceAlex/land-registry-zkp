@@ -34,3 +34,13 @@ describe('GovernmentController — who may import and queue issuance (D86, D87)'
     },
   );
 });
+
+describe('GovernmentController — who may acknowledge an expired archive (D92)', () => {
+  it('acknowledgeArchiveExpiry answers a branch with 403 CentralScopeRequired', () => {
+    expect(guardsOf('acknowledgeArchiveExpiry')).toContain(CentralOnlyGuard);
+  });
+
+  it.each(['roundArchivesOf', 'allArchives'] as const)('%s stays open to a branch', (method) => {
+    expect(guardsOf(method)).not.toContain(CentralOnlyGuard);
+  });
+});
