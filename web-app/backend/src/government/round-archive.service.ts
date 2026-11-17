@@ -43,6 +43,26 @@ export class RoundArchiveService {
     return count;
   }
 
+  /** D92: central marks a round's expired, never-downloaded archives as handled; their alert stops. */
+  async acknowledgeExpired(
+    id: number,
+    actor: Actor,
+    now = new Date(),
+  ): Promise<{ acknowledged: number }> {
+    const round = await this.prisma.changeSet.findUnique({ where: { id }, select: { id: true } });
+    if (!round) throw new NotFoundException(`Change set #${id} not found`);
+    const { count } = await this.prisma.changeSetArchive.updateMany({
+      where: {
+        changeSetId: id,
+        firstDownloadedAt: null,
+        expiresAt: { lte: now },
+        expiryAcknowledgedAt: null,
+      },
+      data: { zip: null, expiryAcknowledgedAt: now, expiryAcknowledgedByOfficeId: actor.officeId },
+    });
+    return { acknowledged: count };
+  }
+
   /** The office's archive of the round, while it exists. An expired archive is gone for good. */
   async archiveFor(
     id: number,
