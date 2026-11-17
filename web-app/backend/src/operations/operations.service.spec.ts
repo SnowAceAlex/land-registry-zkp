@@ -288,7 +288,11 @@ describe('OperationsService.overview (D89)', () => {
       zip: { not: null },
       expiresAt: { gt: now, lte: new Date(now.getTime() + 2 * 86_400_000) },
     });
-    expect(wheres).toContainEqual({ firstDownloadedAt: null, expiresAt: { lte: now } });
+    expect(wheres).toContainEqual({
+      firstDownloadedAt: null,
+      expiresAt: { lte: now },
+      expiryAcknowledgedAt: null,
+    });
     expect(dto.alerts).toContainEqual({
       code: 'ArchiveNotDownloaded',
       severity: 'warning',

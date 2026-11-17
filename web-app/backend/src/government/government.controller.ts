@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   ParseIntPipe,
   Post,
@@ -20,6 +21,7 @@ import {
   ApiConflictResponse,
   ApiConsumes,
   ApiForbiddenResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
@@ -44,7 +46,7 @@ import {
   IssuanceRequestDto,
 } from '../issuance/dto/issuance-request.dto';
 import { IssuanceRequestService } from '../issuance/issuance-request.service';
-import { ArchiveSummaryDto } from './dto/archive.response.dto';
+import { AcknowledgeExpiryResponseDto, ArchiveSummaryDto } from './dto/archive.response.dto';
 import { ConfirmDraftDto } from './dto/confirm-draft.dto';
 import { CreateRevocationDto } from './dto/revocation.dto';
 import {
@@ -344,6 +346,22 @@ export class GovernmentController {
       'Content-Length': String(zip.length),
     });
     res.end(zip);
+  }
+
+  @Post('changesets/:id/archives/acknowledge-expiry')
+  @HttpCode(200)
+  @CentralOnly()
+  @ApiOperation({
+    summary: 'Mark a round’s expired, never-downloaded archives as handled (D92)',
+    description:
+      'Clears their ArchiveExpiredUndownloaded alerts for every office. Idempotent: answers how ' +
+      'many archives it marked, 0 when none was left. The plots still need revoke + re-issue (D83).',
+  })
+  @ApiOkResponse({ type: AcknowledgeExpiryResponseDto })
+  @ApiForbiddenResponse({ description: 'CentralScopeRequired' })
+  @ApiNotFoundResponse({ description: 'No such change set' })
+  acknowledgeArchiveExpiry(@Param('id', ParseIntPipe) id: number, @CurrentActor() actor: Actor) {
+    return this.roundArchives.acknowledgeExpired(id, actor);
   }
 
   @Get('archives')

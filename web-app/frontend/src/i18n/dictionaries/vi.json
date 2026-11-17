@@ -608,7 +608,9 @@
     "confirming": "Đang cập nhật vào hệ thống...",
     "discard": "Hủy bản nháp",
     "discarding": "Đang hủy...",
-    "discardConfirm": "Hủy bản nháp này? Dữ liệu chưa công bố sẽ trở lại hàng chờ.",
+    "discardConfirm": "Hủy bản nháp này?",
+    "discardConfirmBody": "Dữ liệu chưa công bố sẽ trở lại hàng chờ.",
+    "discardKeep": "Giữ bản nháp",
     "invalidatesProofs": "Công bố sẽ cập nhật gốc mới cho hệ thống. Bằng chứng của người dùng sẽ tự động đồng bộ.",
     "pendingTransfers": "Có {count} hồ sơ chuyển nhượng tạo trên gốc cũ sẽ cần thực hiện lại tại quầy sau khi công bố."
   },
@@ -725,6 +727,17 @@
     "alertsTitle": "Cảnh báo",
     "alertsNone": "Không có việc nào cần chú ý.",
     "alertNoOffice": "các thửa chưa phân địa bàn",
+    "alertsGrouped": {
+      "ArchiveNotDownloaded": "Hồ sơ đợt #{ref} của {count} đơn vị chưa được tải và sắp hết hạn.",
+      "ArchiveExpiredUndownloaded": "Hồ sơ đợt #{ref} của {count} đơn vị đã hết hạn mà chưa được tải; các giấy chứng nhận đó phải cấp lại."
+    },
+    "archiveAck": "Đã ghi nhận",
+    "archiveAckPending": "Đang ghi nhận…",
+    "archiveAckTitle": "Đánh dấu đã xử lý hồ sơ hết hạn của đợt #{ref}?",
+    "archiveAckConfirm": "Cảnh báo sẽ ẩn với mọi đơn vị. Hồ sơ không khôi phục được; các thửa trong đó vẫn phải thu hồi và cấp lại.",
+    "archiveAckSubmit": "Đánh dấu đã xử lý",
+    "archiveAckCancel": "Để sau",
+    "archiveAckLabel": "Ghi nhận hồ sơ hết hạn của đợt #{ref}",
     "staleMarker": "Có mục chờ lâu hơn dự kiến",
     "alerts": {
       "ChainAheadOfDatabase": "Blockchain đang ghi nhận một gốc Merkle mà cơ sở dữ liệu chưa cập nhật. Cần xử lý trước khi văn phòng trung tâm chốt sổ tiếp.",

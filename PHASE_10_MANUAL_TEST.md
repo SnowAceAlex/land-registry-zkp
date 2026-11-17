@@ -434,10 +434,10 @@ khi thu hồi C được công bố, nên nằm trước chốt sổ). Bước 1
 5. **Tra D** (`1004`): `1201` và `1202` đều là mục đời sau.
 6. Nếu `Truncated` được kích hoạt (chuỗi >200 nút) trang phải hiện "Chuỗi giấy chứng nhận bị cắt bớt" — không thể dựng bằng tay, đã có test.
 
-### Bước 9b — Archive hết hạn không khoá Chốt sổ (D88, D89)
+### Bước 9b — Archive hết hạn: không khoá Chốt sổ, gộp theo đợt, tắt bằng "Đã ghi nhận" (D88, D89, D92)
 
-*Archive hết hạn mà chưa ai tải không tự hết cảnh báo, nên nó chỉ đòi tick xác nhận; chỉ `ChainAheadOfDatabase`
-chặn hẳn việc tạo đợt.* Dùng archive `CN02` của đợt #4; lệnh SQL giả lập "đã hết hạn và chưa ai tải":
+*Archive hết hạn mà chưa ai tải không tự hết cảnh báo: văn phòng trung tâm tắt nó bằng "Đã ghi nhận"
+(D92). Trước đó nó chỉ đòi tick xác nhận; chỉ `ChainAheadOfDatabase` chặn hẳn việc tạo đợt.* Dùng archive `CN02` của đợt #4; lệnh SQL giả lập "đã hết hạn và chưa ai tải":
 
 ```bash
 docker exec -i land_registry_postgres psql -U postgres -d land_registry -c \
@@ -448,17 +448,35 @@ docker exec -i land_registry_postgres psql -U postgres -d land_registry -c \
 
 Lệnh thứ hai phải in `has_zip = t` (bản trên máy chủ chưa bị xoá).
 
-1. Profile **TT** → **Điều hành**: cảnh báo đỏ **"Hồ sơ đợt #4 của CN02 đã hết hạn mà chưa được tải; các giấy chứng
-   nhận đó phải cấp lại."** Trang điều hành không xoá gì: chạy lại lệnh SELECT vẫn `has_zip = t`.
+1. Profile **TT** → **Điều hành**: **một** cảnh báo đỏ cho đợt #4. Nếu đợt #4 chỉ có archive của CN02:
+   **"Hồ sơ đợt #4 của CN02 đã hết hạn mà chưa được tải; các giấy chứng nhận đó phải cấp lại."** Nếu có
+   N > 1 đơn vị: **"Hồ sơ đợt #4 của N đơn vị đã hết hạn mà chưa được tải; …"**, bên dưới là danh sách
+   mã đơn vị xếp tăng dần (không phải N dòng). Cảnh báo có nút **Đã ghi nhận**. Trang điều hành không
+   xoá gì: chạy lại lệnh SELECT vẫn `has_zip = t`.
 2. Profile **CN02** → **Thu hồi** `1202`, lý do "Hết hạn sử dụng, không gia hạn" (chỉ để hàng chờ có một mục).
 3. Profile **TT** → **Chốt sổ**: hiện **"Xem các cảnh báo sau trước khi chốt sổ"** (không phải "Chưa thể chốt sổ"),
-   danh sách có cảnh báo archive hết hạn, checkbox **"Tôi đã xem các cảnh báo"**; nút **Tạo đợt vào sổ** chỉ mở sau khi
+   danh sách có cảnh báo archive hết hạn (cũng gộp thành một dòng cho đợt #4), checkbox **"Tôi đã xem các cảnh báo"**; nút **Tạo đợt vào sổ** chỉ mở sau khi
    tick. **Đừng tạo đợt.**
 4. Profile **TT** → **Hồ sơ các đợt vào sổ**: dòng `#4 · CN02` có trạng thái **"Đã hết hạn"**, chú thích "Bí mật đã bị
    xoá; cần cấp lại các thửa này.", nút tải bị khoá. Chạy lại lệnh SELECT → **`has_zip = f`**: việc mở danh sách
    archive đã xoá bản trên máy chủ (lần chốt sổ kế tiếp cũng làm việc đó).
-5. Dọn: Profile **CN02** → **Thu hồi** → **Rút lại** đề nghị thu hồi 1202 (bước 10 cần lại thửa này). Cảnh báo archive
-   hết hạn vẫn còn mãi — đúng thiết kế, phản hồi của cán bộ là tick xác nhận.
+5. Dọn: Profile **CN02** → **Thu hồi** → **Rút lại** đề nghị thu hồi 1202 (bước 10 cần lại thửa này).
+   Profile **CN02** → **Điều hành**: cảnh báo của CN02 vẫn hiện, **không có** nút "Đã ghi nhận".
+   Profile **TT** → **Điều hành** → **Đã ghi nhận** → hộp xác nhận của portal (Esc hoặc **Để sau** thì không có gì đổi) → **Đánh dấu đã xử lý**: cảnh báo đợt #4 biến mất.
+   Profile **CN02** tải lại **Điều hành**: cũng mất. Bấm lần nữa không còn nút; gọi lại API trả `{ "acknowledged": 0 }`:
+
+   ```bash
+   curl -s -X POST -H "x-gov-api-key: $HQ" http://localhost:3001/api/government/changesets/4/archives/acknowledge-expiry
+   ```
+
+   Kiểm SQL:
+
+   ```bash
+   docker exec -i land_registry_postgres psql -U postgres -d land_registry -c \
+     "SELECT \"changeSetId\", \"officeId\", \"expiryAcknowledgedAt\" IS NOT NULL AS acked, \"expiryAcknowledgedByOfficeId\" FROM change_set_archives WHERE \"changeSetId\" = 4;"
+   ```
+
+   Mọi dòng `acked = t`, `expiryAcknowledgedByOfficeId` là id của HQ.
 
 ### Bước 10 (tuỳ chọn) — Tồn đọng thu hồi và `REVOCATION_CAP`
 
@@ -483,6 +501,7 @@ Chỉ làm khi cần kiểm `RevocationBacklog` và cap. Đặt `REVOCATION_CAP=
 | Lệnh rò secret của hàng chờ (ngay dưới bảng) | `0` |
 | `curl -s -H "x-gov-api-key: $CN01" http://localhost:3001/api/government/operations/offices` | 403 `CentralScopeRequired` |
 | `curl -s -i -X POST -H "x-gov-api-key: $CN01" http://localhost:3001/api/government/changesets` | 403 `CentralScopeRequired` |
+| `curl -s -i -X POST -H "x-gov-api-key: $CN01" http://localhost:3001/api/government/changesets/4/archives/acknowledge-expiry` | 403 `CentralScopeRequired` |
 | CN01 `POST /api/government/issuance-requests` | 403 `CentralScopeRequired` |
 | CN01 `POST /api/government/import` (kèm một CSV bất kỳ) | 403 `CentralScopeRequired`, không đọc tệp |
 | `status` của backend (`GET /api/government/status`) | `inSync: true`, `chainId: 31337` |
@@ -508,7 +527,7 @@ curl -s -H "x-gov-api-key: $HQ" http://localhost:3001/api/government/queue | gre
 | Archive tách theo chi nhánh; chi nhánh chỉ tải phần mình; trung tâm tải được mọi phần; ghi lần tải đầu (D88) | 2 |
 | Chuyển nhượng và thu hồi ngoài địa bàn bị `OutsideOfficeArea` (D86); trung tâm dự phòng ghi nhận | 3, 4, 8 |
 | Cảnh báo `PendingTransfersWouldBreak`; Chốt sổ đòi tick cảnh báo (D89) | 5 |
-| Archive hết hạn chỉ đòi tick, không khoá Chốt sổ; bản trên máy chủ bị xoá khi mở danh sách archive (D88, D89) | 9b |
+| Archive hết hạn chỉ đòi tick, không khoá Chốt sổ; gộp một dòng mỗi đợt; trung tâm tắt bằng "Đã ghi nhận"; bản trên máy chủ bị xoá khi mở danh sách archive (D88, D89, D92) | 9b |
 | Sổ thay thế chỉ được đề nghị cấp khi sổ cũ đã `REVOKED` thật (D90) | 6 |
 | Lỗi import `supersedesPropertyIds` đúng bốn mã và cảnh báo `PredecessorAlreadySucceeded` | 6, 9 |
 | C không prove được sau thu hồi; người mua A prove được; mọi thứ cùng `rootVersion` | 7 |
