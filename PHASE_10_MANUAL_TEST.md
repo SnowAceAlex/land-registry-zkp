@@ -462,7 +462,7 @@ Lệnh thứ hai phải in `has_zip = t` (bản trên máy chủ chưa bị xoá
    archive đã xoá bản trên máy chủ (lần chốt sổ kế tiếp cũng làm việc đó).
 5. Dọn: Profile **CN02** → **Thu hồi** → **Rút lại** đề nghị thu hồi 1202 (bước 10 cần lại thửa này).
    Profile **CN02** → **Điều hành**: cảnh báo của CN02 vẫn hiện, **không có** nút "Đã ghi nhận".
-   Profile **TT** → **Điều hành** → **Đã ghi nhận** → hộp xác nhận → **OK**: cảnh báo đợt #4 biến mất.
+   Profile **TT** → **Điều hành** → **Đã ghi nhận** → hộp xác nhận của portal (Esc hoặc **Để sau** thì không có gì đổi) → **Đánh dấu đã xử lý**: cảnh báo đợt #4 biến mất.
    Profile **CN02** tải lại **Điều hành**: cũng mất. Bấm lần nữa không còn nút; gọi lại API trả `{ "acknowledged": 0 }`:
 
    ```bash

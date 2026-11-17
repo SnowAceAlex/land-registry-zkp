@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { format } from '@/i18n/format';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Notice } from '@/components/ui/notice';
 import { PageHeader } from '@/components/ui/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -38,9 +40,13 @@ export function OperationsView({
     onSettled: () => queryClient.invalidateQueries({ queryKey: govKeys.overview }),
   });
 
-  function onAcknowledge(ref: number) {
-    if (!window.confirm(format(t.archiveAckConfirm, { ref }))) return;
-    acknowledge.mutate(ref);
+  // The round waiting for the officer's confirmation in the dialog.
+  const [ackRound, setAckRound] = useState<number | null>(null);
+
+  function confirmAcknowledge() {
+    if (ackRound === null) return;
+    acknowledge.mutate(ackRound);
+    setAckRound(null);
   }
 
   const failure = overview.error ?? me.error;
@@ -66,9 +72,19 @@ export function OperationsView({
           <AlertList
             alerts={overview.data.alerts}
             t={t}
-            onAcknowledge={isCentral ? onAcknowledge : undefined}
+            onAcknowledge={isCentral ? setAckRound : undefined}
             acknowledging={acknowledge.isPending ? (acknowledge.variables ?? null) : null}
           />
+          <ConfirmDialog
+            open={ackRound !== null}
+            title={format(t.archiveAckTitle, { ref: ackRound ?? '' })}
+            confirmLabel={t.archiveAckSubmit}
+            cancelLabel={t.archiveAckCancel}
+            onConfirm={confirmAcknowledge}
+            onCancel={() => setAckRound(null)}
+          >
+            {t.archiveAckConfirm}
+          </ConfirmDialog>
 
           <section aria-labelledby="ops-queue" className="space-y-3">
             <h2 id="ops-queue" className="font-medium text-ink">
