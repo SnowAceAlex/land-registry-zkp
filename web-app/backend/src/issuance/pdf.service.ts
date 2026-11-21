@@ -61,7 +61,6 @@ export class PdfService {
     y = this.drawSection(page, bold, 'I. THÔNG TIN NGƯỜI SỬ DỤNG ĐẤT', y);
     y = this.drawRows(page, regular, bold, y, [
       ['Mã định danh chủ sử dụng', shorten(receipt.record.ownerCommitment)],
-      ['(Poseidon commitment)', 'Danh tính thật không lưu trên hệ thống'],
     ]);
 
     // Field order follows mẫu GCN in TT 10/2024: parcel no., map sheet, area,
@@ -125,50 +124,28 @@ export class PdfService {
     receipt: Receipt,
     y: number,
   ): number {
-    page.drawText('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', {
-      x: MARGIN,
-      y,
-      size: 11,
-      font: bold,
-    });
-    page.drawText('Độc lập - Tự do - Hạnh phúc', { x: MARGIN, y: y - 15, size: 10, font: regular });
+    drawCentered(page, 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', y, 11, bold);
+    drawCentered(page, 'Độc lập - Tự do - Hạnh phúc', y - 15, 10, regular);
 
     // Official name per khoản 21 Điều 3 Luật Đất đai 2024 + mẫu TT 10/2024.
     // It is too long for one line at this size, so it is set over two.
-    page.drawText('GIẤY CHỨNG NHẬN QUYỀN SỬ DỤNG ĐẤT,', {
-      x: MARGIN,
-      y: y - 46,
-      size: 13.5,
-      font: bold,
-    });
-    page.drawText('QUYỀN SỞ HỮU TÀI SẢN GẮN LIỀN VỚI ĐẤT', {
-      x: MARGIN,
-      y: y - 63,
-      size: 13.5,
-      font: bold,
-    });
-    page.drawText('(Bản điện tử — phục vụ trình diễn hệ thống)', {
-      x: MARGIN,
-      y: y - 80,
-      size: 9,
-      font: regular,
-      color: rgb(0.35, 0.35, 0.35),
-    });
+    drawCentered(page, 'GIẤY CHỨNG NHẬN QUYỀN SỬ DỤNG ĐẤT,', y - 46, 13.5, bold);
+    drawCentered(page, 'QUYỀN SỞ HỮU TÀI SẢN GẮN LIỀN VỚI ĐẤT', y - 63, 13.5, bold);
     page.drawText(`Số phát hành: ${receipt.record.certificateSerial}`, {
       x: MARGIN,
-      y: y - 99,
+      y: y - 82,
       size: 10,
       font: bold,
     });
 
     page.drawLine({
-      start: { x: MARGIN, y: y - 110 },
-      end: { x: PAGE_WIDTH - MARGIN, y: y - 110 },
+      start: { x: MARGIN, y: y - 93 },
+      end: { x: PAGE_WIDTH - MARGIN, y: y - 93 },
       thickness: 1,
       color: rgb(0.2, 0.2, 0.2),
     });
 
-    return y - 134;
+    return y - 117;
   }
 
   private drawSection(page: PDFPage, bold: PDFFont, title: string, y: number): number {
@@ -236,19 +213,16 @@ export class PdfService {
   }
 
   private drawFooter(page: PDFPage, regular: PDFFont, receipt: Receipt): void {
-    // States the scope gap rather than leaving it to be read as an omission:
-    // the real GCN form also covers attached assets and post-issue changes,
-    // neither of which this thesis models.
-    page.drawText(
-      'Bản rút gọn: chỉ thể hiện quyền sử dụng đất. Không bao gồm mục "Tài sản gắn liền với đất" ' +
-        'và mục "Những thay đổi sau khi cấp GCN" của mẫu Thông tư 10/2024/TT-BTNMT.',
-      { x: MARGIN, y: MARGIN - 8, size: 7, font: regular, color: rgb(0.45, 0.45, 0.45) },
-    );
     page.drawText(
       `Phát hành lúc ${receipt.issuedOn} • Bản điện tử này chỉ có giá trị khi đối chiếu được với gốc Merkle on-chain.`,
-      { x: MARGIN, y: MARGIN - 20, size: 7, font: regular, color: rgb(0.45, 0.45, 0.45) },
+      { x: MARGIN, y: MARGIN - 8, size: 7, font: regular, color: rgb(0.45, 0.45, 0.45) },
     );
   }
+}
+
+function drawCentered(page: PDFPage, text: string, y: number, size: number, font: PDFFont): void {
+  const x = (PAGE_WIDTH - font.widthOfTextAtSize(text, size)) / 2;
+  page.drawText(text, { x, y, size, font });
 }
 
 /** DejaVu Sans ships with the `dejavu-fonts-ttf` package — no binary in git. */
