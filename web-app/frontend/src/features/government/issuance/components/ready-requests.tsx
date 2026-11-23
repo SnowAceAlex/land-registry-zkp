@@ -1,6 +1,6 @@
 'use client';
 
-/** The open issuance requests (D87), each withdrawable until the round that publishes it. */
+/** The open issuance requests (D87), grouped by branch; each withdrawable until its round. */
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { type Failure, apiFailure } from '../../api/error-message';
 import { govKeys } from '../../api/hooks';
 import { listIssuanceRequests, withdrawIssuance } from '../api';
+import { groupByOffice } from '../lib/queued';
 
 export function ReadyRequests({
   t,
@@ -71,18 +72,29 @@ export function ReadyRequests({
       ) : ready.data.length === 0 ? (
         <p className="py-2 text-sm text-steel">{t.readyEmpty}</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-hairline bg-white">
-          <table className="w-full min-w-[40rem] text-left text-sm">
+        groupByOffice(ready.data).map((group, _, all) => (
+        <details
+          key={group.officeCode ?? 'none'}
+          open={all.length === 1}
+          className="rounded-lg border border-hairline bg-white"
+        >
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-ink">
+            {format(t.groupSummary, {
+              office: group.officeCode ?? t.unassignedOffice,
+              count: group.requests.length,
+            })}
+          </summary>
+        <div className="overflow-x-auto border-t border-hairline">
+          <table className="w-full min-w-lg text-left text-sm">
             <thead className="border-b border-hairline text-xs text-steel">
               <tr>
                 <th scope="col" className="px-4 py-2 font-medium">{t.columnProperty}</th>
-                <th scope="col" className="px-4 py-2 font-medium">{t.colOffice}</th>
                 <th scope="col" className="px-4 py-2 font-medium">{t.colCreated}</th>
                 <th scope="col" className="px-4 py-2 font-medium">{t.colAction}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-whisper">
-              {ready.data.map((request) => (
+              {group.requests.map((request) => (
                 <tr key={request.id} className="align-top">
                   <td className="px-4 py-3">
                     <span className="font-mono text-xs">{request.propertyId}</span>
@@ -91,9 +103,6 @@ export function ReadyRequests({
                         {t.held}
                       </span>
                     ) : null}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs">
-                    {request.landOfficeCode ?? t.noOffice}
                   </td>
                   <td className="px-4 py-3 text-xs text-steel">
                     {new Date(request.createdAt).toLocaleString()}
@@ -146,6 +155,8 @@ export function ReadyRequests({
             </tbody>
           </table>
         </div>
+        </details>
+        ))
       )}
     </section>
   );
