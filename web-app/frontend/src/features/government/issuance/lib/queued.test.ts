@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { queuedPropertyIds, requestablePicks } from './queued';
+import { groupByOffice, queuedPropertyIds, requestablePicks } from './queued';
 
 const request = (propertyId: string, status: 'READY' | 'PUBLISHED' | 'WITHDRAWN') => ({
   propertyId,
@@ -20,6 +20,32 @@ describe('queuedPropertyIds', () => {
 
   it('is empty before the list has loaded', () => {
     expect(queuedPropertyIds(undefined).size).toBe(0);
+  });
+});
+
+describe('groupByOffice', () => {
+  const ready = (propertyId: string, landOfficeCode: string | null) => ({
+    propertyId,
+    landOfficeCode,
+  });
+
+  it('orders branches by code, unassigned last, and plots numerically inside each', () => {
+    const groups = groupByOffice([
+      ready('10', 'CN02'),
+      ready('7', null),
+      ready('2', 'CN02'),
+      ready('30', 'CN01'),
+      ready('9', 'CN02'),
+    ]);
+    expect(groups.map((g) => [g.officeCode, g.requests.map((r) => r.propertyId)])).toEqual([
+      ['CN01', ['30']],
+      ['CN02', ['2', '9', '10']],
+      [null, ['7']],
+    ]);
+  });
+
+  it('is empty for no requests', () => {
+    expect(groupByOffice([])).toEqual([]);
   });
 });
 

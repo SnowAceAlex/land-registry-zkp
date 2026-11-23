@@ -22,7 +22,6 @@ import { FileCheck2, FileText, LoaderCircle } from 'lucide-react';
 import { useState } from 'react';
 
 import type { Dictionary } from '@/i18n/dictionaries';
-import { format } from '@/i18n/format';
 import type { ProofPackage } from '@land-registry/blockchain/shared/types';
 import { isTimestampFresh, nowUnixTimestamp } from '@land-registry/blockchain/shared/datetime';
 import { publicSignalIndex, rootSignalName } from '@land-registry/blockchain/shared/circuitInputs';
@@ -36,6 +35,7 @@ import { checkAttestation } from '@/lib/status-attestation';
 
 import { CheckList } from './check-list';
 import { DisclosurePanel } from './disclosure-panel';
+import { FileSlot } from './file-slot';
 import { IssuerChainPanel } from './issuer-chain-panel';
 import { type IssuerChainReport, verifyIssuerChain } from '../lib/issuer-chain';
 import { ReceiptFileError, assertReceiptMatchesProof, parseReceiptFile } from '../lib/receipt-file';
@@ -64,6 +64,8 @@ const VERDICT_KEYS = {
 type Mode = 'standard' | 'agency';
 const MODES: readonly Mode[] = ['standard', 'agency'];
 
+type LoadedFile = { name: string; text: string };
+
 export function VerifyWorkbench({
   t,
   errors,
@@ -76,8 +78,8 @@ export function VerifyWorkbench({
   shell: Dictionary['residentShell'];
 }) {
   const [mode, setMode] = useState<Mode>('standard');
-  const [text, setText] = useState('');
-  const [receiptFile, setReceiptFile] = useState<{ name: string; text: string } | null>(null);
+  const [proofFile, setProofFile] = useState<LoadedFile | null>(null);
+  const [receiptFile, setReceiptFile] = useState<LoadedFile | null>(null);
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const [pkg, setPkg] = useState<ProofPackage | null>(null);
   const [proofError, setProofError] = useState<string | null>(null);
@@ -233,10 +235,11 @@ export function VerifyWorkbench({
   }
 
   async function checkProof() {
+    if (!proofFile) return;
     reset();
     setBusy(true);
     try {
-      const parsed = parseProofFile(text);
+      const parsed = parseProofFile(proofFile.text);
       // Agency tab: refuse a bad or mismatched receipt before any check runs.
       let receipt: Receipt | null = null;
       if (mode === 'agency' && receiptFile) {
@@ -259,16 +262,11 @@ export function VerifyWorkbench({
     }
   }
 
-  async function readFile(files: File[], onText: (value: string) => void) {
-    const file = files[0];
-    if (file) onText(await file.text());
-  }
-
-  async function chooseReceipt(files: File[]) {
-    const file = files[0];
-    if (!file) return;
-    setReceiptFile({ name: file.name, text: await file.text() });
-    setReceiptError(null);
+  /** A new file makes the results on screen belong to the old one, so they go. */
+  async function choose(file: File, store: (loaded: LoadedFile) => void) {
+    const loaded = { name: file.name, text: await file.text() };
+    reset();
+    store(loaded);
   }
 
   /** The D30 identity chain from the receipt's issuer block, and nothing else. */
@@ -347,62 +345,38 @@ export function VerifyWorkbench({
         <h2 className="text-sm font-medium tracking-tight text-ink">{t.inputTitle}</h2>
         <p className="max-w-3xl text-xs leading-relaxed text-steel">{t.inputBody}</p>
 
-        <label htmlFor="proof-json" className="block text-sm text-ink">
-          {t.pasteLabel}
-        </label>
-        <textarea
-          id="proof-json"
-          rows={6}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          aria-describedby="proof-json-hint"
-          className="w-full rounded-lg border border-hairline bg-white px-3 py-2 font-mono text-xs text-ink ui-transition focus:border-authority"
-        />
-        <p id="proof-json-hint" className="text-xs text-steel">
-          {t.pasteHint}
-        </p>
+        <div className="max-w-3xl space-y-2">
+          <FileSlot
+            icon={FileText}
+            label={t.proofSlot}
+            fileName={proofFile?.name ?? null}
+            emptyText={t.fileMissing}
+            chooseText={t.chooseFile}
+            changeText={t.changeFile}
+            disabled={busy}
+            invalid={proofError !== null}
+            onFile={(file) => void choose(file, setProofFile)}
+          />
+          {mode === 'agency' ? (
+            <FileSlot
+              icon={FileCheck2}
+              label={t.receiptSlot}
+              fileName={receiptFile?.name ?? null}
+              emptyText={t.fileMissing}
+              chooseText={t.chooseFile}
+              changeText={t.changeFile}
+              disabled={busy}
+              invalid={receiptError !== null}
+              onFile={(file) => void choose(file, setReceiptFile)}
+            />
+          ) : null}
+        </div>
 
         <div className="flex flex-wrap gap-3">
-          <label className={`${buttonStyles.secondary} cursor-pointer`}>
-            <span className="inline-flex items-center gap-2">
-              <FileText className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-              {t.chooseProof}
-            </span>
-            <input
-              type="file"
-              accept=".json,application/json"
-              className="sr-only"
-              onChange={(event) => {
-                const files = [...(event.target.files ?? [])];
-                event.target.value = '';
-                void readFile(files, setText);
-              }}
-            />
-          </label>
-
-          {mode === 'agency' ? (
-            <label className={`${buttonStyles.secondary} cursor-pointer`}>
-              <span className="inline-flex items-center gap-2">
-                <FileCheck2 className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-                {t.chooseReceipt}
-              </span>
-              <input
-                type="file"
-                accept=".json,application/json"
-                className="sr-only"
-                onChange={(event) => {
-                  const files = [...(event.target.files ?? [])];
-                  event.target.value = '';
-                  void chooseReceipt(files);
-                }}
-              />
-            </label>
-          ) : null}
-
           <button
             type="button"
             className={buttonStyles.primary}
-            disabled={busy || text.trim() === '' || (mode === 'agency' && receiptFile === null)}
+            disabled={busy || proofFile === null || (mode === 'agency' && receiptFile === null)}
             onClick={checkProof}
           >
             {busy ? (
@@ -416,17 +390,19 @@ export function VerifyWorkbench({
           </button>
 
           {pkg ? (
-            <button type="button" className={buttonStyles.secondary} onClick={reset}>
+            <button
+              type="button"
+              className={buttonStyles.secondary}
+              onClick={() => {
+                reset();
+                setProofFile(null);
+                setReceiptFile(null);
+              }}
+            >
               {t.startOver}
             </button>
           ) : null}
         </div>
-
-        {mode === 'agency' ? (
-          <p className="text-xs text-steel">
-            {receiptFile ? format(t.receiptLoaded, { name: receiptFile.name }) : t.receiptMissing}
-          </p>
-        ) : null}
 
         {proofError ? (
           <Notice tone="danger" title={t.proofProblem}>
